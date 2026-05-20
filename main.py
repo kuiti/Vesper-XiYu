@@ -34,6 +34,7 @@ app.add_middleware(
 )
 
 # 挂载静态文件目录（头像）
+# makedirs 必须在 mount 之前：StaticFiles 要求目录已存在，否则启动时报错
 os.makedirs("data/avatars", exist_ok=True)
 app.mount("/avatars", StaticFiles(directory="data/avatars"), name="avatars")
 
@@ -89,6 +90,7 @@ def set_window_theme(data: dict):
         if not hwnd:
             hwnd = ctypes.windll.user32.FindWindowW(None, "Vesper")
         if hwnd:
+            # DWMWA_USE_IMMERSIVE_DARK_MODE = 20 来自 Windows SDK dwmapi.h
             DWMWA_USE_IMMERSIVE_DARK_MODE = 20
             val = ctypes.c_int(1 if dark else 0)
             ctypes.windll.dwmapi.DwmSetWindowAttribute(
@@ -99,6 +101,8 @@ def set_window_theme(data: dict):
         pass
     return {"status": "ignored"}
 
+# API 路由前缀黑名单。SPA fallback 依赖此列表拦截 API 路径不返回 index.html。
+# 新增 API 路由时需同步添加对应前缀，否则该路由会被 fallback 吞噬返回 404。
 API_PREFIXES = ("settings", "chat", "todos", "notes", "countdowns", "reminders",
                 "memory", "summary", "search", "rag", "export", "avatar", "location",
                 "migrate", "test", "tts", "stt", "ws", "avatars", "assets", "api")
@@ -111,7 +115,8 @@ if HAS_FRONTEND:
         first = full_path.split("/")[0] if full_path else ""
         if first in API_PREFIXES:
             return JSONResponse({"detail": "Not Found"}, 404)
-        # Prevent path traversal: resolve and verify within FRONTEND_DIR
+        # 路径遍历防护：解析真实路径并确保在 FRONTEND_DIR 内。
+        # os.sep 后缀防止 FRONTEND=/app/frontend 被 /app/frontend-backup/../../etc 绕过
         raw = os.path.join(FRONTEND_DIR, full_path)
         real = os.path.realpath(raw)
         if not real.startswith(os.path.realpath(FRONTEND_DIR) + os.sep):
@@ -124,6 +129,8 @@ if HAS_FRONTEND:
 async def websocket_endpoint(websocket: WebSocket):
     await chat_websocket(websocket)
 
+# 注意：此方法通过 connect_ex 扫描端口，存在 TOCTOU 竞态条件。
+# launcher.py 的 allocate_port() 通过 bind(port=0) 让 OS 分配是正确方案。
 def find_free_port(start=8001, end=8010):
     import socket
     for port in range(start, end + 1):

@@ -13,7 +13,9 @@ DB_FILE = os.path.join("data", "vesper.db")
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
+    # WAL 模式支持 WebSocket 线程并发读写不互锁
     conn.execute("PRAGMA journal_mode=WAL")
+    # busy_timeout=3000：写锁等待最多 3 秒再放弃，避免并发写入立即报错
     conn.execute("PRAGMA busy_timeout=3000")
     return conn
 
@@ -92,8 +94,9 @@ def init_db():
         )
     ''')
     # FTS5 全文搜索表
+    # unicode61 分词器正确处理中英混合文本（按 Unicode 边界分词）
     cursor.execute('''
-        CREATE VIRTUAL TABLE IF NOT EXISTS chat_fts 
+        CREATE VIRTUAL TABLE IF NOT EXISTS chat_fts
         USING fts5(content, role, timestamp, tokenize='unicode61')
     ''')
     # 触发器：插入时同步
@@ -220,6 +223,7 @@ def delete_chat_history_between(start_iso: str, end_iso: str):
 def search_chat_messages(keyword: str, limit: int = 20):
     conn = get_db_connection()
     cursor = conn.cursor()
+    # FTS5 MATCH 不支持标准参数化查询，必须手动转义双引号防止注入和语法错误
     safe_keyword = '"' + keyword.replace('"', '""') + '"'
     cursor.execute('''
         SELECT rowid, content, role, timestamp
@@ -367,6 +371,7 @@ def delete_reminder(reminder_id):
     conn.close()
 
 # ========== presets ==========
+# 预设中的敏感键，保存/加载时静默过滤以保护 API 密钥不泄露
 _SENSITIVE_KEYS = {"api_key", "amap_key"}
 
 
@@ -444,6 +449,7 @@ def get_active_keypoints():
         return []
 
 def merge_keypoints(old_list, new_list, max_items=10):
+    # 新关键点优先（new_list + old_list），最多保留 max_items 条，精确文本去重
     combined = new_list + old_list
     seen = set()
     unique = []
@@ -465,6 +471,7 @@ def get_messages_since_last_summary():
         start_time = None
     conn = get_db_connection()
     cursor = conn.cursor()
+    # 无上次摘要时获取全部消息（首次运行场景），否则只获取新消息
     if start_time:
         cursor.execute("SELECT role, content, timestamp FROM chat_history WHERE timestamp > ? ORDER BY id", (start_time,))
     else:

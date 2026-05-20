@@ -15,6 +15,7 @@ _model_loaded = False
 
 def get_embedding_model():
     global _embedding_model
+    # 懒加载：首次调用触发模型下载和加载（~500MB），后续调用复用缓存实例
     if _embedding_model is None:
         _embedding_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
     return _embedding_model
@@ -22,6 +23,7 @@ def get_embedding_model():
 def ensure_model_loaded_async():
     """后台线程加载模型，不阻塞主线程"""
     global _model_loaded, _model_loading
+    # 双重检查锁定：CPython GIL 使其在实践中线程安全，无竞态
     if _model_loaded or _model_loading:
         return
     _model_loading = True
@@ -46,6 +48,7 @@ def get_collection(collection_name="chat_memory"):
     global _client_cache
     if _client_cache is None:
         _client_cache = chromadb.PersistentClient(path=CHROMA_PATH)
+    # 余弦距离用于语义搜索：文本嵌入在高维空间中的方向比欧氏距离更准确地反映语义相似度
     return _client_cache.get_or_create_collection(
         name=collection_name,
         metadata={"hnsw:space": "cosine"}
@@ -54,6 +57,7 @@ def get_collection(collection_name="chat_memory"):
 def add_message_vector(msg_id: str, text: str, metadata: dict = None):
     if not is_model_ready():
         return
+    # 过滤短消息噪声：少于5个字符的消息（单字回复、"嗯"、"好的"等）不建立向量索引
     if not text or len(text.strip()) < 5:
         return
     model = get_embedding_model()
@@ -92,6 +96,7 @@ def rebuild_all_vectors(progress_callback=None):
     if not messages:
         return
     client = chromadb.PersistentClient(path=CHROMA_PATH)
+    # 破坏性操作：删除集合并重建。若中途失败（OOM/模型加载失败）将丢失全部向量索引
     try:
         client.delete_collection("chat_memory")
     except:

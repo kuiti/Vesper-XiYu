@@ -18,7 +18,9 @@ from core.vector_store import add_message_vector, search_similar, is_model_ready
 from datetime import datetime
 import random as _random
 
-# 提醒规则（包含重复间隔，分钟）
+# 提醒规则：advance_minutes=提前多久开始提醒，repeat_interval=重复提醒间隔(分钟, None=只一次)
+# level 7(强制): 目标时间后仍触发(now>target不跳过)，每30分钟重复
+# level 1-6: 只在目标时间前 advance_minutes 窗口内触发
 REMINDER_RULES = {
     7: {"name": "强制", "advance_minutes": 0, "repeat_interval": 30},       # 每30分钟
     6: {"name": "重要", "advance_minutes": 21*24*60, "repeat_interval": 1440}, # 每天
@@ -41,6 +43,7 @@ def check_reminders():
             target = datetime.fromisoformat(r["target_time"])
         except ValueError:
             continue
+        # level 7(强制)即使过了目标时间也继续提醒，其他级别过期跳过
         if now > target and r.get("level") != 7:
             continue
         minutes_left = (target - now).total_seconds() / 60
@@ -79,6 +82,7 @@ _summary_lock = threading.Lock()
 
 def generate_and_save_summary():
     """生成并保存新的摘要（后台线程）"""
+    # 非阻塞获取锁：如果已有摘要任务在运行则静默跳过，避免堆积
     if not _summary_lock.acquire(blocking=False):
         return
     try:
@@ -109,6 +113,7 @@ def generate_and_save_summary():
         result = ""
         result = resp.json()["choices"][0]["message"]["content"]
         result = result.strip()
+        # 剥离 LLM 输出的 markdown 代码块标记（格式不稳定，可能不带）
         for prefix in ['```json', '```']:
             if result.startswith(prefix):
                 result = result[len(prefix):].strip()
@@ -182,7 +187,8 @@ async def chat_websocket(websocket: WebSocket):
             # ─── 强制命令（不更新聊天时间、不进入记录、不被 AI 记忆） ───
             if user_message.startswith("/welcome"):
                 try:
-                    # 临时把 last_chat 设为旧时间，绕过 generate_greeting 的 hours_gone 检查
+                    # 临时将 last_chat 设为旧时间绕过 generate_greeting 的 hours_gone 检查。
+                    # 备份→覆盖→生成→恢复流程存在风险：若中间抛异常，原始数据可能丢失。
                     import os as _os2
                     lc_file = "data/last_chat.json"
                     lc_backup = None
@@ -316,6 +322,7 @@ async def chat_websocket(websocket: WebSocket):
                 messages.append({"role": "user", "content": user_message})
 
                 headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+                # 事实型意图用低温(0.3)减少幻觉，创意对话用高温(0.65)增加变化
                 tool_temp = 0.3 if intent_type in ("weather", "location", "search") else 0.65
                 payload = {
                     "model": "deepseek-chat",
@@ -325,7 +332,7 @@ async def chat_websocket(websocket: WebSocket):
                     "stream": True
                 }
 
-                # 联网搜索：启用 DeepSeek 内置搜索
+                # DeepSeek 专有参数 search=True，非 OpenAI 标准，切换 API 提供商时需移除此字段
                 enable_ds_search = get_config("enable_deepseek_search", True)
                 if enable_ds_search and intent_type in ("search",):
                     payload["search"] = True

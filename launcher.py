@@ -6,7 +6,10 @@ import sys, os, threading, socket, tkinter, atexit, ctypes
 if getattr(sys, 'frozen', False):
     BASE_DIR = os.path.dirname(sys.executable)
     MEIPASS = getattr(sys, '_MEIPASS', None)
-    # 将打包的内置文件从临时解压目录复制到 exe 所在目录
+    # PyInstaller 打包后 __file__ 不可靠，用可执行文件位置
+    # MEIPASS 是 PyInstaller 将打包数据解压到的临时目录（--onedir 则为 _internal/ 子目录）
+    # 仅在目标不存在时复制，防止覆盖用户数据（后续启动跳过）
+    # certifi SSL 变量对打包版 HTTPS 功能必需：无此设置所有 API 调用将因 SSL 错误失败
     if MEIPASS:
         import shutil as _shutil
         for _item in ['frontend', 'data', 'config.json']:
@@ -46,13 +49,15 @@ _log.info(f'BASE_DIR={BASE_DIR} frozen={getattr(sys, "frozen", False)}')
 _mutex_name = "Global\\VesperAI_SingleInstance_" + os.path.abspath(BASE_DIR).replace("\\", "_").replace(":", "")
 try:
     _mutex = ctypes.windll.kernel32.CreateMutexW(None, False, _mutex_name)
-    if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
+    if ctypes.windll.kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS (WinError.h)
         sys.exit(0)
 except Exception:
     pass  # 非 Windows 或权限不足，跳过单实例检查
 
 def allocate_port():
-    """由 OS 分配空闲端口（无竞态）"""
+    """由 OS 分配空闲端口（无竞态）。
+    通过 bind(port=0) 让操作系统原子性地分配空闲端口，
+    优于 main.py find_free_port 的 connect_ex 扫描方式。"""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
@@ -65,7 +70,8 @@ def start_backend(port):
         _log.error(f'Backend import failed: {e}')
         raise
     os.makedirs("data", exist_ok=True)
-    # frozen 模式 main.py 从 _MEIPASS 服务，开发模式从 BASE_DIR
+    # frozen 模式 main.py 从 _MEIPASS 服务静态文件，config.js 必须写到同一目录
+    # 开发模式 main.py 从 BASE_DIR/frontend 服务，两者必须一致否则端口配置失效
     _meipass = getattr(sys, '_MEIPASS', None)
     frontend = os.path.join(_meipass if _meipass else BASE_DIR, "frontend")
     if os.path.isdir(frontend):
@@ -99,7 +105,8 @@ os.environ["WEBVIEW2_USER_DATA_FOLDER"] = os.path.join(BASE_DIR, "data", "webvie
 os.makedirs(os.environ["WEBVIEW2_USER_DATA_FOLDER"], exist_ok=True)
 
 port = allocate_port()
-# 在后台线程启动前导入 main，避免导入错误被静默吞噬
+# 在后台线程启动前导入 main，避免导入错误被守护线程静默吞噬
+# （守护线程中的异常不会打印 traceback，只会导致窗口空白无提示）
 try:
     from main import app
 except Exception as e:

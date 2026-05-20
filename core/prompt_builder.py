@@ -30,6 +30,8 @@ def build_system_prompt(current_time_str, emotion="neutral", user_message="", ra
     
     if custom_prompt and custom_prompt.strip():
         personality_part = custom_prompt.strip()
+        # 基于子字符串的启发式：若用户已在自定义提示中提及表情/感叹号则跳过追加，
+        # 避免向已有指令添加冗余或冲突的限制。依赖中文文本匹配。
         if "表情" not in personality_part and "感叹号" not in personality_part:
             if not allow_emotion:
                 personality_part += " 不要使用感叹号，不要使用表情符号。"

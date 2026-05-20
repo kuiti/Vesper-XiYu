@@ -332,7 +332,7 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
     quoteMessage(msg) { this.quoteMsg = msg; this.showContextMenu = false; this.$nextTick(() => this.$refs.inputEl?.focus()) },
     async deleteMessage(msg) { if (!msg.id) return; if (!confirm('删除这条消息？')) return; try { await api.delete(`/chat/manage/message/${msg.id}`); await this.loadHistory(); this.showContextMenu = false } catch (err) { console.error('删除失败', err) } },
     notifyReminder(data) { if (Notification.permission === 'granted') { new Notification(`${data.level_name}提醒`, { body: `${data.content}\n截止 ${data.target_time}`, icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🔔</text></svg>' }) } },
-    adjustFontSize(delta) { this.chatFontSize = Math.min(20, Math.max(10, this.chatFontSize + delta)); document.querySelector('.msg-list').style.fontSize = this.chatFontSize + 'px'; this.updateGlobalConfig('chat_font_size', this.chatFontSize) },
+    adjustFontSize(delta) { this.chatFontSize = Math.min(20, Math.max(10, this.chatFontSize + delta)); const el = this.$refs.messagesContainer; if (el) el.style.fontSize = this.chatFontSize + 'px'; this.updateGlobalConfig('chat_font_size', this.chatFontSize) },
     async exportChat() { try { const res = await api.get('/export/chat?format=txt'); const blob = new Blob([res.data.content], { type: 'text/plain' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = res.data.filename; a.click() } catch (err) { alert('导出失败') } },
     setTheme(v) { this.themeLocal = v; this.currentTheme = v; document.documentElement.setAttribute('data-theme', v); const meta = document.getElementById('theme-color-meta'); if (meta) meta.content = v === 'light' ? '#f5f6fa' : '#0d1117'; api.post('/api/window-theme', { dark: v !== 'light' }).catch(()=>{}); this.updateGlobalConfig('theme', v) },
     updateColorField(key, hex) { if (/^#[0-9a-fA-F]{6}$/.test(hex)) { this.colors[key] = hex; this.updateGlobalConfig(this.colorFields.find(f=>f.key===key)?.configKey, hex) } },
@@ -373,7 +373,7 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
           if (!this.schedId) this.schedulePop()
         } else if (data.type === 'done') {
           this.isStreaming = false
-        } else if (data.type === 'greeting') { this.messages.push({ role: 'assistant', content: data.content, timestamp: new Date().toISOString() }); this.totalMessages++; this.scrollToBottom() }
+        } else if (data.type === 'greeting') { this.messages.push({ id: 'g_' + Date.now(), role: 'assistant', content: data.content, timestamp: new Date().toISOString() }); this.totalMessages++; this.scrollToBottom() }
         else if (data.type === 'reminder_count') {
           this.activeReminderCount = data.count
         }
@@ -385,7 +385,7 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
           this.notifyReminder(d)
           if (d.level < 6) { setTimeout(() => { this.dismissReminder(d._id) }, 8000) }
         }
-        else if (data.type === 'error') { this.messages.push({ role: 'assistant', content: '错误：' + data.content, timestamp: new Date().toISOString() }); this.isStreaming = false; this.stopTypewriter() }
+        else if (data.type === 'error') { this.messages.push({ id: 'e_' + Date.now(), role: 'assistant', content: '错误：' + data.content, timestamp: new Date().toISOString() }); this.isStreaming = false; this.stopTypewriter() }
       }
       this.ws.onerror = () => { this.wsReady = false; this.stopTypewriter() }
       this.ws.onclose = () => {
@@ -402,13 +402,14 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
       if (this.schedId) { clearTimeout(this.schedId); this.schedId = null }
       this.userScrolledUp = false
       const userMsg = this.inputText.trim()
-      this.messages.push({ role: 'user', content: userMsg, timestamp: new Date().toISOString() })
+      this.messages.push({ id: 'u_' + Date.now(), role: 'user', content: userMsg, timestamp: new Date().toISOString() })
       this.totalMessages++; this.inputText = ''; this.scrollToBottom(); this.isStreaming = true; this.streamingSentence = ''
       this.ws.send(JSON.stringify({ message: userMsg, history: this.messages.slice(-20).map(m => ({ role: m.role, content: m.content })) }))
       this.$nextTick(() => { const el = this.$refs.inputEl; if (el) { el.style.height = 'auto'; el.focus() } })
     },
     autoResizeInput() {
       const el = this.$refs.inputEl; if (!el) return
+      el.style.height = ''  // 重置高度确保内容变少时能缩小
       const target = Math.min(el.scrollHeight, 120)
       if (Math.abs(el.offsetHeight - target) > 2) {
         el.style.height = target + 'px'
@@ -430,7 +431,7 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
         const m = this.pendingReply.match(/^([\s\S]*?(?:[。！？!?]|\.{3,}|…|～))/)
         if (m && m[1].trim().length >= 2) {
           const sentence = m[1].trim()
-          this.messages.push({ role: 'assistant', content: sentence, timestamp: new Date().toISOString() }); this.totalMessages++
+          this.messages.push({ id: 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), role: 'assistant', content: sentence, timestamp: new Date().toISOString() }); this.totalMessages++
           this.pendingReply = this.pendingReply.slice(m[1].length)
           this.scrollToBottom()
           const delay = Math.min(Math.max(300, 250 + sentence.length * 30), 2000)
@@ -457,6 +458,7 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
     async testDeepSeek() { this.testing.ds = true; this.testing.dsStatus = ''; this.testing.dsMsg = ''; try { const res = await api.get('/test/deepseek'); this.testing.dsStatus = res.data.ok ? 'ok' : 'fail'; this.testing.dsMsg = res.data.message } catch (err) { this.testing.dsStatus = 'fail'; this.testing.dsMsg = '请求失败' } finally { this.testing.ds = false } },
     async testWeather() { this.testing.wt = true; this.testing.wtStatus = ''; this.testing.wtMsg = ''; try { const res = await api.get('/test/weather'); this.testing.wtStatus = res.data.ok ? 'ok' : 'fail'; this.testing.wtMsg = res.data.ok ? res.data.report : res.data.message } catch (err) { this.testing.wtStatus = 'fail'; this.testing.wtMsg = '请求失败' } finally { this.testing.wt = false } },
     async testSearch() { this.testing.se = true; this.testing.seStatus = ''; this.testing.seMsg = ''; try { const res = await api.get('/test/search'); this.testing.seStatus = res.data.ok ? 'ok' : 'fail'; this.testing.seMsg = res.data.message } catch (err) { this.testing.seStatus = 'fail'; this.testing.seMsg = '请求失败' } finally { this.testing.se = false } },
+    // IP 连通性测试（当前仅内部调用，未绑定 UI 按钮）
     async testIp() { this.testing.ip = true; this.testing.ipStatus = ''; this.testing.ipMsg = ''; try { const res = await api.get('/test/ip'); this.testing.ipStatus = res.data.ok ? 'ok' : 'fail'; this.testing.ipMsg = res.data.message; if (res.data.ok) { this.ipCityShort = res.data.message; this.loadIpLocation() } } catch (err) { this.testing.ipStatus = 'fail'; this.testing.ipMsg = '请求失败' } finally { this.testing.ip = false } },
     async locateAndFill() { this.locating = true; this.testing.ipStatus = ''; this.testing.ipMsg = ''; try { const res = await api.get('/test/ip'); if (res.data.ok) { this.testing.ipStatus = 'ok'; this.testing.ipMsg = res.data.message; await this.loadIpLocation() } else { this.testing.ipStatus = 'fail'; this.testing.ipMsg = '定位服务不可用，请手动选城市' } } catch (err) { this.testing.ipStatus = 'fail'; this.testing.ipMsg = '请求失败' } finally { this.locating = false } },
     preciseLocate() {
@@ -507,10 +509,9 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
 .nav-icons button { background: none; border: none; cursor: pointer; opacity: .5; transition: all .15s; padding: 8px 10px; border-radius: 6px; color: #8899aa; display: flex; align-items: center; gap: 10px; font-size: 13px; white-space: nowrap; width: 100%; }
 .nav-icons button:hover { opacity: 1; color: #ecf0f1; background: rgba(255,255,255,.05); }
 .nav-label { transition: opacity .15s; overflow: hidden; }
-.nav-settings { margin-top: auto !important; background: none; border: none; cursor: pointer; opacity: .5; transition: all .15s; padding: 8px 10px; border-radius: 6px; color: #8899aa; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.nav-settings { background: none; border: none; cursor: pointer; opacity: .5; transition: all .15s; padding: 8px 10px; border-radius: 6px; color: #8899aa; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.nav-icons + .nav-settings { margin-top: auto; }
 .nav-settings:hover { opacity: 1; color: #ecf0f1; background: rgba(255,255,255,.05); }
-.reminder-btn { position: relative; }
-.badge { position: absolute; top: 2px; right: 4px; min-width: 16px; height: 16px; background: #e74c3c; color: #fff; border-radius: 8px; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
 .sidebar-toggle { background: none; border: none; cursor: pointer; padding: 10px; color: #555; display: flex; justify-content: center; border-top: 1px solid rgba(255,255,255,.05); transition: color .15s; }
 .sidebar-toggle:hover { color: #999; }
 
@@ -546,11 +547,15 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
 .ctx-item:hover { background: rgba(255,255,255,.06); }
 .ctx-danger { color: #e74c3c; }
 .ctx-danger:hover { background: rgba(231,76,60,.15); }
-.msg-list, .settings-content, .modal-bd, .card-compact { scrollbar-width: none; }
+.msg-list, .settings-content, .modal-bd, .card-compact { scrollbar-width: thin; }
 .msg-list::-webkit-scrollbar,
 .settings-content::-webkit-scrollbar,
 .modal-bd::-webkit-scrollbar,
-.card-compact::-webkit-scrollbar { display: none; }
+.card-compact::-webkit-scrollbar { width: 5px; }
+.msg-list::-webkit-scrollbar-thumb,
+.settings-content::-webkit-scrollbar-thumb,
+.modal-bd::-webkit-scrollbar-thumb,
+.card-compact::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 3px; }
 
 /* ====== Messages ====== */
 .msg { display: flex; gap: 10px; max-width: 75%; }
@@ -578,18 +583,6 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
 .btn-send { padding: 10px 20px; background: var(--p); color: #fff; border: none; border-radius: 20px; cursor: pointer; font-size: 14px; font-weight: 600; transition: opacity .15s; }
 .btn-send:hover:not(:disabled) { opacity: .85; }
 .btn-send:disabled { opacity: .4; cursor: default; }
-
-.btn-voice-toggle { padding: 8px 12px; background: transparent; color: #888; border: 1px solid rgba(255,255,255,.1); border-radius: 20px; cursor: pointer; font-size: 13px; transition: all .15s; }
-.btn-voice-toggle:hover { color: var(--p); border-color: var(--p); }
-
-.btn-hold-speak { flex: 1; padding: 12px 20px; background: #1e2a3a; color: #ccc; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; cursor: pointer; font-size: 14px; user-select: none; transition: all .1s; min-height: 42px; display: flex; align-items: center; justify-content: center; }
-.btn-hold-speak:active { background: var(--p); color: #fff; border-color: var(--p); }
-
-.btn-play-msg { display: inline-block; margin-left: 6px; color: #888; font-size: 11px; cursor: pointer; padding: 2px 6px; border: 1px solid rgba(255,255,255,.08); border-radius: 4px; user-select: none; }
-.btn-play-msg:hover { color: var(--p); border-color: var(--p); }
-
-:root[data-theme="light"] .btn-hold-speak { background: #f5f6fa; color: #333; border-color: #ddd; }
-:root[data-theme="light"] .btn-voice-toggle { color: #999; border-color: #ddd; }
 
 /* ====== Modals (small tools) ====== */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); backdrop-filter: blur(6px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
@@ -762,8 +755,9 @@ input, select, textarea { font-family: inherit; }
 .reminder-popup-close { background: none; border: none; color: #888; cursor: pointer; padding: 8px; font-size: 14px; align-self: flex-start; }
 .reminder-popup-close:hover { color: #fff; }
 
-html, body { scrollbar-width: none; }
-html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+html, body { scrollbar-width: thin; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { width: 5px; }
+html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 3px; }
 
 /* 滑入动画 */
 .slide-enter-active { transition: all .3s ease-out; }

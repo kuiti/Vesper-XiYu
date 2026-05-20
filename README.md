@@ -1,101 +1,160 @@
-Vesper —— 你的本地 AI 桌面伴侣
-================================
+# Vesper —— 本地 AI 陪伴桌面应用
 
-Vesper 是一个开源的本地 AI 桌面聊天应用。它运行在你的 Windows 电脑上，
-无需云端服务（除 AI 模型 API 外），所有对话数据完全由你掌控。
+Vesper 是一个开源的本地 AI 桌面聊天应用，使用 Python + Vue 构建，数据完全本地掌控。
 
+## 环境要求
 
-## 特性
+- **Windows 10/11**（macOS 也可运行）
+- **Python 3.10+** → [官网下载](https://www.python.org/downloads/)
+- **Edge WebView2 Runtime** → Win11 已内置，Win10 点此[安装](https://developer.microsoft.com/microsoft-edge/webview2/)
+- **Git** → [下载](https://git-scm.com/download/win)
 
-  ● 本地运行 —— 自带 Python 运行时，下载即用，无需安装任何环境
-  ● 流式对话 —— AI 回复逐句呈现，像真人聊天一样自然
-  ● 三层记忆 —— 短期上下文 + 对话摘要 + 向量检索，AI 记得你说过什么
-  ● 工具集成 —— 天气查询、IP 定位、联网搜索、待办、笔记、提醒
-  ● 深/亮双主题 —— 可自定义配色，聊天气泡风格
-  ● 数据可移植 —— 一键导出/导入全部聊天记录
-  ● 离线可用 —— 除 AI 模型 API 外，所有功能本地运行
+## 安装运行（保姆级）
 
+### 第一步：克隆项目
 
-## 技术栈
+打开终端（PowerShell 或 CMD），执行：
 
-  ● 后端：Python 3.10 + FastAPI + SQLite + ChromaDB 向量数据库
-  ● 前端：Vue 3 + Vite
-  ● 桌面壳：pywebview (Edge WebView2)
-  ● AI 模型：DeepSeek Chat API（可替换为任何 OpenAI 兼容接口）
-  ● 嵌入模型：paraphrase-multilingual-MiniLM-L12-v2（本地运行）
+```bash
+git clone https://github.com/kuiti/Vesper.git
+cd Vesper
+```
 
+### 第二步：创建虚拟环境
 
-## 快速开始
+```bash
+python -m venv venv
+```
 
-  1. 下载 Vesper.exe
-  2. 双击运行
-  3. 在设置中填入 DeepSeek API Key（或任意 OpenAI 兼容 API）
-  4. 开始聊天
+激活虚拟环境：
 
+```bash
+# Windows PowerShell:
+venv\Scripts\activate
+
+# Windows CMD:
+venv\Scripts\activate.bat
+```
+
+### 第三步：安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+> `sentence-transformers` 首次运行会自动下载模型（~100MB），需等待几分钟。
+
+### 第四步：配置 API Key
+
+用记事本打开 `config.json`，填入你的 API Key：
+
+```json
+{
+  "api_key": "你的密钥填在这里",
+  ...
+}
+```
+
+支持的 API（OpenAI 兼容接口均可）：
+- [DeepSeek](https://platform.deepseek.com/) — 便宜好用
+- [MiMo](https://100t.xiaomimimo.com/) — 100T token 免费额度
+- [OpenAI](https://platform.openai.com/)
+- 任何兼容 `/v1/chat/completions` 的接口
+
+### 第五步：启动
+
+```bash
+python launcher.py
+```
+
+首次启动会自动创建数据库、下载模型。窗口弹出后即可使用。
+
+> 如果窗口没出来，会自动用浏览器打开 `http://127.0.0.1:XXXX/`。
+
+---
+
+## 功能一览
+
+| 功能 | 说明 |
+|------|------|
+| 流式聊天 | AI 回复逐句呈现，支持 Markdown |
+| 三层记忆 | 短期上下文 + 对话摘要 + 向量检索 |
+| 待办事项 | 创建、管理待办 |
+| 笔记 | 记录笔记，支持全文搜索 |
+| 倒计时 | 事件倒计时 |
+| 提醒 | 定时提醒 |
+| 联网搜索 | DuckDuckGo 搜索 |
+| 天气 | 高德天气（需配置 amap_key） |
+| 数据导出 | 一键备份/恢复全部数据 |
+| 暗色主题 | 可自定义配色 |
+
+---
+
+## 从源码构建前端
+
+如果你修改了前端代码（`frontend-src/`），需要重新构建：
+
+```bash
+cd frontend-src
+npm install
+npm run build
+```
+
+构建产物在 `dist/`，将其内容复制到 `frontend/` 替换即可。
+
+---
 
 ## 项目结构
 
-  vesper_backend/
-  ├── main.py           # FastAPI 入口
-  ├── launcher.py       # 桌面启动器
-  ├── api/              # 17 个 API 路由模块
-  │   ├── chat.py       # WebSocket 流式聊天
-  │   ├── history.py    # 聊天记录
-  │   ├── settings.py   # 设置管理
-  │   ├── memory.py     # 手动记忆
-  │   ├── summary.py    # 对话摘要
-  │   ├── rag.py        # 向量索引
-  │   ├── search.py     # 全文搜索
-  │   ├── todos.py      # 待办事项
-  │   ├── notes.py      # 笔记
-  │   ├── reminders.py  # 提醒
-  │   ├── location.py   # 天气/定位
-  │   └── ...
-  ├── core/
-  │   ├── db.py         # SQLite 数据库
-  │   ├── vector_store.py # ChromaDB 向量存储
-  │   └── prompt_builder.py # 提示词构建
-  ├── frontend/         # 前端静态文件
-  └── config.json       # 配置文件
+```
+vesper_backend/
+├── launcher.py          # 桌面启动器（入口）
+├── main.py              # FastAPI 后端
+├── config.json          # 用户配置
+├── requirements.txt     # Python 依赖列表
+├── README.md            # 本文件
+├── api/                 # API 路由（17个模块）
+│   ├── chat.py          # WebSocket 聊天
+│   ├── memory.py        # 记忆系统
+│   ├── rag.py           # 向量检索
+│   └── ...
+├── core/                # 核心模块
+│   ├── db.py            # SQLite 数据库
+│   ├── prompt_builder.py # 提示词构建
+│   └── vector_store.py  # ChromaDB 向量存储
+├── frontend/            # 前端静态文件（构建产物）
+└── frontend-src/        # 前端源码（Vue 3 + Vite）
+```
 
-  vesper_frontend/
-  └── src/
-      ├── App.vue       # 主界面
-      ├── api.js        # API 封装
-      └── components/   # 子组件
+---
 
+## 常见问题
 
-## 配置
+**Q: 提示 `ModuleNotFoundError: No module named 'xxx'`**
 
-  编辑 config.json 或通过设置面板修改：
+A: 没装依赖或虚拟环境没激活。确认执行了 `pip install -r requirements.txt`。
 
-  {
-    "api_key": "",           // DeepSeek API Key
-    "model_mode": "auto",    // 模型模式
-    "personality": {         // AI 性格
-      "tone": "冷静",        // 语气：冷静/活泼/温柔/毒舌/傲娇
-      "length": "短",        // 回复长度：极短/短/中等/长/详细
-      "recall_past": "从不"  // 回忆过去对话
-    },
-    "custom_system_prompt": ""  // 自定义人设（留空使用默认）
-  }
+**Q: 发送消息后没回复**
 
+A: 检查 `config.json` 中 `api_key` 是否正确，网络是否通畅。
+
+**Q: 模型下载失败或很慢**
+
+A: 设置 HuggingFace 镜像：
+```bash
+set HF_ENDPOINT=https://hf-mirror.com
+```
+
+**Q: WebView2 报错**
+
+A: Win10 需要手动安装 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。
+
+**Q: 端口被占用**
+
+A: 程序自动分配空闲端口，一般不会冲突。
+
+---
 
 ## 开源协议
 
-  MIT License —— 你可以自由使用、修改、分发本项目。
-  只需保留原始版权声明。
-
-
-## 致谢
-
-  Vesper 从 "佐仓" (Sakura) 项目分叉而来，去除了语音模块和所有个人信息，
-  全面重命名为 Vesper，保持了一个干净的开源起点。
-
-  本项目使用以下开源技术：
-  - FastAPI (MIT)
-  - Vue.js (MIT)
-  - ChromaDB (Apache 2.0)
-  - sentence-transformers (Apache 2.0)
-  - pywebview (BSD)
-  - DeepSeek API
+MIT License — 自由使用、修改、分发。

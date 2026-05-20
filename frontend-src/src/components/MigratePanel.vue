@@ -60,7 +60,7 @@ export default {
         const a = document.createElement('a')
         a.href = url
         const now = new Date().toISOString().slice(0,10)
-        a.download = `sakura_backup_${now}.json`
+        a.download = `vesper_backup_${now}.json`
         a.click()
         URL.revokeObjectURL(url)
       } catch (err) {

@@ -5,6 +5,21 @@ import sys, os, threading, socket, tkinter, atexit, ctypes
 # PyInstaller 打包后 __file__ 不可靠，用可执行文件位置
 if getattr(sys, 'frozen', False):
     BASE_DIR = os.path.dirname(sys.executable)
+    MEIPASS = getattr(sys, '_MEIPASS', None)
+    # 将打包的内置文件从临时解压目录复制到 exe 所在目录
+    if MEIPASS:
+        import shutil as _shutil
+        for _item in ['frontend', 'data', 'config.json']:
+            _src = os.path.join(MEIPASS, _item)
+            _dst = os.path.join(BASE_DIR, _item)
+            if os.path.exists(_src) and not os.path.exists(_dst):
+                try:
+                    if os.path.isdir(_src):
+                        _shutil.copytree(_src, _dst)
+                    else:
+                        _shutil.copy2(_src, _dst)
+                except Exception:
+                    pass
     try:
         import certifi
         os.environ['SSL_CERT_FILE'] = certifi.where()
@@ -18,6 +33,14 @@ try:
     os.chdir(BASE_DIR)
 except OSError:
     pass
+
+# --- 启动日志 ---
+import logging as _log
+_log.basicConfig(
+    filename=os.path.join(BASE_DIR, 'data', 'launcher.log'),
+    level=_log.INFO, format='%(asctime)s %(levelname)s %(message)s'
+)
+_log.info(f'BASE_DIR={BASE_DIR} frozen={getattr(sys, "frozen", False)}')
 
 # ─── 单实例锁（Windows 命名互斥体） ───
 _mutex_name = "Global\\VesperAI_SingleInstance_" + os.path.abspath(BASE_DIR).replace("\\", "_").replace(":", "")
@@ -35,10 +58,16 @@ def allocate_port():
         return s.getsockname()[1]
 
 def start_backend(port):
-    import uvicorn
-    from main import app
+    try:
+        import uvicorn
+        from main import app
+    except Exception as e:
+        _log.error(f'Backend import failed: {e}')
+        raise
     os.makedirs("data", exist_ok=True)
-    frontend = os.path.join(BASE_DIR, "frontend")
+    # frozen 模式 main.py 从 _MEIPASS 服务，开发模式从 BASE_DIR
+    _meipass = getattr(sys, '_MEIPASS', None)
+    frontend = os.path.join(_meipass if _meipass else BASE_DIR, "frontend")
     if os.path.isdir(frontend):
         with open(os.path.join(frontend, "config.js"), "w", encoding="utf-8") as f:
             f.write(f"window.__VESPER_CONFIG__ = {{ backendPort: {port} }};")
@@ -183,6 +212,7 @@ try:
     else:
         webview.start()
 except Exception as e:
+    _log.error(f'Window start failed: {e}')
     # WebView2 运行时未安装 → 回退到系统浏览器
     import webbrowser
     print(f"WebView2 启动失败: {e}，回退到浏览器")

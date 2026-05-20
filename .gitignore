@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+data/
+dist/
+build/
+*.spec
+node_modules/
+.codebuddy/
+.claude/
+*.db
+.env

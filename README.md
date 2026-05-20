@@ -2,7 +2,16 @@
 
 Vesper 是一个开源的本地 AI 桌面聊天应用，使用 Python + Vue 构建，数据完全本地掌控。
 
-## 环境要求
+> **不想装 Python？** 下载[打包版](packaged/README.md)解压即用，零环境依赖。
+
+## 快速选择
+
+| 你想要的 | 用哪个 |
+|----------|--------|
+| 开箱即用，不折腾环境 | [**打包版**](packaged/README.md) → [下载](https://github.com/kuiti/Vesper/releases) |
+| 改代码、二次开发 | **源码版** → 看下面教程 |
+
+## 环境要求（源码版）
 
 - **Windows 10/11**（macOS 也可运行）
 - **Python 3.10+** → [官网下载](https://www.python.org/downloads/)

@@ -11,14 +11,14 @@
     <div class="layout">
       <nav class="sidebar" :class="{ collapsed: sidebarCollapsed }">
         <div class="nav-icons">
-          <button @click="openTodoModal" title="待办"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="22" height="22" rx="2"/><path d="M8 12l3 3 5-5"/></svg><span class="nav-label">待办</span></button>
-          <button @click="openNoteModal" title="笔记"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="nav-label">笔记</span></button>
-          <button @click="showHistoryPanel = true" title="历史"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 12"/><path d="M12 2a10 10 0 0 1 0 20"/></svg><span class="nav-label">历史</span></button>
-          <button @click="scrollToBottom(true)" title="回到底部"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg><span class="nav-label">底部</span></button>
+          <button @click="openTodoModal" title="待办"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="22" height="22" rx="2"/><path d="M8 12l3 3 5-5"/></svg><span class="nav-label">待办</span></button>
+          <button @click="openNoteModal" title="笔记"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="nav-label">笔记</span></button>
+          <button @click="showHistoryPanel = true" title="历史"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 12"/><path d="M12 2a10 10 0 0 1 0 20"/></svg><span class="nav-label">历史</span></button>
+          <button @click="scrollToBottom(true)" title="回到底部"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg><span class="nav-label">底部</span></button>
         </div>
-        <button class="nav-settings" @click="openSettings" title="设置"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg><span class="nav-label">设置</span></button>
+        <button class="nav-settings" @click="openSettings" title="设置"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg><span class="nav-label">设置</span></button>
         <button class="sidebar-toggle" @click="sidebarCollapsed=!sidebarCollapsed" :title="sidebarCollapsed?'展开':'收起'">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline :points="sidebarCollapsed ? '9 18 15 12 9 6' : '15 18 9 12 15 6'"/></svg>
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline :points="sidebarCollapsed ? '9 18 15 12 9 6' : '15 18 9 12 15 6'"/></svg>
         </button>
       </nav>
 
@@ -240,20 +240,35 @@ import MigratePanel from './components/MigratePanel.vue'
 import HistoryPanel from './components/HistoryPanel.vue'
 
 const DEFAULT_AVATAR = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="%234e89ae" stroke-width="1.5"%3E%3Cpath d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"%3E%3C/path%3E%3Ccircle cx="12" cy="7" r="4"%3E%3C/circle%3E%3C/svg%3E'
+// 打字机效果配置
+const TYPEWRITER_BASE_DELAY = 250
+const TYPEWRITER_PER_CHAR = 30
+const TYPEWRITER_MIN_DELAY = 300
+const TYPEWRITER_MAX_DELAY = 2000
+const TYPEWRITER_POLL_INTERVAL = 80
+const TYPEWRITER_RETRY_INTERVAL = 120
+// WebSocket 重连配置
+const WS_RECONNECT_BASE = 2000
+const WS_RECONNECT_FACTOR = 1.5
+const WS_RECONNECT_MAX = 30000
+// 发送冷却 (ms)
+const SEND_COOLDOWN = 500
+// 提醒自动关闭 (ms)，仅 level < 6
+const REMINDER_AUTO_DISMISS = 8000
 
 export default {
   components: { TodoList, NoteList, CountdownList, ReminderList, MemoryPanel, SearchPanel, ChatManagePanel, RAGPanel, MigratePanel, HistoryPanel },
   data() {
     return {
       showTodoModal: false, showNoteModal: false, showCountdownModal: false, showReminderModal: false, showHistoryPanel: false, showSettingsModal: false,
-      currentTheme: 'dark', messages: [], inputText: '', ws: null, isStreaming: false, streamingSentence: '', wsReady: false,
+      currentTheme: 'dark', messages: [], inputText: '', ws: null, isStreaming: false, wsReady: false,
       pendingReply: '', schedId: null,
       wsReconnectAttempts: 0, _reconnectTimer: null, userScrolledUp: false, lastScrollTop: 0,
-      floatingDate: '', reminderPopups: [], activeReminderCount: 0,
+      floatingDate: '', reminderPopups: [],
       chatFontSize: 14, chatBgImage: '', saveError: '', loadError: '', showContextMenu: false, ctxMenuX: 0, ctxMenuY: 0, ctxTargetMsg: null, quoteMsg: null, showEmojiPicker: false,
       kaomojis: ['(￣▽￣)','(´･_･`)','(>_<)','(╥﹏╥)','(*¯︶¯*)','(╯‵□′)╯','(=・ω・=)','(・∀・)'],
       apiKeyLocal: '', themeLocal: 'dark', amapKeyLocal: '', enableSearchLocal: true,
-      aiNameLocal: 'Vesper', userNameLocal: '', toneLocal: '冷静', lengthLocal: '短', recallLocal: '从不', emotionLocal: false, customPromptLocal: '',
+      aiNameLocal: 'Vesper', userNameLocal: '', toneLocal: '冷静', lengthLocal: '短', recallLocal: '从不', customPromptLocal: '',
       colors: { primary: '#5390d4', bg: '#0d1117', sidebarBg: '#161b22', chatBg: '#0d1117', userBubble: '#2b5278', aiBubble: '#1e2632' },
       totalMessages: 0, conversationDays: 0, userAvatarUrl: DEFAULT_AVATAR, assistantAvatarUrl: DEFAULT_AVATAR,
       provinces: [], cities: [], selectedProvince: '', selectedCity: '', ipCity: '', ipCityShort: '',
@@ -261,7 +276,6 @@ export default {
       testing: { ds: false, dsStatus: '', dsMsg: '', wt: false, wtStatus: '', wtMsg: '', se: false, seStatus: '', seMsg: '', ip: false, ipStatus: '', ipMsg: '' },
       settingsTab: 'api', locating: false,
       sidebarCollapsed: true,
-      hasApiKey: false, hasAmapKey: false,
       settingsTabs: [
         { id: 'api', icon: 'api', label: 'API' },
         { id: 'role', icon: 'role', label: '角色' },
@@ -289,14 +303,14 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
   beforeUnmount() { if (this.ws) this.ws.close(); if (this._locationTimer) clearInterval(this._locationTimer); if (this._reconnectTimer) clearTimeout(this._reconnectTimer); if (this._keydownHandler) document.removeEventListener('keydown', this._keydownHandler); if (this._wheelHandler) document.removeEventListener('wheel', this._wheelHandler) },
   methods: {
     async loadAllSettings() {
-      try { const res = await api.get('/settings/'); this.themeLocal = res.data.theme || 'dark'; this.currentTheme = this.themeLocal; document.documentElement.setAttribute('data-theme', this.currentTheme); this.enableSearchLocal = res.data.enable_web_search !== false; this.hasAmapKey = res.data.has_amap_key || false; this.hasApiKey = res.data.has_api_key || false; this.aiNameLocal = res.data.ai_name || 'Vesper'; this.userNameLocal = res.data.user_name || ''; this.toneLocal = res.data.personality_tone || '冷静'; this.lengthLocal = res.data.length_level || '短'; this.recallLocal = res.data.recall_past || '从不'; this.emotionLocal = res.data.allow_emotion === true; this.customPromptLocal = res.data.custom_system_prompt || ''; this.chatBgImage = res.data.chat_bg_image || ''; this.chatFontSize = res.data.chat_font_size || 14;
+      try { const res = await api.get('/settings/'); this.themeLocal = res.data.theme || 'dark'; this.currentTheme = this.themeLocal; document.documentElement.setAttribute('data-theme', this.currentTheme); this.enableSearchLocal = res.data.enable_web_search !== false; this.aiNameLocal = res.data.ai_name || 'Vesper'; this.userNameLocal = res.data.user_name || ''; this.toneLocal = res.data.personality_tone || '冷静'; this.lengthLocal = res.data.length_level || '短'; this.recallLocal = res.data.recall_past || '从不'; this.customPromptLocal = res.data.custom_system_prompt || ''; this.chatBgImage = res.data.chat_bg_image || ''; this.chatFontSize = res.data.chat_font_size || 14;
       if (res.data.precise_city) { this.ipCityShort = res.data.precise_city; this.ipCity = res.data.precise_city }
       this.colors = { primary: res.data.primary_color || '#5390d4', bg: res.data.bg_color || '#0d1117', sidebarBg: res.data.sidebar_bg || '#161b22', chatBg: res.data.chat_bg || '#0d1117', userBubble: res.data.user_bubble || '#2b5278', aiBubble: res.data.ai_bubble || '#1e2632' } } catch (err) { console.error(err) }
     },
     async updateGlobalConfig(key, value) { try { await api.post('/settings/', { key, value }); this.saveError = ''; if (key === 'theme') { this.currentTheme = value; document.documentElement.setAttribute('data-theme', value) } } catch (err) { this.saveError = '保存失败: ' + key; setTimeout(() => { this.saveError = '' }, 3000); console.error(err) } },
     async saveApiKey() { await this.updateGlobalConfig('api_key', this.apiKeyLocal); this.apiKeySaved = true; setTimeout(() => { this.apiKeySaved = false }, 2000) },
     async saveTone() { await this.updateGlobalConfig('personality', { tone: this.toneLocal }) },
-    async loadAvatars() { try { const userRes = await api.get('/avatar/user'); if (userRes.data.url) this.userAvatarUrl = `${BASE_URL}${userRes.data.url}?t=${Date.now()}`; const assistantRes = await api.get('/avatar/assistant'); if (assistantRes.data.url) this.assistantAvatarUrl = `${BASE_URL}${assistantRes.data.url}?t=${Date.now()}` } catch (err) { console.error(err) } },
+    async loadAvatars() { try { const userRes = await api.get('/avatar/user'); if (userRes.data.url) this.userAvatarUrl = `${BASE_URL}${userRes.data.url}`; const assistantRes = await api.get('/avatar/assistant'); if (assistantRes.data.url) this.assistantAvatarUrl = `${BASE_URL}${assistantRes.data.url}` } catch (err) { console.error(err) } },
     async loadProvinces() { try { const res = await api.get('/location/provinces'); this.provinces = res.data } catch (err) { console.error(err) } },
     async onProvinceChange() { if (!this.selectedProvince) return; try { const res = await api.get(`/location/cities/${this.selectedProvince}`); this.cities = res.data; this.selectedCity = '' } catch (err) { console.error(err) } },
     async savePreciseCity() { if (!this.selectedCity) { alert('请选择省份和城市'); return } const cityObj = this.cities.find(c => c.adcode === this.selectedCity); await this.updateGlobalConfig('precise_city', cityObj ? cityObj.name : this.selectedCity); alert('已保存') },
@@ -327,7 +341,7 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
     formatTime(ts) { if (!ts) return ''; try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) } catch { return '' } },
     dateLabel(ts) { if (!ts) return ''; try { const d = new Date(ts); if (isNaN(d.getTime())) return ''; const today = new Date(); if (d.toDateString() === today.toDateString()) return '今天'; const y = new Date(today); y.setDate(y.getDate()-1); if (d.toDateString() === y.toDateString()) return '昨天'; return d.toLocaleDateString('zh-CN', { month:'long', day:'numeric' }) } catch { return '' } },
     safeLinkify(text) { if (!text) return ''; const escaped = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); return escaped.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>') },
-    openContextMenu(e, msg) { this.ctxTargetMsg = msg; this.ctxMenuX = e.clientX; this.ctxMenuY = e.clientY; this.showContextMenu = true; setTimeout(() => { document.addEventListener('click', () => { this.showContextMenu = false }, { once: true }) }) },
+    openContextMenu(e, msg) { this.ctxTargetMsg = msg; const mw = 140, mh = 130; this.ctxMenuX = Math.min(e.clientX, window.innerWidth - mw); this.ctxMenuY = Math.min(e.clientY, window.innerHeight - mh); this.showContextMenu = true; setTimeout(() => { document.addEventListener('click', () => { this.showContextMenu = false }, { once: true }) }) },
     copyMessage(msg) { navigator.clipboard.writeText(msg.content).catch(() => {}); this.showContextMenu = false },
     quoteMessage(msg) { this.quoteMsg = msg; this.showContextMenu = false; this.$nextTick(() => this.$refs.inputEl?.focus()) },
     async deleteMessage(msg) { if (!msg.id) return; if (!confirm('删除这条消息？')) return; try { await api.delete(`/chat/manage/message/${msg.id}`); await this.loadHistory(); this.showContextMenu = false } catch (err) { console.error('删除失败', err) } },
@@ -375,7 +389,7 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
           this.isStreaming = false
         } else if (data.type === 'greeting') { this.messages.push({ id: 'g_' + Date.now(), role: 'assistant', content: data.content, timestamp: new Date().toISOString() }); this.totalMessages++; this.scrollToBottom() }
         else if (data.type === 'reminder_count') {
-          this.activeReminderCount = data.count
+          // 提醒计数（保留供未来徽章使用）
         }
         else if (data.type === 'reminder') {
           const d = data.data
@@ -383,14 +397,14 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
           d._id = crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 10))
           this.reminderPopups.push(d)
           this.notifyReminder(d)
-          if (d.level < 6) { setTimeout(() => { this.dismissReminder(d._id) }, 8000) }
+          if (d.level < 6) { setTimeout(() => { this.dismissReminder(d._id) }, REMINDER_AUTO_DISMISS) }
         }
         else if (data.type === 'error') { this.messages.push({ id: 'e_' + Date.now(), role: 'assistant', content: '错误：' + data.content, timestamp: new Date().toISOString() }); this.isStreaming = false; this.stopTypewriter() }
       }
       this.ws.onerror = () => { this.wsReady = false; this.stopTypewriter() }
       this.ws.onclose = () => {
         this.wsReady = false; this.stopTypewriter()
-        const delay = Math.min(2000 * Math.pow(1.5, this.wsReconnectAttempts), 30000)
+        const delay = Math.min(WS_RECONNECT_BASE * Math.pow(WS_RECONNECT_FACTOR, this.wsReconnectAttempts), WS_RECONNECT_MAX)
         this.wsReconnectAttempts++
         this._reconnectTimer = setTimeout(() => { if (!this.wsReady) this.connectWebSocket() }, delay)
       }
@@ -398,12 +412,12 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
     sendMessage() {
       if (!this.inputText.trim() || this.isStreaming || this._sendingCooldown) return
       if (!this.wsReady) { this.messages.push({ id: 'err_' + Date.now(), role: 'assistant', content: '未连接，请确认后端已启动', timestamp: new Date().toISOString() }); return }
-      this._sendingCooldown = true; setTimeout(() => { this._sendingCooldown = false }, 500)
+      this._sendingCooldown = true; setTimeout(() => { this._sendingCooldown = false }, SEND_COOLDOWN)
       if (this.schedId) { clearTimeout(this.schedId); this.schedId = null }
       this.userScrolledUp = false
       const userMsg = this.inputText.trim()
       this.messages.push({ id: 'u_' + Date.now(), role: 'user', content: userMsg, timestamp: new Date().toISOString() })
-      this.totalMessages++; this.inputText = ''; this.scrollToBottom(); this.isStreaming = true; this.streamingSentence = ''
+      this.totalMessages++; this.inputText = ''; this.scrollToBottom(); this.isStreaming = true
       this.ws.send(JSON.stringify({ message: userMsg, history: this.messages.slice(-20).map(m => ({ role: m.role, content: m.content })) }))
       this.$nextTick(() => { const el = this.$refs.inputEl; if (el) { el.style.height = 'auto'; el.focus() } })
     },
@@ -421,7 +435,7 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
     openReminderModal() { this.showReminderModal = true }, closeReminderModal() { this.showReminderModal = false },
     openSettings() { this.showSettingsModal = true; this.loadIpLocation() },
     closeSettingsModal() { this.showSettingsModal = false },
-    stopTypewriter() { this.pendingReply = ''; this.streamingSentence = ''; if (this.schedId) { clearTimeout(this.schedId); this.schedId = null } },
+    stopTypewriter() { this.pendingReply = ''; if (this.schedId) { clearTimeout(this.schedId); this.schedId = null } },
     schedulePop() {
       if (this.schedId) return
       const pop = () => {
@@ -434,17 +448,17 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
           this.messages.push({ id: 'a_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), role: 'assistant', content: sentence, timestamp: new Date().toISOString() }); this.totalMessages++
           this.pendingReply = this.pendingReply.slice(m[1].length)
           this.scrollToBottom()
-          const delay = Math.min(Math.max(300, 250 + sentence.length * 30), 2000)
+          const delay = Math.min(Math.max(TYPEWRITER_MIN_DELAY, TYPEWRITER_BASE_DELAY + sentence.length * TYPEWRITER_PER_CHAR), TYPEWRITER_MAX_DELAY)
           this.schedId = setTimeout(pop, delay)
         } else if (!this.isStreaming) {
           const remain = this.pendingReply.trim()
           if (remain) { this.messages.push({ role: 'assistant', content: remain, timestamp: new Date().toISOString() }); this.totalMessages++ }
           this.pendingReply = ''; this.scrollToBottom()
         } else {
-          this.schedId = setTimeout(pop, 120)
+          this.schedId = setTimeout(pop, TYPEWRITER_RETRY_INTERVAL)
         }
       }
-      this.schedId = setTimeout(pop, 80)
+      this.schedId = setTimeout(pop, TYPEWRITER_POLL_INTERVAL)
     },
     dismissReminder(id) { this.reminderPopups = this.reminderPopups.filter(p => p._id !== id) },
     async completeReminder(pop) {
@@ -508,12 +522,15 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
 .nav-icons { display: flex; flex-direction: column; gap: 2px; padding: 8px; flex: 1; }
 .nav-icons button { background: none; border: none; cursor: pointer; opacity: .5; transition: all .15s; padding: 8px 10px; border-radius: 6px; color: #8899aa; display: flex; align-items: center; gap: 10px; font-size: 13px; white-space: nowrap; width: 100%; }
 .nav-icons button:hover { opacity: 1; color: #ecf0f1; background: rgba(255,255,255,.05); }
+.nav-icons button:focus-visible { outline: 2px solid var(--p); outline-offset: 2px; opacity: 1; }
 .nav-label { transition: opacity .15s; overflow: hidden; }
 .nav-settings { background: none; border: none; cursor: pointer; opacity: .5; transition: all .15s; padding: 8px 10px; border-radius: 6px; color: #8899aa; display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .nav-icons + .nav-settings { margin-top: auto; }
 .nav-settings:hover { opacity: 1; color: #ecf0f1; background: rgba(255,255,255,.05); }
+.nav-settings:focus-visible { outline: 2px solid var(--p); outline-offset: 2px; opacity: 1; }
 .sidebar-toggle { background: none; border: none; cursor: pointer; padding: 10px; color: #555; display: flex; justify-content: center; border-top: 1px solid rgba(255,255,255,.05); transition: color .15s; }
 .sidebar-toggle:hover { color: #999; }
+.sidebar-toggle:focus-visible { outline: 2px solid var(--p); outline-offset: 2px; }
 
 /* ====== Chat ====== */
 .chat { flex: 1; display: flex; flex-direction: column; background: var(--cb); overflow: hidden; }
@@ -570,6 +587,7 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
 .msg-bubble.typing-cursor { padding: 10px 16px; }
 .cursor-bar { display: inline-block; width: 2px; height: 16px; background: var(--p); vertical-align: text-bottom; animation: cursorBlink .8s infinite; border-radius: 1px; }
 @keyframes cursorBlink { 0%,100% { opacity: 1; } 50% { opacity: .15; } }
+@media (prefers-reduced-motion: reduce) { .cursor-bar { animation: none; } }
 
 .msg-time { font-size: 10px; color: #7f8c8d; margin-top: 3px; opacity: .35; }
 .msg.user .msg-time { text-align: right; }
@@ -583,6 +601,8 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
 .btn-send { padding: 10px 20px; background: var(--p); color: #fff; border: none; border-radius: 20px; cursor: pointer; font-size: 14px; font-weight: 600; transition: opacity .15s; }
 .btn-send:hover:not(:disabled) { opacity: .85; }
 .btn-send:disabled { opacity: .4; cursor: default; }
+.btn-send:focus-visible, .btn:focus-visible, .btn-s:focus-visible, .btn-more:focus-visible { outline: 2px solid var(--p); outline-offset: 2px; }
+.chat-input textarea:focus-visible { outline: none; border-color: var(--p); }
 
 /* ====== Modals (small tools) ====== */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); backdrop-filter: blur(6px); display: flex; justify-content: center; align-items: center; z-index: 1000; }
@@ -594,7 +614,7 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
 .modal-bd { flex: 1; overflow-y: auto; padding: 16px; }
 
 /* ====== Settings ====== */
-.settings-panel { position: fixed; width: 820px; height: 580px; background: #1e2a3a; border-radius: 10px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,.5); z-index: 1001; }
+.settings-panel { position: fixed; width: 820px; max-width: 95vw; height: 580px; max-height: 90vh; background: #1e2a3a; border-radius: 10px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 16px 48px rgba(0,0,0,.5); z-index: 1001; }
 .settings-titlebar { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: var(--sb); cursor: move; user-select: none; border-bottom: 1px solid rgba(128,128,128,.1); }
 .settings-titlebar span { color: #ecf0f1; font-size: 14px; font-weight: 600; }
 .settings-titlebar button { background: none; border: none; color: #888; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: color .15s; }
@@ -635,15 +655,15 @@ this.userScrolledUp = distFromBottom > 250; const seps = el.querySelectorAll('.d
 .stat-lbl { font-size: 11px; color: rgba(255,255,255,.7); margin-top: 2px; }
 .stat-sep { width: 1px; height: 28px; background: rgba(255,255,255,.3); }
 .card-compact { padding: 8px 12px; }
-.btn-danger { background: rgba(231,76,60,.15) !important; color: #e74c3c !important; }
-.btn-danger:hover { background: rgba(231,76,60,.3) !important; }
+.preset-row .btn-danger { background: rgba(231,76,60,.15); color: #e74c3c; }
+.preset-row .btn-danger:hover { background: rgba(231,76,60,.3); }
 
 /* --- Shared form elements --- */
 .field { margin-bottom: 12px; }
 .field label { display: block; font-size: 12px; color: #8899aa; margin-bottom: 5px; }
 .field input, .field select, .field textarea, .api-row input, .loc-row select { width: 100%; padding: 8px 12px; border-radius: 6px; background: #0f1923; color: #ddd; border: 1px solid rgba(255,255,255,.08); font-size: 13px; outline: none; resize: vertical; font-family: inherit; }
 .field input:focus, .field select:focus, .field textarea:focus, .api-row input:focus, .loc-row select:focus { border-color: var(--p); }
-.role-textarea { flex: 1; min-height: 150px; line-height: 1.6; resize: vertical; background: transparent !important; }
+.field .role-textarea { flex: 1; min-height: 150px; line-height: 1.6; resize: vertical; background: transparent; }
 input, select, textarea { font-family: inherit; }
 .btn { padding: 8px 18px; background: var(--p); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap; }
 .btn:hover { opacity: .85; }
@@ -656,8 +676,8 @@ input, select, textarea { font-family: inherit; }
 .test-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 13px; }
 .test-row > span:first-child { width: 50px; color: #8899aa; font-size: 12px; flex-shrink: 0; }
 .test-row > span:last-child { font-size: 11px; flex: 1; }
-.ok { color: #4caf50 !important; }
-.fail { color: #e74c3c !important; }
+.test-row .ok { color: #4caf50; }
+.test-row .fail { color: #e74c3c; }
 .ip-status { color: #4caf50; font-size: 13px; margin-bottom: 8px; }
 
 /* --- Theme toggle --- */
@@ -674,7 +694,7 @@ input, select, textarea { font-family: inherit; }
 .color-swatch { width: 22px; height: 22px; border-radius: 4px; border: 1px solid rgba(255,255,255,.15); flex-shrink: 0; }
 .color-label { width: 56px; font-size: 12px; color: #8899aa; flex-shrink: 0; }
 .color-pick { width: 28px; height: 24px; padding: 0; border: 1px solid rgba(255,255,255,.1); border-radius: 4px; cursor: pointer; background: transparent; }
-.color-hex { width: 80px; padding: 4px 8px !important; border-radius: 4px; background: #0f1923; color: #ccc; border: 1px solid rgba(255,255,255,.08); font-size: 12px; outline: none; font-family: monospace; }
+.color-row .color-hex { width: 80px; padding: 4px 8px; border-radius: 4px; background: #0f1923; color: #ccc; border: 1px solid rgba(255,255,255,.08); font-size: 12px; outline: none; font-family: monospace; }
 .color-hex:focus { border-color: var(--p); }
 .preset-bar { display: flex; gap: 6px; flex-wrap: wrap; }
 :root[data-theme="light"] .color-hex { background: #f5f6fa; color: #333; }
@@ -731,8 +751,8 @@ input, select, textarea { font-family: inherit; }
 :root[data-theme="light"] .settings-nav { border-color: #eee; }
 :root[data-theme="light"] .btn-s { background: #e8e9ed; color: #555; }
 :root[data-theme="light"] .btn-s:hover { background: #ddd; color: #222; }
-:root[data-theme="light"] .btn-danger { background: #fce4e4 !important; color: #d63031 !important; }
-:root[data-theme="light"] .btn-danger:hover { background: #f8d0d0 !important; }
+:root[data-theme="light"] .preset-row .btn-danger { background: #fce4e4; color: #d63031; }
+:root[data-theme="light"] .preset-row .btn-danger:hover { background: #f8d0d0; }
 
 /* ====== 右侧提醒弹窗 ====== */
 .reminder-popups { position: fixed; right: 16px; top: 60px; z-index: 900; pointer-events: none; max-height: calc(100vh - 100px); }
@@ -760,14 +780,16 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { width: 5px; }
 html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 3px; }
 
 /* 滑入动画 */
-.slide-enter-active { transition: all .3s ease-out; }
-.slide-leave-active { transition: all .2s ease-in; }
+.slide-enter-active { transition: transform .3s ease-out, opacity .3s ease-out; }
+.slide-leave-active { transition: transform .2s ease-in, opacity .2s ease-in; }
 .slide-enter-from { opacity: 0; transform: translateX(60px); }
 .slide-leave-to { opacity: 0; transform: translateX(60px); }
+@media (prefers-reduced-motion: reduce) { .slide-enter-active, .slide-leave-active { transition: none; } }
 
 /* 紧急提醒脉冲 */
 .level-7 .reminder-popup-bar { animation: pulse .6s infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .4; } }
+@media (prefers-reduced-motion: reduce) { .level-7 .reminder-popup-bar { animation: none; } }
 
 /* 亮色模式提醒弹窗 */
 :root[data-theme="light"] .reminder-popup { background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.12); }

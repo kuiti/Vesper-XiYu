@@ -18,16 +18,16 @@ def get_location_by_ip() -> dict:
                 if isinstance(city, list): city = ""
                 if city:
                     return {"province": province, "city": city, "adcode": data.get("adcode", "")}
-        except:
-            pass
+        except Exception as e:
+            print(f"[意图-定位] 高德异常: {e}")
     # 备用: ip-api.com
     try:
         resp = requests.get("https://ip-api.com/json/?lang=zh-CN", timeout=5)
         data = resp.json()
         if data.get("status") == "success":
             return {"province": data.get("regionName", ""), "city": data.get("city", ""), "adcode": ""}
-    except:
-        pass
+    except Exception as e:
+        print(f"[意图] 异常: {e}")
     return {}
 
 def get_city_by_ip():
@@ -60,8 +60,8 @@ def get_current_weather(city: str) -> dict:
         resp = requests.get(url, timeout=10).json()
         if resp.get("status") == "1" and resp.get("lives"):
             return resp["lives"][0]
-    except:
-        pass
+    except Exception as e:
+        print(f"[意图] 异常: {e}")
     return {}
 
 # ─── 天气代码映射 (WMO) ───
@@ -76,8 +76,8 @@ def get_city_coords(city: str) -> dict:
         if data.get("results"):
             r = data["results"][0]
             return {"lat": r["latitude"], "lng": r["longitude"], "name": r.get("name", city), "country": r.get("country", "")}
-    except:
-        pass
+    except Exception as e:
+        print(f"[意图] 异常: {e}")
     return {}
 
 def get_openmeteo_weather(lat: float, lng: float) -> dict:
@@ -252,33 +252,25 @@ def detect_intent(user_message: str) -> tuple:
             if "error" not in om:
                 parts = [f"{city}天气："]
                 if om.get("weather"):
-                    parts.append(f"天气{om['weather']}")
+                    parts.append(om['weather'])
                 if om.get("temp") is not None:
-                    parts.append(f"气温{om['temp']}°C")
-                if om.get("feels_like") is not None:
-                    parts.append(f"体感{om['feels_like']}°C")
-                if om.get("humidity") is not None:
-                    parts.append(f"湿度{om['humidity']}%")
-                if om.get("pressure") is not None:
-                    parts.append(f"气压{om['pressure']}hPa")
+                    parts.append(f"{om['temp']}°C")
+                # 最多追加 3 个额外字段，按优先级
+                extras = []
+                if om.get("precipitation", 0) > 0:
+                    extras.append(f"降水{om['precipitation']}mm")
                 if om.get("wind_speed") is not None:
-                    wd = wind_direction_name(om.get("wind_direction"))
-                    parts.append(f"{wd}风{om['wind_speed']}km/h")
-                if om.get("cloud_cover") is not None:
-                    cover = om["cloud_cover"]
-                    parts.append(f"云量{cover}%")
-                if om.get("visibility") is not None:
-                    parts.append(f"能见度{om['visibility']}m")
-                if om.get("precipitation") is not None and om["precipitation"] > 0:
-                    parts.append(f"降水量{om['precipitation']}mm")
-                if om.get("dew_point") is not None:
-                    parts.append(f"露点{om['dew_point']}°C")
-                # 未来预报
-                if om.get("daily"):
-                    parts.append("| 预报：")
-                    for d in om["daily"][:2]:
-                        dname = d["date"][-5:] if d.get("date") else ""
-                        parts.append(f"{dname} {d.get('weather','')} {d.get('temp_min','')}~{d.get('temp_max','')}°C")
+                    extras.append(f"{wind_direction_name(om.get('wind_direction'))}风{om['wind_speed']}km/h")
+                if om.get("feels_like") is not None and abs(om["feels_like"] - om.get("temp", 0)) > 3:
+                    extras.append(f"体感{om['feels_like']}°C")
+                if om.get("humidity") is not None:
+                    extras.append(f"湿度{om['humidity']}%")
+                parts.extend(extras[:3])
+                # 预报只给明天一条
+                if om.get("daily") and len(om["daily"]) > 1:
+                    d = om["daily"][1]
+                    dname = d["date"][-5:] if d.get("date") else "明天"
+                    parts.append(f"{dname} {d.get('weather','')} {d.get('temp_min','')}~{d.get('temp_max','')}°C")
                 weather_text = "，".join(parts)
                 return ("weather", {"city": coords.get("name", city), "text": weather_text})
         # 2. 回退 Amap

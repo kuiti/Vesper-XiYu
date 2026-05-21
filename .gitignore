@@ -10,3 +10,5 @@ node_modules/
 .claude/
 *.db
 .env
+*.zip
+*.tar.gz

@@ -1,3 +1,4 @@
+import asyncio
 import requests
 from fastapi import APIRouter, HTTPException
 from core.db import get_config
@@ -16,11 +17,14 @@ async def get_provinces():
     if not key:
         raise HTTPException(400, "请先配置高德 API Key")
     url = f"https://restapi.amap.com/v3/config/district?keywords=中国&subdistrict=1&key={key}"
-    resp = requests.get(url, timeout=10)
-    data = resp.json()
-    if data.get("status") == "1":
+    try:
+        resp = await asyncio.to_thread(requests.get, url, timeout=10)
+        data = resp.json()
+    except Exception as e:
+        raise HTTPException(502, f"请求高德API失败: {e}")
+    if data.get("status") == "1" and data.get("districts") and len(data["districts"]) > 0:
         provinces = []
-        for item in data["districts"][0]["districts"]:
+        for item in data["districts"][0].get("districts", []):
             provinces.append({"name": item["name"], "adcode": item["adcode"]})
         return provinces
     raise HTTPException(500, "获取省份失败")
@@ -32,11 +36,14 @@ async def get_cities(province_adcode: str):
     if not key:
         raise HTTPException(400, "请先配置高德 API Key")
     url = f"https://restapi.amap.com/v3/config/district?keywords={province_adcode}&subdistrict=1&key={key}"
-    resp = requests.get(url, timeout=10)
-    data = resp.json()
-    if data.get("status") == "1" and data["districts"]:
+    try:
+        resp = await asyncio.to_thread(requests.get, url, timeout=10)
+        data = resp.json()
+    except Exception as e:
+        raise HTTPException(502, f"请求高德API失败: {e}")
+    if data.get("status") == "1" and data.get("districts") and len(data["districts"]) > 0:
         cities = []
-        for item in data["districts"][0]["districts"]:
+        for item in data["districts"][0].get("districts", []):
             cities.append({"name": item["name"], "adcode": item["adcode"]})
         return cities
     raise HTTPException(500, "获取城市失败")
@@ -48,11 +55,14 @@ async def get_districts(city_adcode: str):
     if not key:
         raise HTTPException(400, "请先配置高德 API Key")
     url = f"https://restapi.amap.com/v3/config/district?keywords={city_adcode}&subdistrict=1&key={key}"
-    resp = requests.get(url, timeout=10)
-    data = resp.json()
-    if data.get("status") == "1" and data["districts"]:
+    try:
+        resp = await asyncio.to_thread(requests.get, url, timeout=10)
+        data = resp.json()
+    except Exception as e:
+        raise HTTPException(502, f"请求高德API失败: {e}")
+    if data.get("status") == "1" and data.get("districts") and len(data["districts"]) > 0:
         districts = []
-        for item in data["districts"][0]["districts"]:
+        for item in data["districts"][0].get("districts", []):
             districts.append({"name": item["name"], "adcode": item["adcode"]})
         return districts
     raise HTTPException(500, "获取区县失败")
@@ -63,27 +73,26 @@ async def get_location_by_ip():
     key = get_config("amap_key", "")
     if key:
         try:
-            resp = requests.get(f"https://restapi.amap.com/v3/ip?key={key}", timeout=10)
+            resp = await asyncio.to_thread(requests.get, f"https://restapi.amap.com/v3/ip?key={key}", timeout=10)
             data = resp.json()
             if data.get("status") == "1":
                 province = data.get("province", "")
                 city = data.get("city", "")
-                # 高德可能返回空数组 [] 表示无法定位
                 if isinstance(province, list): province = ""
                 if isinstance(city, list): city = ""
                 if city:
                     return {"province": province, "city": city, "adcode": data.get("adcode", "")}
-        except:
-            pass
+        except Exception as e:
+            print(f"[定位] 异常: {e}")
 
     # 备用: ip-api.com
     try:
-        resp = requests.get("http://ip-api.com/json/?lang=zh-CN", timeout=5)
+        resp = await asyncio.to_thread(requests.get, "https://ip-api.com/json/?lang=zh-CN", timeout=5)
         data = resp.json()
         if data.get("status") == "success":
             return {"province": data.get("regionName", ""), "city": data.get("city", ""), "adcode": ""}
-    except:
-        pass
+    except Exception as e:
+        print(f"[定位] ip-api 异常: {e}")
 
     return {"province": "", "city": "", "adcode": ""}
 
@@ -95,7 +104,7 @@ async def reverse_geocode(coord: GeoCoord):
         raise HTTPException(400, "请先配置高德 API Key")
     try:
         url = f"https://restapi.amap.com/v3/geocode/regeo?key={key}&location={coord.lng},{coord.lat}&extensions=base"
-        resp = requests.get(url, timeout=10)
+        resp = await asyncio.to_thread(requests.get, url, timeout=10)
         data = resp.json()
         if data.get("status") == "1":
             addr = data.get("regeocode", {}).get("addressComponent", {})

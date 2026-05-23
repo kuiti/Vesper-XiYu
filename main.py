@@ -1,4 +1,4 @@
-# version: 3.9.2
+# version: 5.0.0
 """夕语后端 —— 延迟加载版本，所有路由在 lifespan startup 中加载"""
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,8 +37,15 @@ _ALL_ROUTERS = [
     ("api.schedule", "router"),
     ("api.vision", "router"),
     ("api.cloud", "router"),
+    ("api.tts", "router"),
+    ("api.stt", "router"),
     ("api.emotion", "router"),
     ("api.relationship", "router"),
+    ("api.demand", "router"),
+    ("api.goal", "router"),
+    ("api.favorites", "router"),
+    ("api.stats", "router"),
+    ("api.report", "router"),
 ]
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
@@ -46,39 +53,14 @@ HAS_FRONTEND = os.path.exists(FRONTEND_DIR)
 
 API_PREFIXES = ("settings", "chat", "todos", "notes", "countdowns", "reminders",
                 "memory", "summary", "search", "rag", "export", "avatar", "location",
-                "migrate", "test", "ws", "avatars", "assets", "api",
+                "migrate", "test", "tts", "stt", "ws", "avatars", "api",
                 "knowledge", "mcp", "profile", "schedule", "vision", "cloud", "text",
-                "emotion", "relationship")
+                "emotion", "relationship", "demand", "goal", "favorites",
+                "history", "split_sentences", "report", "stats")
 
 
 @asynccontextmanager
 async def lifespan(app):
-    global _startup_stage
-    _startup_stage = "loading_routes"
-    for mod_name, attr in _ALL_ROUTERS:
-        try:
-            mod = importlib.import_module(mod_name)
-            app.include_router(getattr(mod, attr))
-        except Exception as e:
-            print(f"[启动] 加载路由 {mod_name} 失败: {e}")
-
-    # SPA fallback 必须在所有 API 路由之后注册，否则 catch-all 会拦截 API 请求
-    if HAS_FRONTEND:
-        @app.get("/{full_path:path}")
-        async def spa_fallback(full_path: str):
-            first = full_path.split("/")[0] if full_path else ""
-            if first in API_PREFIXES:
-                return JSONResponse({"detail": "Not Found"}, 404)
-            raw = os.path.join(FRONTEND_DIR, full_path)
-            real = os.path.realpath(raw)
-            if not real.startswith(os.path.realpath(FRONTEND_DIR) + os.sep):
-                return JSONResponse({"detail": "Not Found"}, 404)
-            if os.path.isfile(real):
-                return FileResponse(real)
-            return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
-
-    _startup_stage = "ready"
-
     # 启动天气定时推送调度器
     from api.chat import weather_scheduler
     weather_task = asyncio.create_task(weather_scheduler())
@@ -106,8 +88,16 @@ app.add_middleware(
 os.makedirs("data/avatars", exist_ok=True)
 app.mount("/avatars", StaticFiles(directory="data/avatars"), name="avatars")
 
-if HAS_FRONTEND:
-    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIR, "assets")), name="assets")
+# 路由在模块级加载
+_startup_stage = "loading_routes"
+for mod_name, attr in _ALL_ROUTERS:
+    try:
+        mod = importlib.import_module(mod_name)
+        app.include_router(getattr(mod, attr))
+    except Exception as e:
+        print(f"[启动] 加载路由 {mod_name} 失败: {e}")
+
+_startup_stage = "ready"
 
 
 @app.get("/health")
@@ -150,26 +140,46 @@ def set_window_theme(data: dict):
     return {"status": "ignored"}
 
 
+# SPA fallback 必须注册在所有显式路由之后（包括 /health、/），否则 catch-all 会拦截它们
+if HAS_FRONTEND:
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        first = full_path.split("/")[0] if full_path else ""
+        if first in API_PREFIXES:
+            return JSONResponse({"detail": "Not Found"}, 404)
+        raw = os.path.join(FRONTEND_DIR, full_path)
+        real = os.path.realpath(raw)
+        if not real.startswith(os.path.realpath(FRONTEND_DIR) + os.sep):
+            return JSONResponse({"detail": "Not Found"}, 404)
+        if os.path.isfile(real):
+            return FileResponse(real)
+        return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+    assets_dir = os.path.join(FRONTEND_DIR, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+    else:
+        print(f"[启动] 警告: assets 目录不存在 ({assets_dir})，前端静态资源将不可用")
+
+
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
     from api.chat import chat_websocket
     await chat_websocket(websocket)
 
 
-def find_free_port(start=8001, end=8010):
-    import socket
-    for port in range(start, end + 1):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("127.0.0.1", port)) != 0:
-                return port
-    return start
-
-
+# 生产环境由 launcher.py 启动，以下仅用于开发时直接运行 main.py
 if __name__ == "__main__":
-    import uvicorn
-    port = find_free_port()
+    import uvicorn, socket
+    def _dev_find_free_port(start=8001, end=8010):
+        for port in range(start, end + 1):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                if s.connect_ex(("127.0.0.1", port)) != 0:
+                    return port
+        return start
+    port = _dev_find_free_port()
     os.makedirs("data", exist_ok=True)
     with open("data/port.txt", "w") as f:
         f.write(str(port))
-    print(f"后端端口: {port}")
+    print(f"[开发] 后端端口: {port}")
     uvicorn.run(app, host="127.0.0.1", port=port)

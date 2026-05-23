@@ -5,8 +5,8 @@
 AI 情绪：由好感度和信任度共同决定，有更多变化
 """
 
-from datetime import datetime
-from core.db import get_conn
+from datetime import datetime, timedelta
+from core.db import get_conn, get_config, set_config
 
 # 范围
 MIN_VALUE = 0
@@ -61,14 +61,87 @@ def get_ai_emotion() -> str:
         return "distrustful"
     elif affection < 20:
         return "cold"
-    elif trust < 20:
+    elif trust < 25:
         return "hurt"
-    else:
+    elif affection < 40 and trust < 35:
         return "annoyed"
+    else:
+        return "cautious"
 
 
-def _update_value(key: str, delta: float):
-    """更新单个值，带上下限保护"""
+def _get_current_value(key: str) -> float:
+    """读取当前好感/信任值"""
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM relationship WHERE key=?", (key,))
+        row = cursor.fetchone()
+    if row:
+        return row["value"]
+    return INITIAL_AFFECTION if key == "affection" else INITIAL_TRUST
+
+
+def _progressive_multiplier(current: float) -> float:
+    """渐进式关系乘数。模拟人类社交：初期慢热，中后期加速，近上限微减速。"""
+    if current < 20:
+        return 0.45
+    elif current < 45:
+        return 0.7
+    elif current < 65:
+        return 1.0
+    elif current < 85:
+        return 1.2
+    else:
+        return 1.1
+
+
+# 长久模式参数
+LONG_TERM_SCALE = 0.35
+DAILY_CAP_AFFECTION = 12.0
+DAILY_CAP_TRUST = 10.0
+
+
+def _apply_daily_cap(key: str, delta: float) -> float:
+    """长久模式每日上限：跨天自动清零，超出上限的裁剪"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    last_date = get_config("_rel_daily_date", "")
+    daily_key = f"_rel_daily_{key}"
+
+    if last_date != today:
+        set_config("_rel_daily_date", today)
+        set_config("_rel_daily_affection", 0)
+        set_config("_rel_daily_trust", 0)
+
+    cap = DAILY_CAP_AFFECTION if key == "affection" else DAILY_CAP_TRUST
+    accumulated = get_config(daily_key, 0.0)
+
+    if delta > 0:
+        remaining = max(0.0, cap - accumulated)
+        capped = min(delta, remaining)
+    else:
+        remaining = max(-cap, -cap - accumulated)
+        capped = max(delta, remaining)
+
+    if abs(capped) > 0.001:
+        set_config(daily_key, accumulated + capped)
+
+    return capped
+
+
+def _update_value(key: str, delta: float) -> float:
+    """更新单个值，带渐进乘数 + 长久模式上限。返回实际应用的 delta。"""
+    if abs(delta) < 0.001:
+        return 0.0
+
+    current = _get_current_value(key)
+    delta *= _progressive_multiplier(current)
+
+    mode = get_config("relationship_mode", "fast")
+    if mode == "long_term":
+        delta = _apply_daily_cap(key, delta * LONG_TERM_SCALE)
+
+    if abs(delta) < 0.001:
+        return 0.0
+
     now = datetime.now().isoformat()
     with get_conn() as conn:
         cursor = conn.cursor()
@@ -81,78 +154,188 @@ def _update_value(key: str, delta: float):
             initial = INITIAL_AFFECTION if key == "affection" else INITIAL_TRUST
             cursor.execute("INSERT INTO relationship (key, value, updated_at) VALUES (?, ?, ?)", (key, initial + delta, now))
 
+    return delta
 
-def adjust_relationship(emotion: str = "neutral", user_message: str = "", hours_since_last: float = 0):
-    """每轮对话后调用，根据互动情况调整好感度和信任度
+
+# ─── 模式切换 ───
+
+def get_relationship_mode() -> str:
+    """获取当前关系模式"""
+    return get_config("relationship_mode", "fast")
+
+
+def switch_relationship_mode(new_mode: str) -> dict:
+    """切换关系模式。返回结果 dict。
+    - 1天冷却
+    - 切到长久模式时软上限削减（削减前存档原值，可恢复）
+    """
+    if new_mode not in ("fast", "long_term"):
+        return {"ok": False, "error": f"无效模式: {new_mode}，可选: fast, long_term"}
+
+    now = datetime.now()
+    lock_until_str = get_config("_rel_mode_locked_until", "")
+    if lock_until_str:
+        try:
+            lock_until = datetime.fromisoformat(lock_until_str)
+            if now < lock_until:
+                remaining = int((lock_until - now).total_seconds() / 3600) + 1
+                return {"ok": False, "error": f"切换冷却中，{remaining}小时后再试"}
+        except (ValueError, TypeError):
+            pass
+
+    current_mode = get_config("relationship_mode", "fast")
+    if new_mode == current_mode:
+        return {"ok": True, "mode": current_mode, "clamped": False}
+
+    clamped = False
+    clamp_reason = ""
+
+    if new_mode == "long_term":
+        # 切入长久模式：软上限削减（先存档原值以备恢复）
+        affection, trust = get_relationship()
+        set_config("_rel_pre_clamp_affection", affection)
+        set_config("_rel_pre_clamp_trust", trust)
+        a_clamped, t_clamped = affection, trust
+
+        if affection > 80:
+            a_clamped = 80.0
+        elif affection > 60:
+            a_clamped = 60.0
+
+        if trust > 85:
+            t_clamped = 85.0
+        elif trust > 65:
+            t_clamped = 65.0
+
+        if a_clamped != affection or t_clamped != trust:
+            clamped = True
+            clamp_reason = f"好感 {affection:.1f}→{a_clamped:.1f} 信任 {trust:.1f}→{t_clamped:.1f}"
+            now_str = now.isoformat()
+            with get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key='affection'", (a_clamped, now_str))
+                cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key='trust'", (t_clamped, now_str))
+            # 记录日志
+            _log_emotion_event(
+                a_delta=a_clamped - affection,
+                t_delta=t_clamped - trust,
+                a_reasons=["切换到长久模式，软上限削减"],
+                t_reasons=["切换到长久模式，软上限削减"],
+                trigger="[mode_switch→long_term]"
+            )
+
+    # 写入新模式 + 冷却锁
+    set_config("relationship_mode", new_mode)
+    set_config("_rel_mode_locked_until", (now + timedelta(days=1)).isoformat())
+
+    return {"ok": True, "mode": new_mode, "clamped": clamped, "clamp_reason": clamp_reason}
+
+
+def adjust_relationship(sentiment_result: dict = None, hours_since_last: float = 0):
+    """每轮对话后调用，基于 LLM 情景化分析调整好感度和信任度。
+    不再使用关键词匹配——LLM 已判断 target/intent/relationship_impact。
 
     Args:
-        emotion: 用户情绪分析结果 (positive/negative/neutral)
-        user_message: 用户消息内容
+        sentiment_result: analyze_sentiment() 返回的 dict，含 sentiment/target/intent/relationship_impact
         hours_since_last: 距上次聊天的小时数
     """
-    # ─── 好感度调整（AI 对用户的好感）───
-    affection_delta = 0
+    if sentiment_result is None:
+        sentiment_result = {}
 
-    # 用户情绪影响 AI 好感
-    if emotion == "positive":
-        affection_delta += 0.5
-    elif emotion == "negative":
-        affection_delta -= 0.3
-    else:
-        affection_delta += 0.1
+    target = sentiment_result.get("target", "other")
+    intent = sentiment_result.get("intent", "statement")
+    impact = sentiment_result.get("relationship_impact", 0)
 
-    # 长时间不聊天 → 好感略微下降
-    if hours_since_last > 24:
-        affection_delta -= 0.5
-
-    # 用户使用亲密称呼 → 好感增加
-    intimate_words = ["亲爱的", "宝贝", "老公", "老婆", "darling", "honey", "笨蛋", "傻瓜"]
-    if any(w in user_message for w in intimate_words):
-        affection_delta += 0.5
-
-    # 用户表达感谢/认可 → 好感增加
-    positive_feedback = ["谢谢", "感谢", "说得对", "没错", "好的", "明白了", "懂了", "赞", "厉害"]
-    if any(kw in user_message for kw in positive_feedback):
-        affection_delta += 0.3
-
-    # 用户表达不满/攻击 → 好感降低
-    unhappy_keywords = ["不对", "错了", "不对劲", "不靠谱", "瞎说", "胡说", "垃圾", "没用", "废物", "烦"]
-    if any(kw in user_message for kw in unhappy_keywords):
-        affection_delta -= 1.0
-
-    _update_value("affection", affection_delta)
-
-    # ─── 信任度调整（AI 对用户的信任）───
+    # ─── LLM 已综合判断关系影响，直接应用 ───
+    impact = max(-2.0, min(2.0, impact))  # 防御性限幅
+    affection_delta = impact * 0.5  # -2~+2 映射到 -1.0~+1.0
     trust_delta = 0
+    a_reasons = [f"LLM判断: intent={intent} target={target} impact={impact}"]
+    t_reasons = []
 
-    # 用户分享个人信息 → AI 更了解用户 → 信任增加
-    personal_keywords = ["我喜欢", "我不喜欢", "我的", "我在", "我住", "我是", "我叫", "我最近", "我想要"]
-    if any(kw in user_message for kw in personal_keywords):
-        trust_delta += 0.5
+    # ─── 补充规则：LLM 可能忽略的边界 ───
+    # 澄清事实 = 增进互相理解（哪怕 LLM 判了负分也修正）
+    if intent == "clarification" and target in ("self", "ai"):
+        trust_delta += 0.2
+        t_reasons.append("友善澄清，增进理解")
 
-    # 用户撒谎或前后矛盾 → 信任大幅降低
-    lie_keywords = ["骗你的", "开玩笑的", "其实不是", "我瞎说的", "逗你玩"]
-    if any(kw in user_message for kw in lie_keywords):
-        trust_delta -= 2.0
+    # 明确攻击 AI = 信任大幅降低
+    if intent == "attack" and target == "ai":
+        trust_delta -= 1.0
+        t_reasons.append("明确攻击AI")
 
-    # 用户纠正 AI → 信任降低
-    correction_keywords = ["不是这样", "不对，应该是", "你理解错了", "我说的是"]
-    if any(kw in user_message for kw in correction_keywords):
-        trust_delta -= 0.5
-
-    # 用户表达不满 → 信任降低
-    if any(kw in user_message for kw in unhappy_keywords):
-        trust_delta -= 0.5
-
-    # 正面反馈 → 信任增加
-    if any(kw in user_message for kw in positive_feedback):
+    # 分享个人信息 = 信任增加
+    if intent == "sharing":
         trust_delta += 0.3
+        t_reasons.append("分享个人信息")
 
-    # 用户连续正常交流 → 信任缓慢增加
-    if emotion == "neutral" or emotion == "positive":
+    # 开玩笑 = 关系好才开玩笑
+    if intent == "joke":
+        affection_delta += 0.2
+        a_reasons.append("开玩笑互动")
+
+    # ─── 时间衰减（不受 LLM 判断影响）───
+    if hours_since_last > 24:
+        decay = -0.5
+        affection_delta += decay
+        a_reasons.append(f"长时间未聊天({hours_since_last:.0f}h)")
+
+    # ─── 连续正常交流 → 信任缓慢积累 ───
+    sentiment = sentiment_result.get("sentiment", "neutral")
+    if sentiment in ("neutral", "positive"):
         trust_delta += 0.1
 
-    _update_value("trust", trust_delta)
+    actual_a = _update_value("affection", affection_delta)
+    actual_t = _update_value("trust", trust_delta)
+
+    # ─── 事件日志（使用实际应用的 delta）───
+    if abs(actual_a) > 0.001 or abs(actual_t) > 0.001:
+        _log_emotion_event(
+            a_delta=actual_a,
+            t_delta=actual_t,
+            a_reasons=a_reasons,
+            t_reasons=t_reasons,
+            trigger=f"[{intent}→{target}]"
+        )
+
+
+def _log_emotion_event(a_delta: float = 0, t_delta: float = 0, a_reasons: list = None, t_reasons: list = None, trigger: str = ""):
+    """记录一次情感调整事件到 emotion_log"""
+    affection, trust = get_relationship()
+    ai_emotion = get_ai_emotion()
+    now = datetime.now().isoformat()
+
+    all_reasons = (a_reasons or []) + (t_reasons or [])
+    reason_text = "；".join(all_reasons) if all_reasons else "常规互动"
+
+    # 从 trigger 反推事件类型（trigger 格式为 "[intent→target]"）
+    event_type = "user_interaction"
+    if trigger and "→" in trigger:
+        parts = trigger.strip("[]").split("→")
+        intent = parts[0] if parts else ""
+        target = parts[1] if len(parts) > 1 else ""
+        if intent == "attack":
+            event_type = "user_angry"
+        elif intent == "gratitude":
+            event_type = "user_thanks"
+        elif intent == "sharing":
+            event_type = "user_personal_share"
+        elif intent == "joke":
+            event_type = "user_joke"
+        elif intent == "clarification":
+            event_type = "user_clarification"
+        elif intent == "complaint":
+            event_type = "user_complaint"
+        elif intent == "mode_switch":
+            event_type = "mode_switch"
+    elif "长时间未聊天" in reason_text:
+        event_type = "time_decay"
+
+    with get_conn() as conn:
+        conn.cursor().execute(
+            "INSERT INTO emotion_log (timestamp, event_type, affection_delta, trust_delta, affection_after, trust_after, ai_emotion_after, trigger_detail, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (now, event_type, a_delta, t_delta, affection, trust, ai_emotion, trigger, reason_text)
+        )
 
 
 def get_relationship_hint() -> str:
@@ -196,14 +379,43 @@ def get_relationship_hint() -> str:
     emotion_info = AI_EMOTIONS.get(ai_emotion, AI_EMOTIONS["neutral"])
     emotion_hint = f"你现在的状态是{emotion_info['label']}，{emotion_info['description']}"
 
-    return f"【关系状态】好感度:{affection:.0f}/100 信任度:{trust:.0f}/100。{affection_hint}。{trust_hint}。{emotion_hint}。"
+    # 性格特征提示（来自 emotion_evolution）
+    trait_hint = ""
+    try:
+        from core.emotion_evolution import get_all_traits
+        traits = get_all_traits()
+        trait_parts = []
+        if traits.get("optimism", 0.5) >= 0.6:
+            trait_parts.append("你性格偏乐观")
+        elif traits.get("optimism", 0.5) <= 0.3:
+            trait_parts.append("你性格偏悲观")
+        if traits.get("expressiveness", 0.5) >= 0.6:
+            trait_parts.append("善于表达")
+        elif traits.get("expressiveness", 0.5) <= 0.3:
+            trait_parts.append("话少寡言")
+        if traits.get("playfulness", 0.4) >= 0.6:
+            trait_parts.append("爱开玩笑")
+        if trait_parts:
+            trait_hint = "。" + "，".join(trait_parts) + "。"
+    except Exception as e:
+        print(f"[关系] 读取性格特征失败: {e}")
+        pass
+
+    return f"【关系状态】好感度:{affection:.0f}/100 信任度:{trust:.0f}/100。{affection_hint}。{trust_hint}。{emotion_hint}{trait_hint}"
 
 
 def reset_relationship():
-    """重置好感度/信任度为初始值"""
+    """重置好感度/信任度为初始值（同时重置累积量、模式、冷却）"""
     now = datetime.now().isoformat()
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key='affection'", (INITIAL_AFFECTION, now))
         cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key='trust'", (INITIAL_TRUST, now))
         cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key='recent_negative_count'", (0, now))
+    # 重置每日累积量
+    set_config("_rel_daily_affection", 0)
+    set_config("_rel_daily_trust", 0)
+    set_config("_rel_daily_date", "")
+    set_config("_rel_mode_locked_until", "")
+    set_config("_rel_pre_clamp_affection", 0)
+    set_config("_rel_pre_clamp_trust", 0)

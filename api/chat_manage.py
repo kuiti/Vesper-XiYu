@@ -1,4 +1,4 @@
-# version: 3.8.1
+# version: 5.0.0
 from fastapi import APIRouter, BackgroundTasks
 from core.db import delete_chat_history_between, delete_chat_history_older_than, set_config, get_config, reset_active_memory, get_db_connection
 from pydantic import BaseModel
@@ -17,13 +17,17 @@ def _clear_vectors():
     try:
         from core.vector_store import rebuild_all_vectors
         rebuild_all_vectors()
-    except:
-        pass
+    except Exception as e:
+        print(f"[向量清理] 异常: {e}")
 
 @router.delete("/range")
 async def delete_range(range: DateRange, bg: BackgroundTasks):
-    start_iso = datetime.strptime(range.start, "%Y-%m-%d").isoformat()
-    end_iso = datetime.strptime(range.end, "%Y-%m-%d").replace(hour=23, minute=59, second=59).isoformat()
+    try:
+        start_iso = datetime.strptime(range.start, "%Y-%m-%d").isoformat()
+        end_iso = datetime.strptime(range.end, "%Y-%m-%d").replace(hour=23, minute=59, second=59).isoformat()
+    except ValueError:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"detail": "日期格式无效，需为 YYYY-MM-DD"}, status_code=400)
     count = delete_chat_history_between(start_iso, end_iso)
     if count > 0:
         reset_active_memory()
@@ -44,12 +48,11 @@ async def delete_recent(minutes: int, bg: BackgroundTasks):
 @router.delete("/message/{msg_id}")
 async def delete_message(msg_id: int, bg: BackgroundTasks):
     """删除单条消息"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM chat_history WHERE id = ?", (msg_id,))
-    cursor.execute("DELETE FROM chat_fts WHERE rowid = ?", (msg_id,))
-    conn.commit()
-    conn.close()
+    from core.db import get_conn
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM chat_history WHERE id = ?", (msg_id,))
+        cursor.execute("DELETE FROM chat_fts WHERE rowid = ?", (msg_id,))
     reset_active_memory()
     bg.add_task(_clear_vectors)
     return {"status": "ok"}

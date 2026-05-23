@@ -23,20 +23,15 @@ def record_emotion(emotion: str):
 
     with get_conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT date FROM emotion_daily WHERE date=?", (today,))
-        if cursor.fetchone():
-            cursor.execute(
-                f"UPDATE emotion_daily SET score=score+?, {field}={field}+1, total_messages=total_messages+1, updated_at=? WHERE date=?",
-                (delta, now, today)
-            )
-        else:
-            pos = 1 if emotion == "positive" else 0
-            neg = 1 if emotion == "negative" else 0
-            neu = 1 if emotion == "neutral" else 0
-            cursor.execute(
-                "INSERT INTO emotion_daily (date, score, positive_count, negative_count, neutral_count, total_messages, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)",
-                (today, delta, pos, neg, neu, now)
-            )
+        pos = 1 if emotion == "positive" else 0
+        neg = 1 if emotion == "negative" else 0
+        neu = 1 if emotion == "neutral" else 0
+        cursor.execute(
+            f"INSERT INTO emotion_daily (date, score, positive_count, negative_count, neutral_count, total_messages, updated_at) "
+            f"VALUES (?, ?, ?, ?, ?, 1, ?) "
+            f"ON CONFLICT(date) DO UPDATE SET score=score+?, {field}={field}+1, total_messages=total_messages+1, updated_at=?",
+            (today, delta, pos, neg, neu, now, delta, now)
+        )
 
 
 def get_emotion_trend(days: int = 7) -> list:

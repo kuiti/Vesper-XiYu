@@ -25,5 +25,11 @@ async def create_countdown(cd: CountdownCreate):
 
 @router.delete("/{cd_id}")
 async def remove_countdown(cd_id: int):
-    delete_countdown(cd_id)
+    from core.db import get_conn
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM countdowns WHERE id = ?", (cd_id,))
+        if c.rowcount == 0:
+            from fastapi import HTTPException
+            raise HTTPException(404, "倒计时不存在")
     return {"status": "ok"}

@@ -1,1 +1,1 @@
-window.__VESPER_CONFIG__ = { backendPort: 8001 }; 
+window.__SAKURA_CONFIG__ = { backendPort: 8001 }; 

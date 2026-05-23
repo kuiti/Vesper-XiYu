@@ -22,8 +22,12 @@ WMO_WEATHER = {
 def get_city_coords(city: str) -> dict:
     """通过城市名获取经纬度（Open-Meteo 地理编码）"""
     try:
-        url = f"https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1&language=zh"
-        resp = requests.get(url, timeout=8)
+        resp = requests.get(
+            "https://geocoding-api.open-meteo.com/v1/search",
+            params={"name": city, "count": 1, "language": "zh"},
+            timeout=8
+        )
+        resp.raise_for_status()
         data = resp.json()
         if data.get("results"):
             r = data["results"][0]
@@ -47,7 +51,11 @@ def get_openmeteo_weather(lat: float, lng: float) -> dict:
                f"&current={fields}&daily={daily}"
                f"&timezone=auto&forecast_days=3")
         resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
         data = resp.json()
+        if data.get("error"):
+            print(f"[天气] API 错误: {data.get('reason', '未知')}")
+            return {}
         current = data.get("current", {})
         daily_data = data.get("daily", {})
         return {
@@ -120,7 +128,7 @@ def get_weather_suggestion(weather: dict, hour: int) -> str:
             suggestions.append("早上有点凉，带件外套")
         elif temp > 35:
             suggestions.append("今天很热，注意防暑")
-        if today_rain > 0:
+        if (today_rain or 0) > 0:
             suggestions.append("今天有雨，记得带伞")
     elif hour < 19:
         if temp > 33:
@@ -128,9 +136,9 @@ def get_weather_suggestion(weather: dict, hour: int) -> str:
     else:
         if daily and len(daily) > 1:
             tmr = daily[1]
-            if tmr.get("precipitation_sum", 0) > 0:
+            if (tmr.get("precipitation_sum", 0) or 0) > 0:
                 suggestions.append("明天有雨，出门提前准备")
-            if tmr.get("temp_min") and tmr["temp_min"] < 10:
+            if tmr.get("temp_min") is not None and tmr["temp_min"] < 10:
                 suggestions.append("明天降温，注意添衣")
     return "。".join(suggestions) + "。" if suggestions else ""
 

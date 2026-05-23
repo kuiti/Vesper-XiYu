@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from core.db import get_todos, add_todo, toggle_todo, delete_todo
+from core.db import get_todos, add_todo, delete_todo
 from pydantic import BaseModel
 from typing import List
 
@@ -34,5 +34,10 @@ async def update_todo(todo_id: int, update: TodoUpdate):
 
 @router.delete("/{todo_id}")
 async def remove_todo(todo_id: int):
-    delete_todo(todo_id)
+    from core.db import get_conn
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
+        if c.rowcount == 0:
+            raise HTTPException(404, "待办不存在")
     return {"status": "ok"}

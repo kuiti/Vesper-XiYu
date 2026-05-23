@@ -1,4 +1,4 @@
-# version: 3.8.1
+# version: 5.0.0
 from fastapi import APIRouter
 from core.db import get_reminders, add_reminder, delete_reminder, update_reminder_done, update_reminder_last_reminded
 from pydantic import BaseModel
@@ -41,5 +41,11 @@ async def snooze_reminder(rid: int):
 
 @router.delete("/{rid}")
 async def remove_reminder(rid: int):
-    delete_reminder(rid)
+    from core.db import get_conn
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM reminders WHERE id = ?", (rid,))
+        if c.rowcount == 0:
+            from fastapi import HTTPException
+            raise HTTPException(404, "提醒不存在")
     return {"status": "ok"}

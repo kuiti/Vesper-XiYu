@@ -152,7 +152,7 @@ def generate_reminder_message(content: str, level: int, style: str = "warm", cat
     template = random.choice(urgency_templates)
 
     # 填充内容
-    message = template.format(content=content)
+    message = template.replace("{content}", content)
 
     return message
 

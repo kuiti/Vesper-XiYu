@@ -1,4 +1,4 @@
-# version: 3.9.0
+# version: 5.0.0
 import requests
 import re
 from datetime import datetime
@@ -150,15 +150,40 @@ def build_weather_text(casts: list) -> str:
     return text
 
 def web_search(query: str) -> str:
+    """联网搜索。DDG 优先，失败回退 Bing。超时 8 秒。"""
+    # 方案1: DuckDuckGo
     try:
         from duckduckgo_search import DDGS
-        with DDGS() as ddgs:
+        with DDGS(timeout=8) as ddgs:
             results = list(ddgs.text(query, max_results=3))
             if results:
                 return "\n\n".join([f"{r['title']}：{r['body'][:150]}" for r in results])
-            return "未找到相关信息"
     except Exception as e:
-        return f"搜索出错：{str(e)}"
+        print(f"[搜索] DDG 失败: {e}")
+
+    # 方案2: Bing 备用
+    try:
+        resp = requests.get(
+            f"https://www.bing.com/search?q={requests.utils.quote(query)}",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+            timeout=8
+        )
+        if resp.status_code == 200:
+            from re import findall
+            snippets = findall(r'<p[^>]*class=["\']?[^"\'>]*\bb_caption\b[^>]*>(.*?)</p>', resp.text, flags=re.DOTALL)
+            if not snippets:
+                snippets = findall(r'<p[^>]*>(.*?)</p>', resp.text, flags=re.DOTALL)
+            clean = []
+            for s in snippets[:3]:
+                s = re.sub(r'<[^>]+>', '', s).strip()
+                if len(s) > 20:
+                    clean.append(s[:200])
+            if clean:
+                return "\n\n".join(clean)
+    except Exception as e:
+        print(f"[搜索] Bing 备用失败: {e}")
+
+    return ""
 
 # ─── 意图关键词 ─────────────────────────────────
 
@@ -218,13 +243,22 @@ NEWS_PATTERNS = [
 ]
 
 KNOWLEDGE_PATTERNS = [
-    r"什么是", r"是谁", r"怎么样", r"如何", r"为什么",
-    r"介绍一下", r"介绍一下", r"告诉我.*关于",
+    r"什么是", r"介绍一下", r"告诉我.*关于",
     r"我不.*知道.*什么", r"我不.*了解",
     r"能.*告诉.*我.*关于", r"知道.*关于",
     r"科普", r"定义", r"解释.*一下",
     r"是什么意思", r"啥意思", r"什么意思",
 ]
+
+# 泛化知识模式（需排除情感/关系类问题）
+FUZZY_KNOWLEDGE_PATTERNS = [
+    r"是谁", r"怎么样", r"如何", r"为什么",
+]
+
+def _is_emotional_question(msg: str) -> bool:
+    """检测是否为情感/关系类问题（不应触发搜索）"""
+    emotional_markers = ["不理我", "你生气", "你难过", "你不开心", "你喜欢我", "你是不是", "你怎么了", "你在吗", "你爱我", "你想我"]
+    return any(m in msg for m in emotional_markers)
 
 def match_any(msg: str, patterns: list) -> bool:
     for p in patterns:
@@ -276,7 +310,7 @@ def detect_intent(user_message: str) -> tuple:
         # 2. 回退 Amap
         forecast = get_weather_forecast(city)
         live = get_current_weather(city)
-        humidity_str = f"，湿度{live['humidity']}%" if live.get("humidity") else ""
+        humidity_str = f"，湿度{live['humidity']}%" if live.get("humidity") is not None else ""
         if "error" not in forecast:
             weather_text = build_weather_text(forecast["casts"]) + humidity_str
             return ("weather", {"city": city, "text": weather_text})
@@ -300,14 +334,14 @@ def detect_intent(user_message: str) -> tuple:
         if match_any(user_message, NEWS_PATTERNS):
             query = extract_search_query(user_message, ["最近新闻", "新闻", "最新消息", "热点", "头条", "告诉我"])
             result = web_search(query + " 新闻")
-            if "未找到" not in result and "出错" not in result:
+            if result:
                 return ("search", result)
 
-        # 知识问答
-        elif match_any(user_message, KNOWLEDGE_PATTERNS):
+        # 知识问答（泛化模式需排除情感问题）
+        elif match_any(user_message, KNOWLEDGE_PATTERNS) or (match_any(user_message, FUZZY_KNOWLEDGE_PATTERNS) and not _is_emotional_question(user_message)):
             query = extract_search_query(user_message, ["什么是", "是谁", "介绍一下", "告诉我关于", "为什么", "如何", "怎么样"])
             result = web_search(query)
-            if "未找到" not in result and "出错" not in result:
+            if result:
                 return ("search", result)
 
         # 明确搜索
@@ -315,7 +349,7 @@ def detect_intent(user_message: str) -> tuple:
             query = extract_search_query(user_message, ["搜索", "查一下", "帮我查", "帮我搜", "百度", "上网查", "网上查", "查一查", "搜一搜"])
             if query and query != user_message:
                 result = web_search(query)
-                if "未找到" not in result and "出错" not in result:
+                if result:
                     return ("search", result)
 
     return (None, None)

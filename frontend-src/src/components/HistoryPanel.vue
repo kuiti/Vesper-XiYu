@@ -39,11 +39,14 @@ export default {
   mounted() {
     this.loadDates()
   },
+  beforeUnmount() {
+    if (this._loadAbort) { this._loadAbort.abort(); this._loadAbort = null }
+  },
   methods: {
     async loadDates() {
       try {
         const res = await api.get('/chat/history/dates')
-        this.months = res.data.months
+        this.months = res.data?.months || []
       } catch (err) {
         console.error('加载日期失败', err)
       }
@@ -53,7 +56,7 @@ export default {
         if (this._loadAbort) this._loadAbort.abort()
         this._loadAbort = new AbortController()
         const res = await api.get(`/chat/history/date?date=${encodeURIComponent(date)}`, { signal: this._loadAbort.signal })
-        this.dateMessages = res.data.messages
+        this.dateMessages = res.data?.messages || []
         this.viewingDate = date
       } catch (err) {
         if (err?.name !== 'CanceledError' && err?.code !== 'ERR_CANCELED') console.error('加载消息失败', err)

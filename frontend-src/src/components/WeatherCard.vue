@@ -2,22 +2,22 @@
   <div class="weather-card">
     <div class="weather-header">
       <span class="weather-icon">{{ weatherIcon }}</span>
-      <span class="weather-temp">{{ data.temp }}°C</span>
+      <span class="weather-temp">{{ data.temp }}度</span>
       <span class="weather-desc">{{ data.weather }}</span>
     </div>
     <div class="weather-body">
       <div class="weather-detail">
-        <span v-if="data.feels_like">体感 {{ data.feels_like }}°C</span>
-        <span v-if="data.humidity">湿度 {{ data.humidity }}%</span>
-        <span v-if="data.wind_direction || data.wind_speed">
-          {{ data.wind_direction }}风 {{ data.wind_speed }}km/h
+        <span v-if="data.feels_like != null">体感 {{ data.feels_like }}度</span>
+        <span v-if="data.humidity != null">湿度 {{ data.humidity }}%</span>
+        <span v-if="data.wind_speed != null">
+          {{ data.wind_direction || '' }}{{ data.wind_direction ? '风 ' : '' }}{{ data.wind_speed }}km/h
         </span>
       </div>
       <div v-if="data.forecast && data.forecast.length" class="weather-forecast">
         <div v-for="f in data.forecast" :key="f.label" class="forecast-item">
           <span class="forecast-label">{{ f.label }}</span>
           <span class="forecast-weather">{{ f.weather }}</span>
-          <span class="forecast-temp">{{ f.low }}~{{ f.high }}°C</span>
+          <span class="forecast-temp">{{ f.low }}~{{ f.high }}度</span>
         </div>
       </div>
       <div v-if="data.suggestion" class="weather-suggestion">
@@ -39,13 +39,15 @@ export default {
   computed: {
     weatherIcon() {
       const w = (this.data.weather || '').toString()
-      if (w.includes('晴')) return '☀'
-      if (w.includes('云') || w.includes('阴')) return '☁'
-      if (w.includes('雨')) return '🌧'
-      if (w.includes('雪')) return '❄'
-      if (w.includes('雾')) return '🌫'
-      if (w.includes('雷')) return '⛈'
-      return '🌤'
+      if (w.includes('晴')) return '晴'
+      if (w.includes('雷')) return '雷'
+      if (w.includes('云') || w.includes('阴')) return '阴'
+      if (w.includes('雨')) return '雨'
+      if (w.includes('雪')) return '雪'
+      if (w.includes('雾')) return '雾'
+      if (w.includes('霾')) return '霾'
+      if (w.includes('沙') || w.includes('尘')) return '沙'
+      return '晴'
     },
     pushTimeLabel() {
       const h = this.data.push_hour

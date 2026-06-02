@@ -8,9 +8,9 @@
       <div v-for="todo in todos" :key="todo.id" class="todo-item">
         <input type="checkbox" :checked="todo.done" @change="toggleTodo(todo.id, todo)">
         <span :class="{ done: todo.done }">{{ todo.task }}</span>
-        <button @click="deleteTodo(todo.id)">🗑️</button>
+        <button @click="deleteTodo(todo.id)" class="del-btn">删除</button>
       </div>
-      <div v-if="!todos.length" class="empty">暂无待办</div>
+      <div v-if="!todos.length" class="empty">还没待办。试试输入「买菜」然后按 +</div>
     </div>
   </div>
 </template>
@@ -68,56 +68,16 @@ export default {
 </script>
 
 <style scoped>
-.todo-list {
-  padding: 10px;
-}
-.add-todo {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.add-todo input {
-  flex: 1;
-  padding: 6px;
-  border-radius: 8px;
-  border: 1px solid #2c3e50;
-  background: #1a1a2e;
-  color: white;
-}
-.add-todo button {
-  background: #4e89ae;
-  border: none;
-  border-radius: 8px;
-  color: white;
-  cursor: pointer;
-  width: 32px;
-}
-.todo-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  padding: 6px;
-  background: #16213e;
-  border-radius: 8px;
-}
-.todo-item span {
-  flex: 1;
-  color: white;
-}
-.todo-item span.done {
-  text-decoration: line-through;
-  color: #7f8c8d;
-}
-.todo-item button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-}
-.empty {
-  color: #7f8c8d;
-  text-align: center;
-  font-size: 14px;
-}
+.todo-list { padding: 10px; }
+.add-todo { display: flex; gap: 8px; margin-bottom: 12px; }
+.add-todo input { flex: 1; padding: 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--tc); }
+.add-todo button { background: var(--p); border: none; border-radius: 8px; color: #fff; cursor: pointer; width: 32px; }
+.todo-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 8px 10px; background: var(--sb); border-radius: 8px; transition: transform .15s, background .15s; }
+.todo-item:hover { background: rgba(255,255,255,.04); transform: translateX(2px); }
+.todo-item input[type="checkbox"] { accent-color: var(--p, #e8929b); width: 16px; height: 16px; cursor: pointer; }
+.todo-item span { flex: 1; color: var(--tc); }
+.todo-item span.done { text-decoration: line-through; color: var(--tc2); transition: all .25s; }
+.todo-item button { background: none; border: none; cursor: pointer; font-size: 14px; opacity: .4; transition: opacity .15s; }
+.todo-item button:hover { opacity: 1; }
+.empty { color: var(--tc2); text-align: center; font-size: 14px; padding: 20px; }
 </style>

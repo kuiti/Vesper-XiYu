@@ -28,16 +28,18 @@ export default {
   mounted() { this.loadDocs() },
   methods: {
     async loadDocs() {
-      try { const res = await api.get('/knowledge/'); this.docs = res.data.documents; this.modelReady = res.data.model_ready } catch (e) { console.error(e) }
+      try { const res = await api.get('/knowledge/'); this.docs = res.data?.documents || []; this.modelReady = res.data?.model_ready } catch (e) { this.error = '加载文档列表失败'; console.error(e) }
     },
     async onFilePicked(e) {
       const file = e.target.files[0]; if (!file) return
+      const MAX_SIZE = 50 * 1024 * 1024  // 50MB
+      if (file.size > MAX_SIZE) { this.error = `文件过大 (${(file.size / 1024 / 1024).toFixed(1)}MB)，限制 50MB`; return }
       this.uploading = true; this.error = ''
       const form = new FormData(); form.append('file', file)
       try {
         const res = await api.post('/knowledge/upload', form)
-        if (res.data.status === 'ok') this.loadDocs()
-        else this.error = res.data.message
+        if (res.data?.status === 'ok') this.loadDocs()
+        else this.error = res.data?.message
       } catch (err) { this.error = '上传失败' }
       finally { this.uploading = false; e.target.value = '' }
     },
@@ -54,10 +56,10 @@ export default {
 .add-row { display: flex; gap: 8px; }
 .doc-list { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
 .doc-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: rgba(255,255,255,.03); border-radius: 6px; }
-.doc-name { flex: 1; font-size: 12px; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.doc-meta { font-size: 11px; color: #7f8c8d; flex-shrink: 0; }
+.doc-name { flex: 1; font-size: 12px; color: var(--tc); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-meta { font-size: 11px; color: var(--tc2); flex-shrink: 0; }
 .error-msg { color: #e74c3c; font-size: 12px; }
-.empty-hint { color: #7f8c8d; text-align: center; font-size: 12px; padding: 8px; }
+.empty-hint { color: var(--tc2); text-align: center; font-size: 12px; padding: 8px; }
 .model-status { font-size: 11px; color: #f39c12; }
 .model-status.ready { color: #4caf50; }
 </style>

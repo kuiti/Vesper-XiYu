@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="chat-manage">
     <div class="section">
       <h4>快捷删除</h4>
@@ -18,18 +18,27 @@
         <button @click="deleteAll" class="danger-btn">清除全部</button>
       </div>
     </div>
-    
+
     <div class="section">
       <h4>自定义日期范围</h4>
       <div class="date-range">
-        <input type="text" v-model="startDate" placeholder="yyyy/mm/dd" maxlength="10" @input="onDateInput">
-        <span>至</span>
-        <input type="text" v-model="endDate" placeholder="yyyy/mm/dd" maxlength="10" @input="onDateInput">
-        <button @click="deleteRange" :disabled="!dateValid" :title="dateError">删除</button>
+        <span class="range-label">从</span>
+        <div class="date-selects">
+          <select v-model.number="startYear"><option v-for="y in years" :key="y" :value="y">{{ y }}年</option></select>
+          <select v-model.number="startMonth" @change="fixStartDay"><option v-for="m in 12" :key="m" :value="m">{{ m }}月</option></select>
+          <select v-model.number="startDay"><option v-for="d in startMaxDay" :key="d" :value="d">{{ d }}日</option></select>
+        </div>
+        <span class="range-label">至</span>
+        <div class="date-selects">
+          <select v-model.number="endYear"><option v-for="y in years" :key="y" :value="y">{{ y }}年</option></select>
+          <select v-model.number="endMonth" @change="fixEndDay"><option v-for="m in 12" :key="m" :value="m">{{ m }}月</option></select>
+          <select v-model.number="endDay"><option v-for="d in endMaxDay" :key="d" :value="d">{{ d }}日</option></select>
+        </div>
+        <button @click="deleteRange" :disabled="!dateValid" :title="dateErrorMsg">删除</button>
       </div>
-      <div v-if="dateError" class="date-error">{{ dateError }}</div>
+      <div v-if="dateErrorMsg" class="date-error">{{ dateErrorMsg }}</div>
     </div>
-    
+
     <div class="section">
       <h4>自动清理</h4>
       <div class="auto-cleanup">
@@ -47,181 +56,92 @@ import api from '../api.js'
 export default {
   data() {
     return {
-      startDate: '',
-      endDate: '',
+      startYear: new Date().getFullYear(),
+      startMonth: new Date().getMonth() + 1,
+      startDay: new Date().getDate(),
+      endYear: new Date().getFullYear(),
+      endMonth: new Date().getMonth() + 1,
+      endDay: new Date().getDate(),
       cleanupDays: 30,
-      dateError: ''
+      dateError: '' // kept for compatibility, but dateErrorMsg is the computed version
     }
   },
   computed: {
+    years() {
+      const y = new Date().getFullYear()
+      const arr = []
+      for (let i = y - 5; i <= y; i++) arr.push(i)
+      return arr
+    },
+    startMaxDay() { return new Date(this.startYear, this.startMonth, 0).getDate() },
+    endMaxDay() { return new Date(this.endYear, this.endMonth, 0).getDate() },
     dateValid() {
-      this.dateError = ''
-      const s = this.startDate.trim(), e = this.endDate.trim()
-      if (!s || !e) return false
-      const pat = /^(\d{4})\/(\d{1,2})\/(\d{1,2})$/
-      const sm = s.match(pat), em = e.match(pat)
-      if (!sm) { this.dateError = '开始日期格式应为 yyyy/mm/dd' ; return false }
-      if (!em) { this.dateError = '结束日期格式应为 yyyy/mm/dd' ; return false }
-      if (parseInt(sm[2]) > 12 || parseInt(em[2]) > 12) { this.dateError = '月份不能超过12' ; return false }
-      if (parseInt(sm[3]) > 31 || parseInt(em[3]) > 31) { this.dateError = '日期不能超过31' ; return false }
-      if (s > e) { this.dateError = '开始日期不能晚于结束日期' ; return false }
+      const d1 = new Date(this.startYear, this.startMonth - 1, this.startDay)
+      const d2 = new Date(this.endYear, this.endMonth - 1, this.endDay)
+      if (d1 > d2) return false
+      if (d2 > new Date()) return false
       return true
+    },
+    dateErrorMsg() {
+      const d1 = new Date(this.startYear, this.startMonth - 1, this.startDay)
+      const d2 = new Date(this.endYear, this.endMonth - 1, this.endDay)
+      if (d1 > d2) return '开始日期不能晚于结束日期'
+      if (d2 > new Date()) return '结束日期不能超过今天'
+      return ''
     }
   },
-  mounted() {
-    this.loadCleanupSettings()
-  },
+  mounted() { this.loadCleanupSettings() },
   methods: {
+    fixStartDay() { if (this.startDay > this.startMaxDay) this.startDay = this.startMaxDay },
+    fixEndDay() { if (this.endDay > this.endMaxDay) this.endDay = this.endMaxDay },
+    _fmt(y, m, d) { return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}` },
     async quickDelete(type) {
       const labels = { '30min': '半小时', '60min': '一小时', today: '今天', yesterday: '昨天', '3days': '最近3天', '7days': '最近7天', '14days': '最近14天', '30days': '最近30天', '60days': '最近60天', '90days': '最近90天', '180days': '最近半年', '365days': '最近一年' }
       if (!confirm(`确定删除${labels[type]}的记录吗？此操作同时清除AI记忆。`)) return
-
       try {
-        if (type === '30min') {
-          await api.delete('/chat/manage/recent/30')
-        } else if (type === '60min') {
-          await api.delete('/chat/manage/recent/60')
-        } else if (type === 'today') {
-          const today = new Date().toISOString().slice(0,10)
-          await api.delete('/chat/manage/range', { data: { start: today, end: today } })
-        } else if (type === 'yesterday') {
-          const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0,10)
-          await api.delete('/chat/manage/range', { data: { start: yesterday, end: yesterday } })
-        } else {
-          const days = parseInt(type.replace('days',''))
-          await api.delete(`/chat/manage/older-than/${days}`)
-        }
+        if (type === '30min') { await api.delete('/chat/manage/recent/30') }
+        else if (type === '60min') { await api.delete('/chat/manage/recent/60') }
+        else if (type === 'today') { const d = new Date(); const t = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; await api.delete('/chat/manage/range', { data: { start: t + 'T00:00:00', end: t + 'T23:59:59' } }) }
+        else if (type === 'yesterday') { const d = new Date(Date.now() - 86400000); const y = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; await api.delete('/chat/manage/range', { data: { start: y + 'T00:00:00', end: y + 'T23:59:59' } }) }
+        else { const days = parseInt(type.replace('days','')); await api.delete(`/chat/manage/older-than/${days}`) }
         this.$emit('changed')
-      } catch (err) {
-        console.error('删除失败', err)
-        alert('删除失败')
-      }
+      } catch (err) { console.error(err); alert('删除失败') }
     },
     async deleteAll() {
       if (!confirm('确定清除全部聊天记录和AI记忆？此操作不可恢复！')) return
-      try {
-        await api.delete('/chat/manage/all')
-        this.$emit('changed')
-      } catch (err) {
-        console.error('清除失败', err)
-        alert('清除失败')
-      }
+      try { await api.delete('/chat/manage/all'); this.$emit('changed') } catch (err) { console.error(err); alert('清除失败') }
     },
-    onDateInput() { this.dateError = '' },
     async deleteRange() {
       if (!this.dateValid) return
-      const norm = (d) => {
-        const [y, m, d_] = d.trim().match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/).slice(1)
-        return `${y}/${m.padStart(2,'0')}/${d_.padStart(2,'0')}`
-      }
-      const start = norm(this.startDate), end = norm(this.endDate)
+      const start = this._fmt(this.startYear, this.startMonth, this.startDay)
+      const end = this._fmt(this.endYear, this.endMonth, this.endDay)
       if (!confirm(`确定删除 ${start} 至 ${end} 的聊天记录和AI记忆吗？`)) return
-      try {
-        await api.delete('/chat/manage/range', { data: { start, end } })
-        this.$emit('changed')
-        this.startDate = ''; this.endDate = ''
-        alert('已删除')
-      } catch (err) {
-        console.error('删除失败', err)
-        alert('删除失败')
-      }
+      try { await api.delete('/chat/manage/range', { data: { start, end } }); this.$emit('changed'); alert('已删除') } catch (err) { console.error(err); alert('删除失败') }
     },
-    async loadCleanupSettings() {
-      try {
-        const res = await api.get('/chat/manage/cleanup-settings')
-        this.cleanupDays = res.data.auto_cleanup_days
-      } catch (err) {
-        console.error('加载设置失败', err)
-      }
-    },
-    async saveCleanupSettings() {
-      try {
-        await api.post('/chat/manage/cleanup-settings', { days: this.cleanupDays })
-        alert('自动清理设置已保存')
-      } catch (err) {
-        console.error('保存失败', err)
-      }
-    }
+    async loadCleanupSettings() { try { const res = await api.get('/chat/manage/cleanup-settings'); const d = res.data.auto_cleanup_days; this.cleanupDays = (typeof d === 'number' && d >= 7 && d <= 365) ? d : 30 } catch (err) {} },
+    async saveCleanupSettings() { try { await api.post('/chat/manage/cleanup-settings', { days: this.cleanupDays }); alert('自动清理设置已保存') } catch (err) { console.error(err) } }
   }
 }
 </script>
 
 <style scoped>
-.chat-manage {
-  padding: 10px;
-}
-.section {
-  margin-bottom: 20px;
-}
-.section h4 {
-  margin: 0 0 10px 0;
-  color: #4e89ae;
-  font-size: 14px;
-}
-.quick-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.quick-buttons button {
-  background: #2c3e50;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 12px;
-  color: white;
-  cursor: pointer;
-  font-size: 12px;
-}
-.date-range { display: flex; align-items: center; gap: 8px; }
-.date-range input[type="text"] { width: 100px; padding: 6px 8px; border-radius: 6px; background: #0f1923; color: #ddd; border: 1px solid rgba(255,255,255,.1); font-size: 13px; font-family: monospace; text-align: center; outline: none; }
-.date-range input[type="text"]:focus { border-color: #4e89ae; }
+.chat-manage { padding: 10px; }
+.section { margin-bottom: 20px; }
+.section h4 { margin: 0 0 10px 0; color: var(--p); font-size: 14px; }
+.quick-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick-buttons button { background: var(--sb); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; color: var(--tc); cursor: pointer; font-size: 12px; transition: background .15s; }
+.quick-buttons button:hover { background: var(--p); color: #fff; }
+.date-range { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.range-label { color: var(--tc2); font-size: 13px; }
+.date-selects { display: flex; gap: 4px; }
+.date-selects select { padding: 6px 4px; border-radius: 6px; background: var(--bg); color: var(--tc); border: 1px solid var(--border); font-size: 13px; }
+.date-range > button { background: var(--p); border: none; border-radius: 6px; padding: 6px 14px; color: #fff; cursor: pointer; }
+.date-range > button:disabled { opacity: .4; cursor: not-allowed; }
 .date-error { color: #e74c3c; font-size: 11px; margin-top: 6px; }
-.quick-buttons button:hover {
-  background: #4e89ae;
-}
-.danger-btn { background: #e74c3c !important; }
+.danger-btn { background: #e74c3c !important; color: #fff !important; border-color: #e74c3c !important; }
 .danger-btn:hover { background: #c0392b !important; }
-.date-range {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.date-range input {
-  padding: 6px;
-  border-radius: 6px;
-  border: 1px solid #2c3e50;
-  background: #1a1a2e;
-  color: white;
-}
-.date-range button {
-  background: #4e89ae;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 12px;
-  color: white;
-  cursor: pointer;
-}
-.auto-cleanup {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.auto-cleanup input {
-  width: 80px;
-  padding: 6px;
-  border-radius: 6px;
-  border: 1px solid #2c3e50;
-  background: #1a1a2e;
-  color: white;
-}
-.auto-cleanup button {
-  background: #4e89ae;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 12px;
-  color: white;
-  cursor: pointer;
-}
+.auto-cleanup { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.auto-cleanup input { width: 80px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--tc); }
+.auto-cleanup span { color: var(--tc2); font-size: 13px; }
+.auto-cleanup button { background: var(--p); border: none; border-radius: 6px; padding: 6px 14px; color: #fff; cursor: pointer; }
 </style>

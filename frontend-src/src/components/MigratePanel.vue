@@ -34,7 +34,12 @@
         <li>记忆键值对</li>
         <li>对话摘要</li>
         <li>待办 / 笔记 / 倒计时 / 提醒</li>
-        <li>向量记忆库（导入后需手动重建）</li>
+        <li>用户画像</li>
+        <li>AI 性格（OCEAN）</li>
+        <li>目标追踪</li>
+        <li>情感日志 & 每日统计</li>
+        <li>成就 & 收藏 & 日记</li>
+        <li>句子索引（导入后需手动重建向量）</li>
       </ul>
     </div>
   </div>
@@ -60,9 +65,9 @@ export default {
         const a = document.createElement('a')
         a.href = url
         const now = new Date().toISOString().slice(0,10)
-        a.download = `vesper_backup_${now}.json`
+        a.download = `sakura_backup_${now}.json`
         a.click()
-        URL.revokeObjectURL(url)
+        setTimeout(() => URL.revokeObjectURL(url), 10000)
       } catch (err) {
         console.error('导出失败', err)
         alert('导出失败')
@@ -103,16 +108,16 @@ export default {
 <style scoped>
 .migrate-panel { padding: 8px; }
 .section { margin-bottom: 16px; }
-.section h4 { margin: 0 0 6px 0; color: #4e89ae; font-size: 14px; }
-.desc { font-size: 12px; color: #7f8c8d; margin: 0 0 10px 0; }
-hr { border: none; border-top: 1px solid #2c3e50; margin: 12px 0; }
-.btn-primary { width: 100%; padding: 10px; background: #4e89ae; border: none; border-radius: 8px; color: white; cursor: pointer; font-size: 14px; }
+.section h4 { margin: 0 0 6px 0; color: var(--p); font-size: 14px; }
+.desc { font-size: 12px; color: var(--tc2); margin: 0 0 10px 0; }
+hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+.btn-primary { width: 100%; padding: 10px; background: var(--p); border: none; border-radius: 8px; color: #fff; cursor: pointer; font-size: 14px; }
 .btn-primary:disabled { opacity: .5; cursor: wait; }
 .result { margin-top: 8px; padding: 8px; border-radius: 6px; font-size: 13px; }
 .result.ok { background: #4caf5022; color: #4caf50; }
 .result.error { background: #e74c3c22; color: #e74c3c; }
-.restored-detail { margin-top: 6px; font-size: 11px; color: #7f8c8d; }
+.restored-detail { margin-top: 6px; font-size: 11px; color: var(--tc2); }
 .restored-detail div { padding: 2px 0; }
-ul { font-size: 12px; color: #bdc3c7; padding-left: 16px; }
+ul { font-size: 12px; color: var(--tc2); padding-left: 16px; }
 ul li { margin-bottom: 3px; }
 </style>

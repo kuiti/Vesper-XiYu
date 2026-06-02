@@ -23,11 +23,17 @@ export default {
     return {
       loading: false,
       modelLoaded: false,
-      vectorCount: 0
+      vectorCount: 0,
+      _statusTimer: null,
+      _unmounted: false
     }
   },
   mounted() {
     this.loadStatus()
+  },
+  beforeUnmount() {
+    this._unmounted = true
+    if (this._statusTimer) { clearTimeout(this._statusTimer); this._statusTimer = null }
   },
   methods: {
     async loadStatus() {
@@ -44,7 +50,7 @@ export default {
       try {
         await api.post('/rag/rebuild')
         alert('索引重建已开始，请稍等几分钟（后台运行）')
-        setTimeout(() => this.loadStatus(), 5000)
+        if (!this._unmounted) this._statusTimer = setTimeout(() => this.loadStatus(), 5000)
       } catch (err) {
         console.error('重建失败', err)
         alert('重建失败，请检查后端日志')
@@ -57,26 +63,13 @@ export default {
 </script>
 
 <style scoped>
-.rag-panel {
-  padding: 10px;
-}
-.status-row {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 6px 10px; margin-bottom: 6px;
-  background: rgba(255,255,255,.03); border-radius: 6px;
-  font-size: 13px;
-}
-.label { color: #8899aa; }
-.badge { padding: 2px 10px; border-radius: 10px; font-size: 11px; background: rgba(255,255,255,.08); color: #ccc; }
+.rag-panel { padding: 10px; }
+.status-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; margin-bottom: 6px; background: rgba(255,255,255,.03); border-radius: 6px; font-size: 13px; }
+.label { color: var(--tc2); }
+.badge { padding: 2px 10px; border-radius: 10px; font-size: 11px; background: rgba(255,255,255,.08); color: var(--tc); }
 .badge.ok { background: #4caf5033; color: #4caf50; }
 .badge.fail { background: #e74c3c33; color: #e74c3c; }
-button {
-  width: 100%; padding: 8px; margin-top: 10px;
-  background: #4e89ae; border: none; border-radius: 6px;
-  color: white; cursor: pointer;
-}
-button:disabled { background: #2c3e50; }
-.hint {
-  font-size: 12px; color: #7f8c8d; margin-top: 8px; text-align: center;
-}
+button { width: 100%; padding: 8px; margin-top: 10px; background: var(--p); border: none; border-radius: 6px; color: #fff; cursor: pointer; }
+button:disabled { background: var(--border); }
+.hint { font-size: 12px; color: var(--tc2); margin-top: 8px; text-align: center; }
 </style>

@@ -9,7 +9,7 @@
       <div v-for="(value, key) in memories" :key="key" class="item">
         <span class="key">{{ key }}</span>
         <span class="value">{{ value }}</span>
-        <button @click="deleteMemory(key)">🗑️</button>
+        <button @click="deleteMemory(key)" class="del-btn">删除</button>
       </div>
       <div v-if="Object.keys(memories).length === 0" class="empty">暂无手动记忆</div>
     </div>
@@ -18,9 +18,9 @@
       <h4>📝 长对话摘要</h4>
       <div class="summary-text">{{ summary || '暂无摘要' }}</div>
       <div class="keypoints">
-        <span v-for="kp in keypoints" :key="kp" class="keypoint">{{ kp }}</span>
+        <span v-for="(kp, i) in keypoints" :key="i" class="keypoint">{{ kp }}</span>
       </div>
-      <button @click="resetSummary">重置摘要记忆</button>
+      <button @click="resetSummary" :disabled="resetting">{{ resetting ? '重置中...' : '重置摘要记忆' }}</button>
     </div>
   </div>
 </template>
@@ -35,7 +35,8 @@ export default {
       newKey: '',
       newValue: '',
       summary: '',
-      keypoints: []
+      keypoints: [],
+      resetting: false
     }
   },
   mounted() {
@@ -46,7 +47,7 @@ export default {
     async loadMemory() {
       try {
         const res = await api.get('/memory/')
-        this.memories = res.data
+        this.memories = (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) ? res.data : {}
       } catch (err) { console.error(err) }
     },
     async addMemory() {
@@ -61,23 +62,26 @@ export default {
     async deleteMemory(key) {
       if (!confirm(`删除记忆 "${key}"？`)) return
       try {
-        await api.delete(`/memory/${key}`)
+        await api.delete(`/memory/${encodeURIComponent(key)}`)
         await this.loadMemory()
       } catch (err) { console.error(err) }
     },
     async loadSummary() {
       try {
         const res = await api.get('/summary/active')
-        this.summary = res.data.summary
-        this.keypoints = res.data.keypoints || []
+        const d = res.data || {}
+        this.summary = d.summary || ''
+        this.keypoints = d.keypoints || []
       } catch (err) { console.error(err) }
     },
     async resetSummary() {
       if (!confirm('确定要重置摘要记忆？此操作不可撤销。')) return
+      this.resetting = true
       try {
         await api.post('/summary/reset')
         await this.loadSummary()
       } catch (err) { console.error(err) }
+      finally { this.resetting = false }
     }
   }
 }
@@ -86,14 +90,14 @@ export default {
 <style scoped>
 .memory-panel { padding: 8px; }
 .add-memory { display: flex; gap: 8px; margin-bottom: 12px; }
-.add-memory input { flex: 1; padding: 6px; border-radius: 6px; background: #1a1a2e; color: white; border: 1px solid #2c3e50; }
-.add-memory button { background: #4e89ae; border: none; color: white; border-radius: 6px; cursor: pointer; padding: 0 12px; }
-.item { display: flex; justify-content: space-between; align-items: center; padding: 6px; background: #16213e; border-radius: 6px; margin-bottom: 6px; }
-.item .key { font-weight: bold; color: #4e89ae; width: 80px; }
-.item .value { flex: 1; color: white; }
+.add-memory input { flex: 1; padding: 6px; border-radius: 6px; background: var(--bg); color: var(--tc); border: 1px solid var(--border); }
+.add-memory button { background: var(--p); border: none; color: #fff; border-radius: 6px; cursor: pointer; padding: 0 12px; }
+.item { display: flex; justify-content: space-between; align-items: center; padding: 6px; background: var(--sb); border-radius: 6px; margin-bottom: 6px; }
+.item .key { font-weight: bold; color: var(--p); width: 80px; }
+.item .value { flex: 1; color: var(--tc); }
 .item button { background: none; border: none; color: #e74c3c; cursor: pointer; }
-.empty, .summary-text { text-align: center; color: #7f8c8d; font-size: 13px; padding: 12px; }
+.empty, .summary-text { text-align: center; color: var(--tc2); font-size: 13px; padding: 12px; }
 .summary-section { margin-top: 16px; }
 .keypoints { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-.keypoint { background: #2c3e50; padding: 4px 8px; border-radius: 12px; font-size: 12px; color: #bdc3c7; }
+.keypoint { background: var(--border); padding: 4px 8px; border-radius: 12px; font-size: 12px; color: var(--tc2); }
 </style>

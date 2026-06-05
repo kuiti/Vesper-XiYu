@@ -1,0 +1,210 @@
+# core/scheduler.py — APScheduler 定时任务管理
+"""替代 asyncio.create_task，支持持久化、错过补执行、错误重试"""
+import logging
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
+
+logger = logging.getLogger(__name__)
+
+# 全局调度器实例
+_scheduler = None
+
+
+def get_scheduler() -> AsyncIOScheduler:
+    """获取全局调度器（懒初始化）"""
+    global _scheduler
+    if _scheduler is None:
+        _scheduler = AsyncIOScheduler(
+            job_defaults={
+                'coalesce': True,      # 错过的任务合并为一次执行
+                'max_instances': 1,     # 同一任务最多1个实例
+                'misfire_grace_time': 300,  # 错过5分钟内仍可执行
+            }
+        )
+    return _scheduler
+
+
+def start_scheduler():
+    """启动调度器"""
+    scheduler = get_scheduler()
+    if not scheduler.running:
+        scheduler.start()
+        logger.info("[调度器] 已启动")
+
+
+def shutdown_scheduler():
+    """关闭调度器"""
+    global _scheduler
+    if _scheduler and _scheduler.running:
+        _scheduler.shutdown(wait=False)
+        logger.info("[调度器] 已关闭")
+    _scheduler = None
+
+
+def add_interval_job(func, seconds: int, job_id: str = None, **kwargs):
+    """添加间隔任务"""
+    scheduler = get_scheduler()
+    job_id = job_id or f"interval_{func.__name__}"
+    try:
+        scheduler.add_job(
+            func,
+            trigger=IntervalTrigger(seconds=seconds),
+            id=job_id,
+            replace_existing=True,
+            **kwargs
+        )
+        logger.info(f"[调度器] 添加间隔任务: {job_id} (每{seconds}秒)")
+    except Exception as e:
+        logger.error(f"[调度器] 添加任务失败: {job_id} - {e}")
+
+
+def add_cron_job(func, hour: int, minute: int = 0, job_id: str = None, **kwargs):
+    """添加定时任务（每天指定时间）"""
+    scheduler = get_scheduler()
+    job_id = job_id or f"cron_{func.__name__}_{hour:02d}{minute:02d}"
+    try:
+        # 分离 CronTrigger 参数和 add_job 参数
+        cron_kwargs = {k: v for k, v in kwargs.items() if k in ('day_of_week', 'day', 'week', 'month', 'year', 'second')}
+        job_kwargs = {k: v for k, v in kwargs.items() if k not in cron_kwargs}
+        scheduler.add_job(
+            func,
+            trigger=CronTrigger(hour=hour, minute=minute, **cron_kwargs),
+            id=job_id,
+            replace_existing=True,
+            **job_kwargs
+        )
+        logger.info(f"[调度器] 添加定时任务: {job_id} ({hour:02d}:{minute:02d})")
+    except Exception as e:
+        logger.error(f"[调度器] 添加任务失败: {job_id} - {e}")
+
+
+def remove_job(job_id: str):
+    """移除任务"""
+    scheduler = get_scheduler()
+    try:
+        scheduler.remove_job(job_id)
+        logger.info(f"[调度器] 移除任务: {job_id}")
+    except Exception:
+        pass
+
+
+def list_jobs() -> list:
+    """列出所有任务"""
+    scheduler = get_scheduler()
+    return [
+        {
+            "id": job.id,
+            "name": job.name,
+            "next_run": str(job.next_run_time) if job.next_run_time else None,
+            "trigger": str(job.trigger),
+        }
+        for job in scheduler.get_jobs()
+    ]
+
+
+# ─── 天气推送任务 ───
+async def _weather_push_job(hour: int):
+    """天气推送任务（由调度器调用）"""
+    try:
+        from core.db import get_config
+        from core.weather import get_weather_for_city, build_weather_card_data
+        import asyncio
+
+        if not get_config("use_weather_care", True):
+            return
+
+        city = get_config("precise_city") or get_config("manual_city") or "北京"
+        for attempt in range(2):
+            weather = await asyncio.to_thread(get_weather_for_city, city)
+            card_data = build_weather_card_data(weather, hour)
+            if "error" not in card_data:
+                # 通过 WebSocket 推送（需要获取所有活跃连接）
+                # 这里只记录日志，实际推送由 main.py 的 WebSocket 处理
+                print(f"[天气调度] {hour}:00 推送成功: {card_data.get('weather', '')} {card_data.get('temp', '')}°C")
+                break
+            print(f"[天气调度] 第{attempt+1}次获取失败: {card_data['error']}")
+            if attempt == 0:
+                await asyncio.sleep(60)
+        else:
+            print(f"[天气调度] 2次尝试均失败，本时段跳过")
+    except Exception as e:
+        print(f"[天气调度] 推送异常: {e}")
+
+
+async def _diary_generate_job():
+    """AI 日记自动生成任务（由调度器调用）"""
+    try:
+        import asyncio
+        from datetime import datetime
+
+        def _do_diary():
+            from core.db import get_conn, get_config, save_diary_entry
+            from core.llm_client import call_llm
+
+            today = datetime.now().strftime("%Y-%m-%d")
+            ai_name = get_config("ai_name", "佐仓")
+
+            with get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) as cnt FROM chat_history WHERE timestamp >= ?", (today,))
+                msg_count = cursor.fetchone()["cnt"]
+                cursor.execute("SELECT content, role FROM chat_history WHERE timestamp >= ? ORDER BY id DESC LIMIT 15", (today,))
+                recent = cursor.fetchall()
+
+            if msg_count < 5:
+                print(f"[AI日记] 今日消息不足5条，跳过")
+                return
+
+            recent_text = "\n".join([f"{'用户' if r['role']=='user' else '「' + ai_name + '」'}: {r['content'][:80]}" for r in reversed(recent)])
+            prompt = f"今天是{today}。「{ai_name}」和用户今天聊了{msg_count}条消息。以下是今天的一些对话片段：\n{recent_text}\n\n请以「{ai_name}」的第一人称视角写一篇简短的日记（80字以内），内容包括：今天和用户聊了什么、自己的感受、用户今天的心情。语气温暖自然。"
+
+            result = call_llm(prompt=prompt, temperature=0.8, max_tokens=200, timeout=15)
+            if result:
+                mood = "温暖"
+                save_diary_entry(today, result, mood)
+                print(f"[AI日记] 已自动生成 {today}")
+
+        await asyncio.to_thread(_do_diary)
+    except Exception as e:
+        print(f"[AI日记] 自动生成失败: {e}")
+
+
+def setup_default_jobs():
+    """设置默认的定时任务"""
+    from core.scheduler import add_cron_job
+
+    # 天气推送：7:00, 12:00, 19:00
+    for hour in [7, 12, 19]:
+        add_cron_job(
+            _weather_push_job,
+            hour=hour,
+            job_id=f"weather_{hour:02d}",
+            args=[hour]
+        )
+
+    # AI 日记：23:00
+    add_cron_job(
+        _diary_generate_job,
+        hour=23,
+        job_id="diary_23"
+    )
+
+    # 每周清理 emotion_log 和 proactive_response_log（每周日 4:00）
+    def _cleanup_job():
+        try:
+            from core.db import cleanup_emotion_log
+            cleanup_emotion_log(90)
+        except Exception as e:
+            print(f"[清理] emotion_log 清理失败: {e}")
+        try:
+            from core.db import get_conn
+            from datetime import datetime, timedelta
+            cutoff = (datetime.now() - timedelta(days=90)).isoformat()
+            with get_conn() as conn:
+                conn.cursor().execute("DELETE FROM proactive_response_log WHERE timestamp < ?", (cutoff,))
+        except Exception as e:
+            print(f"[清理] proactive_response_log 清理失败: {e}")
+    add_cron_job(_cleanup_job, hour=4, day_of_week="sun", job_id="cleanup_emotion_log")
+
+    print("[调度器] 已设置默认任务: 天气(7/12/19点) + 日记(23点)")

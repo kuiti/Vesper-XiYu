@@ -1,0 +1,49 @@
+# === 只跟踪佐仓 ===
+# 忽略所有顶层目录，再单独排除佐仓
+/*
+!.gitignore
+!sakura_backend/
+!sakura_frontend/
+
+# === 通用排除 ===
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+venv/
+.venv/
+*.egg
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Build / Dist
+dist/
+build/
+*.spec
+
+# Database / Data
+data/
+*.db
+*.sqlite
+*.sqlite3
+chroma_db/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/projects/*/sessions/
+
+# Temp
+*.tmp
+*.log

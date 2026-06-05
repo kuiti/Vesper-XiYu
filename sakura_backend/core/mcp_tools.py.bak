@@ -1,0 +1,209 @@
+"""MCP 工具注册表 —— 将现有 DB 函数封装为标准 JSON-RPC 工具"""
+
+from core.db import (
+    get_memory,
+    get_todos as _get_todos, add_todo,
+    get_notes as _get_notes, add_note,
+    get_reminders as _get_reminders, add_reminder, delete_reminder,
+    search_chat_messages, get_config,
+    get_conn,
+)
+
+TOOLS = [
+    {
+        "name": "search_memory",
+        "description": "搜索用户记忆和对话记忆，返回相关记忆内容",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "搜索关键词"}},
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "get_todos",
+        "description": "获取所有待办事项列表",
+        "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "add_todo",
+        "description": "添加新的待办事项",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"task": {"type": "string", "description": "待办内容"}},
+            "required": ["task"]
+        }
+    },
+    {
+        "name": "get_notes",
+        "description": "获取所有笔记列表",
+        "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "add_note",
+        "description": "添加新的笔记",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"title": {"type": "string"}, "content": {"type": "string"}},
+            "required": ["content"]
+        }
+    },
+    {
+        "name": "get_reminders",
+        "description": "获取所有提醒列表",
+        "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "add_reminder",
+        "description": "添加新的提醒事项（用于记住重要日期、考试、约会等）",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "content": {"type": "string", "description": "提醒内容"},
+                "target_time": {"type": "string", "description": "目标时间（ISO格式，如2026-06-09T09:00:00）"},
+                "level": {"type": "integer", "description": "重要程度 1-7（1=最高，7=最低）", "default": 4}
+            },
+            "required": ["content", "target_time"]
+        }
+    },
+    {
+        "name": "delete_reminder",
+        "description": "删除提醒事项",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"id": {"type": "integer", "description": "提醒ID"}},
+            "required": ["id"]
+        }
+    },
+    {
+        "name": "add_schedule",
+        "description": "添加日程/特殊日期（生日、纪念日、节日等）",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "日程标题"},
+                "start_time": {"type": "string", "description": "开始时间（ISO格式）"},
+                "end_time": {"type": "string", "description": "结束时间（可选）"},
+                "description": {"type": "string", "description": "描述（可选）"},
+                "color": {"type": "string", "description": "颜色（可选，默认蓝色）", "default": "#5390d4"}
+            },
+            "required": ["title", "start_time"]
+        }
+    },
+    {
+        "name": "get_schedules",
+        "description": "获取所有日程列表",
+        "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "delete_schedule",
+        "description": "删除日程",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"id": {"type": "integer", "description": "日程ID"}},
+            "required": ["id"]
+        }
+    },
+    {
+        "name": "search_chat",
+        "description": "全文搜索聊天记录",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"keyword": {"type": "string", "description": "搜索关键词"}},
+            "required": ["keyword"]
+        }
+    },
+]
+
+
+def call_tool(name, arguments):
+    """执行工具调用，返回结果字符串"""
+    tool_found = False
+    for tool in TOOLS:
+        if tool["name"] == name:
+            tool_found = True
+            for req in tool["inputSchema"].get("required", []):
+                if req not in arguments:
+                    return f"缺少必需参数: {req}"
+            break
+    if not tool_found:
+        return f"未知工具: {name}"
+    if name == "search_memory":
+        mems = get_memory()
+        query = arguments.get("query", "").lower()
+        results = [f"{k}: {v}" for k, v in mems.items() if query in k.lower() or query in v.lower()]
+        return "\n".join(results[:5]) if results else "无相关记忆"
+
+    if name == "get_todos":
+        todos = _get_todos()
+        if not todos:
+            return "暂无待办"
+        return "\n".join([f"[{'✓' if t['done'] else ' '}] {t['task']}" for t in todos])
+
+    if name == "add_todo":
+        add_todo(arguments["task"])
+        return "待办已添加"
+
+    if name == "get_notes":
+        notes = _get_notes()
+        if not notes:
+            return "暂无笔记"
+        return "\n".join([f"- {n.get('title') or (n.get('content') or '')[:30]}" for n in notes])
+
+    if name == "add_note":
+        add_note(arguments.get("title", ""), arguments["content"])
+        return "笔记已添加"
+
+    if name == "get_reminders":
+        reminders = _get_reminders()
+        if not reminders:
+            return "暂无提醒"
+        return "\n".join([f"- {r['content']} ({r.get('target_time','')})" for r in reminders])
+
+    if name == "add_reminder":
+        level = arguments.get("level", 4)
+        add_reminder(arguments["content"], arguments["target_time"], level)
+        return f"提醒已添加: {arguments['content']}"
+
+    if name == "delete_reminder":
+        delete_reminder(arguments["id"])
+        return "提醒已删除"
+
+    if name == "add_schedule":
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO schedule (title, start_time, end_time, description, color) VALUES (?, ?, ?, ?, ?)",
+                (
+                    arguments["title"],
+                    arguments["start_time"],
+                    arguments.get("end_time", ""),
+                    arguments.get("description", ""),
+                    arguments.get("color", "#5390d4"),
+                ),
+            )
+            conn.commit()
+        return f"日程已添加: {arguments['title']}"
+
+    if name == "get_schedules":
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, title, start_time, color FROM schedule ORDER BY start_time DESC LIMIT 20")
+            rows = cursor.fetchall()
+        if not rows:
+            return "暂无日程"
+        return "\n".join([f"- {r['title']} ({r['start_time'][:10]})" for r in rows])
+
+    if name == "delete_schedule":
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM schedule WHERE id = ?", (arguments["id"],))
+            conn.commit()
+        return "日程已删除"
+
+    if name == "search_chat":
+        results = search_chat_messages(arguments["keyword"])
+        if not results:
+            return "无匹配聊天记录"
+        return "\n".join([f"[{r['role']}] {r['content'][:100]}" for r in results[:5]])
+
+    return f"未知工具: {name}"

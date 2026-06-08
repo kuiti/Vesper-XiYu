@@ -14,21 +14,21 @@ export const useChatStore = defineStore('chat', () => {
   const historyReady = ref(false)
   const favoriteIds = ref(new Set())
 
-  let ws = null
+  const wsRaw = ref(null)
   let _onMessage = null
 
   function connect(onMessage) {
     _onMessage = onMessage
-    if (ws && ws.readyState === WebSocket.OPEN) return
+    if (wsRaw.value && wsRaw.value.readyState === WebSocket.OPEN) return
     try {
-      ws = createWebSocket('/ws/chat')
+      wsRaw.value = createWebSocket('/ws/chat')
     } catch (e) { scheduleReconnect(); return }
-    ws.onopen = () => { wsReady.value = true }
-    ws.onmessage = (event) => {
+    wsRaw.value.onopen = () => { wsReady.value = true }
+    wsRaw.value.onmessage = (event) => {
       if (_onMessage) _onMessage(event)
     }
-    ws.onerror = () => { wsReady.value = false; try { ws.close() } catch(e) {} }
-    ws.onclose = () => { wsReady.value = false; scheduleReconnect() }
+    wsRaw.value.onerror = () => { wsReady.value = false; try { wsRaw.value?.close() } catch(e) {} }
+    wsRaw.value.onclose = () => { wsReady.value = false; scheduleReconnect() }
   }
 
   let reconnectTimer = null
@@ -44,13 +44,13 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function send(data) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(data))
+    if (wsRaw.value && wsRaw.value.readyState === WebSocket.OPEN) {
+      wsRaw.value.send(JSON.stringify(data))
     }
   }
 
   function disconnect() {
-    if (ws) { ws.onclose = null; ws.close(); ws = null }
+    if (wsRaw.value) { wsRaw.value.onclose = null; wsRaw.value.close(); wsRaw.value = null }
     wsReady.value = false
   }
 
@@ -97,7 +97,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   return {
-    messages, isStreaming, pendingReply, wsReady,
+    messages, isStreaming, pendingReply, wsReady, wsRaw,
     totalMessages, nextAfterId, loadingMore, historyReady, favoriteIds,
     connect, send, disconnect, scheduleReconnect,
     loadHistory, loadMoreHistory, loadFavoriteIds, toggleFavorite,

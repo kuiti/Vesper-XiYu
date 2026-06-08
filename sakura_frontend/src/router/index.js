@@ -6,7 +6,7 @@ const routes = [
     path: '/',
     component: () => import('../layouts/DefaultLayout.vue'),
     children: [
-      { path: '', name: 'chat', component: () => import('../views/ChatView.vue') },
+      { path: '', name: 'chat', component: () => import('../views/ChatFullView.vue') },
       { path: 'tools', name: 'tools', component: () => import('../views/ToolsView.vue') },
       { path: 'memory', name: 'memory', component: () => import('../views/MemoryView.vue') },
       { path: 'diary', name: 'diary', component: () => import('../views/DiaryView.vue') },

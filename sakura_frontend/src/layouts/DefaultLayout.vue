@@ -34,7 +34,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NLayout, NLayoutSider, NLayoutContent, NMenu, NIcon } from 'naive-ui'
 import { ChatboxEllipses, Apps, Book, StatsChart, GameController, Settings, TimeOutline } from '@vicons/ionicons5'

@@ -1,4 +1,4 @@
-// router/index.js — 路由配置（逐步添加页面）
+// router/index.js — 路由配置
 import { createRouter, createWebHashHistory } from 'vue-router'
 
 const routes = [
@@ -7,8 +7,13 @@ const routes = [
     component: () => import('../layouts/DefaultLayout.vue'),
     children: [
       { path: '', name: 'chat', component: () => import('../views/ChatView.vue') },
-      // 以下页面逐步从旧 App.vue 迁移
+      { path: 'tools', name: 'tools', component: () => import('../views/ToolsView.vue') },
+      { path: 'memory', name: 'memory', component: () => import('../views/MemoryView.vue') },
+      { path: 'diary', name: 'diary', component: () => import('../views/DiaryView.vue') },
+      { path: 'stats', name: 'stats', component: () => import('../views/StatsView.vue') },
+      { path: 'games', name: 'games', component: () => import('../views/GamesView.vue') },
       { path: 'settings', name: 'settings', component: () => import('../views/SettingsView.vue') },
+      { path: 'history', name: 'history', component: () => import('../views/HistoryView.vue') },
     ]
   }
 ]

@@ -556,7 +556,7 @@ def delete_memory(key):
         cursor.execute("DELETE FROM memory WHERE key = ?", (key,))
         if old:
             cursor.execute(
-                "INSERT INTO memory_history (memory_key, action, old_value, new_value, changed_at) VALUES (?, 'DELETE', ?, ?, ?)",
+                "INSERT INTO memory_history (memory_key, old_value, new_value, event, created_at) VALUES (?, ?, ?, 'DELETE', ?)",
                 (key, old["value"], None, datetime.now().isoformat())
             )
 
@@ -1039,7 +1039,8 @@ def get_active_tiered_summaries():
             "key_points": kp or [], "importance": r["importance"],
             "remaining_days": r["remaining_days"], "start_time": r["start_time"],
             "end_time": r["end_time"], "created_at": r["created_at"],
-            "mention_count": r["mention_count"], "daily_boost": r["daily_boost"]
+            "mention_count": r["mention_count"] if "mention_count" in r.keys() else 0,
+            "daily_boost": r["daily_boost"] if "daily_boost" in r.keys() else 0
         })
     return result
 
@@ -1059,8 +1060,9 @@ def get_tiered_summaries_by_level(level):
         result.append({
             "id": r["id"], "level": r["level"], "summary": r["summary"],
             "key_points": kp or [], "importance": r["importance"],
-            "remaining_days": r["remaining_days"], "mention_count": r["mention_count"],
-            "daily_boost": r["daily_boost"]
+            "remaining_days": r["remaining_days"],
+            "mention_count": r["mention_count"] if "mention_count" in r.keys() else 0,
+            "daily_boost": r["daily_boost"] if "daily_boost" in r.keys() else 0
         })
     return result
 

@@ -5,7 +5,7 @@ from core.db import (
     get_todos as _get_todos, add_todo,
     get_notes as _get_notes, add_note,
     get_reminders as _get_reminders, add_reminder, delete_reminder,
-    search_chat_messages, get_config,
+    search_chat_messages, get_config, set_config,
     get_conn,
 )
 

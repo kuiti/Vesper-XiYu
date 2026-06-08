@@ -23,13 +23,17 @@ def query(sql: str) -> str:
     sql_upper = sql_stripped.upper()
     if not sql_upper.startswith("SELECT"):
         return "错误：仅允许 SELECT 查询"
-    _dangerous = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "EXEC", "UNION", "ATTACH", "DETACH", "PRAGMA"]
+    _dangerous = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "EXEC", "UNION",
+                  "ATTACH", "DETACH", "PRAGMA", "REPLACE", "VACUUM", "LOAD_EXTENSION"]
     import re as _re
     for kw in _dangerous:
         if _re.search(r'\b' + kw + r'\b', sql_upper):
             return f"错误：不允许包含 {kw} 关键词"
     if ";" in sql_stripped:
         return "错误：不允许堆叠查询（分号）"
+    # 防止注释绕过（-- 和 /* */）
+    if "--" in sql_stripped or "/*" in sql_stripped:
+        return "错误：不允许 SQL 注释"
 
     conn = _get_conn()
     try:

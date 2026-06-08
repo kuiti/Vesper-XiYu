@@ -21,6 +21,22 @@ PERSONALITY_KEY_MAP = {
     "personality_tone": "tone",
 }
 
+# 允许前端修改的配置键白名单
+_SETTINGS_WHITELIST = {
+    "model_mode", "custom_system_prompt", "ai_background", "theme",
+    "enable_web_search", "enable_llm_web_search", "search_provider",
+    "auto_cleanup_days", "default_city", "precise_city", "manual_city",
+    "enable_llm_weather_search", "primary_color", "bg_color", "sidebar_bg",
+    "chat_bg", "user_bubble", "ai_bubble", "use_system_notification",
+    "notification_style", "use_weather_care", "show_tray_notification",
+    "relationship_mode", "sentence_mode", "chat_font_size", "proactive_frequency",
+    "proactive_style", "chat_bg_image", "bg_opacity", "bg_blur", "bg_mode",
+    "pin_enabled", "quick_phrases", "snake_high", "2048_best", "minesweeper_wins",
+    "user_name", "ai_name", "api_key", "api_provider", "api_base_url", "api_model",
+    "tts_enabled", "tts_engine", "tts_voice", "tts_api_key", "tts_server_url",
+    "tts_api_url", "stt_enabled", "auto_play_voice", "tts_clone_audio",
+} | set(PERSONALITY_KEY_MAP.keys())
+
 @router.get("/")
 async def get_all_settings() -> Dict[str, Any]:
     personality = get_config("personality", {})
@@ -106,6 +122,9 @@ async def update_setting(update: ConfigUpdate):
     # 拒绝内部配置键（_ 开头）
     if update.key.startswith("_"):
         return {"status": "error", "message": "不能修改内部配置"}
+    # 白名单校验（防止前端注入任意配置）
+    if update.key not in _SETTINGS_WHITELIST:
+        return {"status": "error", "message": f"不允许修改配置: {update.key}"}
     # 数值范围校验
     if update.key in _NUMERIC_KEYS:
         lo, hi = _NUMERIC_KEYS[update.key]

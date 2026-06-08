@@ -172,8 +172,6 @@ async def _diary_generate_job():
 
 def setup_default_jobs():
     """设置默认的定时任务"""
-    from core.scheduler import add_cron_job
-
     # 天气推送：7:00, 12:00, 19:00
     for hour in [7, 12, 19]:
         add_cron_job(

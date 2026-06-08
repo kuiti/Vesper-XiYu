@@ -26,6 +26,9 @@ EMOTION_WILLINGNESS = {
     "annoyed": 0.1,
     "hurt": 0.4,
     "distrustful": 0.1,
+    "hostile": 0.05,
+    "betrayed": 0.1,
+    "resentful": 0.05,
 }
 
 

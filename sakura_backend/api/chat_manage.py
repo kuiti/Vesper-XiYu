@@ -23,8 +23,26 @@ def _clear_vectors():
 @router.delete("/range")
 async def delete_range(range: DateRange, bg: BackgroundTasks):
     try:
-        start_iso = datetime.strptime(range.start, "%Y-%m-%d").isoformat()
-        end_iso = datetime.strptime(range.end, "%Y-%m-%d").replace(hour=23, minute=59, second=59).isoformat()
+        # 兼容 "YYYY-MM-DD" 和 "YYYY-MM-DDTHH:MM:SS" 两种格式
+        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+            try:
+                start_iso = datetime.strptime(range.start, fmt).isoformat()
+                break
+            except ValueError:
+                continue
+        else:
+            raise ValueError(f"无法解析日期: {range.start}")
+        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+            try:
+                end_iso = datetime.strptime(range.end, fmt).isoformat()
+                break
+            except ValueError:
+                continue
+        else:
+            raise ValueError(f"无法解析日期: {range.end}")
+        # 如果是纯日期，end 默认补 23:59:59
+        if len(range.end) <= 10:
+            end_iso = datetime.strptime(range.end, "%Y-%m-%d").replace(hour=23, minute=59, second=59).isoformat()
     except ValueError:
         from fastapi.responses import JSONResponse
         return JSONResponse({"detail": "日期格式无效，需为 YYYY-MM-DD"}, status_code=400)

@@ -523,7 +523,7 @@ def _on_tray_quit(icon, item):
             os.remove(f)
         except OSError:
             pass
-    os._exit(0)
+    sys.exit(0)
 
 def _setup_tray():
     """设置系统托盘"""

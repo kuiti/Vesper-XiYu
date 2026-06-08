@@ -197,7 +197,7 @@ def analyze_sentiment(text, context=None):
             "intent": result.get("intent", "statement"),
             "emotion_subtype": result.get("emotion_subtype", "neutral"),
             "relationship_impact": max(-2.0, min(2.0, impact)),
-            "background_update": bg if isinstance(bg, str) and len(bg) > 0 else None,
+            "background_update": bg if bg else None,
             "empathy_strategy": None,
             "context_keyword": detect_context_keyword(text)
         }

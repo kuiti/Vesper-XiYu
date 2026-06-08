@@ -413,8 +413,6 @@ def generate_proactive(trigger_type: str, context: dict = None):
                 weather = _future.result(timeout=3)
             except concurrent.futures.TimeoutError:
                 weather = {}
-            finally:
-                _pool.shutdown(wait=False)
             if "error" not in weather and weather.get("temp") is not None:
                 w_desc = weather.get("weather", "")
                 w_temp = weather["temp"]
@@ -462,6 +460,8 @@ def generate_proactive(trigger_type: str, context: dict = None):
         idle_desc = f"现在是「{user_name}」平时活跃的时段，但已经几小时没说话了。"
     elif trigger_type == "heartbeat":
         idle_desc = f"你想主动找「{user_name}」聊聊天，保持陪伴感。"
+    elif trigger_type == "proactive_tag":
+        idle_desc = f"刚才你和「{user_name}」聊得不错，现在想再找他聊几句。"
 
     # ─── 主动风格设置 ───
     style = get_config("proactive_style", "warm")

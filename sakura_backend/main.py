@@ -85,12 +85,16 @@ app = FastAPI(title="佐仓后端 API", version="1.0.0", lifespan=lifespan)
 # ─── 信任代理头（Nginx 反向代理）───
 try:
     from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
-    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+    _trusted = os.environ.get("SAKURA_TRUSTED_HOSTS", "127.0.0.1,localhost")
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=_trusted)
 except ImportError:
     pass
 
 # ─── CORS（云端模式限制 origins）───
-_cors_origins = os.environ.get("SAKURA_CORS_ORIGINS", "*").split(",")
+_cors_origins = os.environ.get("SAKURA_CORS_ORIGINS", "").split(",")
+if _cors_origins == [""]:
+    _cors_origins = ["http://127.0.0.1:8060", "http://127.0.0.1:8061", "http://127.0.0.1:8062",
+                     "http://127.0.0.1:8063", "http://127.0.0.1:8064", "http://localhost:5173"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
@@ -135,7 +139,9 @@ def root():
 
 @app.post("/api/window-theme")
 def set_window_theme(data: dict):
-    dark = data.get("dark", True)
+    dark = bool(data.get("dark", True))
+    if not isinstance(data.get("dark", None), (bool, type(None))):
+        return {"status": "error", "message": "dark 参数必须是布尔值"}
     try:
         import ctypes
         from ctypes import wintypes

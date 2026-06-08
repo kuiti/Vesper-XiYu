@@ -53,6 +53,7 @@ _ALL_ROUTERS = [
     ("api.favorites", "router"),
     ("api.stats", "router"),
     ("api.report", "router"),
+    ("api.characters", "router"),
 ]
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")

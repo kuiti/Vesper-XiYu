@@ -2,9 +2,7 @@
 """消除 8 个文件中重复的 HTTP 样板代码。所有非流式 LLM 调用统一走此模块。"""
 import json
 import re
-import time
-import requests
-from core.db import get_config
+from core.llm_provider import get_provider
 
 
 def _extract_json(text: str) -> str | None:
@@ -46,7 +44,7 @@ def call_llm(
     timeout: int = 15,
     json_mode: bool = False,
 ) -> str | dict | None:
-    """调用 OpenAI 兼容 LLM API，返回响应内容。
+    """调用 LLM API，返回响应内容（使用 LLMProvider 抽象层）。
 
     Args:
         prompt: 用户消息（放在 user role）
@@ -61,62 +59,32 @@ def call_llm(
         json_mode=True:  dict | None（解析后的 JSON）
         API key 未配置或调用失败: None
     """
+    provider = get_provider()
+    # 快速检查 provider 是否可用
+    from core.db import get_config
     api_key = get_config("api_key", "")
-    base_url = get_config("api_base_url", "https://api.deepseek.com/v1").rstrip("/")
-    is_local = get_config("api_provider", "") == "ollama" or "localhost:11434" in base_url
-    if not api_key and not is_local:
+    is_local = get_config("api_provider", "") == "ollama"
+    if not api_key and not is_local and provider.name not in ("ollama",):
         print("[LLM] API Key 未配置")
         return None
-
-    model = get_config("api_model", "deepseek-chat")
 
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
-    payload = {
-        "model": model,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "stream": False,
-    }
+    content = provider.chat(
+        messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        timeout=timeout,
+    )
 
-    import traceback as _traceback
-    last_error = None
-    for attempt in range(3):
-        try:
-            hdrs = {"Content-Type": "application/json"}
-            if not is_local or api_key:
-                hdrs["Authorization"] = f"Bearer {api_key}"
-            resp = requests.post(
-                f"{base_url}/chat/completions",
-                headers=hdrs,
-                json=payload,
-                timeout=timeout,
-            )
-            resp.raise_for_status()
-            body = resp.json()
-            choices = body.get("choices", [])
-            if not choices:
-                raise ValueError(f"API 返回空 choices | usage={body.get('usage')}")
-            msg = choices[0].get("message", {})
-            content = (msg.get("content") or "").strip()
-            finish = choices[0].get("finish_reason", "")
-            if not content:
-                print(f"[LLM] 空内容 | finish_reason={finish} | model={model} | prompt_head={prompt[:80]}")
-            break
-        except Exception as e:
-            last_error = e
-            if attempt < 2:
-                time.sleep(1 + attempt)
-    else:
-        print(f"[LLM] 调用失败（重试3次）: {last_error}")
-        return None
+    if not content:
+        return None if not json_mode else None
 
-    if not json_mode or not content:
-        return content if not json_mode else None
+    if not json_mode:
+        return content
 
     # ─── JSON 模式：去 markdown fence + 解析 ───
     # 在全文查找 ```json ... ``` 代码块

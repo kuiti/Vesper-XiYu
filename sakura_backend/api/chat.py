@@ -3,7 +3,6 @@ import json
 import os
 import random
 import time
-import requests
 import threading
 import asyncio
 import uuid
@@ -25,6 +24,7 @@ from api.split_sentences import fallback_split
 from core.vector_store import add_message_vector, add_sentence_vectors, search_similar, search_knowledge_similar, is_model_ready
 from core.demand_analyzer import save_demand_record, get_user_patterns, extract_patterns_via_llm
 from core.mcp_tools import OPENAI_TOOLS, call_tool
+from core.llm_provider import get_provider
 from api.chat_tasks import (
     check_reminders, _build_depth_hint, _clean_dsml,
     _apply_background_update, _trigger_daily_evolution,
@@ -617,8 +617,9 @@ async def chat_websocket(websocket: WebSocket):
                 # 正常对话
                 api_key = get_config("api_key", "")
                 is_local = get_config("api_provider", "") == "ollama"
-                if not api_key and not is_local:
-                    await websocket.send_text(json.dumps({"type": "error", "content": "请先配置 API Key"}))
+                provider = get_provider()
+                if not api_key and not is_local and provider.name not in ("ollama",):
+                    await websocket.send_text(json.dumps({"type": "error", "content": "请先配置 API Key 或切换至 Ollama"}))
                     continue
 
                 current_time_str = datetime.now().strftime("%Y年%m月%d日 %H:%M")
@@ -945,97 +946,58 @@ async def chat_websocket(websocket: WebSocket):
                 time_context = f"（当前时间：{now.strftime('%Y-%m-%d %H:%M')}）"
                 messages.append({"role": "user", "content": f"{time_context}\n{user_message}"})
 
-                base_url = get_config("api_base_url", "https://api.deepseek.com/v1").rstrip("/")
-                model = get_config("api_model", "deepseek-chat")
-                is_local = get_config("api_provider", "") == "ollama"
-                if is_local and not api_key:
-                    headers = {"Content-Type": "application/json"}
-                else:
-                    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
                 # 事实型意图用低温(0.3)减少幻觉，创意对话用高温(0.65)增加变化
                 tool_temp = 0.3 if intent_type in ("weather", "location", "search") else 0.5
-                payload = {
-                    "model": model,
-                    "messages": messages,
-                    "temperature": tool_temp,
-                    "max_tokens": 2000,
-                    "stream": True,
-                    "tools": OPENAI_TOOLS,
-                    "tool_choice": "auto"
-                }
 
-                # 联网搜索：search_provider = off/llm/ddg
-                #   llm: 大模型自行判断是否搜索（search:true 始终携带）
-                #   ddg: DuckDuckGo 按意图触发 + search:true 仅搜索意图
-                #   天气开启大模型联网时也会加 search:true
+                # 联网搜索参数（DeepSeek 等支持 search 参数的 provider）
                 sp = get_config("search_provider", "ddg")
                 enable_llm_weather = get_config("enable_llm_weather_search", False)
+                extra_kwargs = {}
+                base_url = (get_config("api_base_url", "") or "").lower()
                 if "deepseek" in base_url:
                     if sp == "llm" or \
                        (sp == "ddg" and intent_type in ("search",)) or \
                        (enable_llm_weather and intent_type == "weather"):
-                        payload["search"] = True
+                        extra_kwargs["search"] = True
 
                 try:
                     full_reply = []
                     assistant_content = ""
                     token_queue = asyncio.Queue()
-                    api_url = f"{base_url}/chat/completions"
+                    loop = asyncio.get_running_loop()
 
                     def _stream_request():
-                        """在线程中执行同步流式请求，逐 token 放入队列（含重试）"""
+                        """在线程中执行流式请求，逐 chunk 放入队列（使用 LLMProvider）"""
                         try:
-                            resp = None
-                            for attempt in range(3):
-                                try:
-                                    resp = requests.post(api_url, headers=headers, json=payload, stream=True, timeout=90)
-                                    resp.raise_for_status()
-                                    break
-                                except requests.exceptions.RequestException:
-                                    if attempt == 2:
-                                        raise
-                                    if resp:
-                                        resp.close()
-                                    time.sleep(2 ** attempt)  # 1s, 2s
-                            with resp:
-                                for line in resp.iter_lines():
-                                    if line:
-                                        line = line.decode('utf-8')
-                                        if line.startswith("data: "):
-                                            line = line[6:]
-                                            if line == "[DONE]":
-                                                break
-                                            try:
-                                                chunk = json.loads(line)
-                                                delta = chunk["choices"][0].get("delta", {})
-                                                # 检查 tool_calls
-                                                if "tool_calls" in delta:
-                                                    asyncio.run_coroutine_threadsafe(token_queue.put({"tool_calls": delta["tool_calls"]}), loop)
-                                                    continue
-                                                token = delta.get("content", "")
-                                                if token:
-                                                    asyncio.run_coroutine_threadsafe(token_queue.put(token), loop)
-                                            except (json.JSONDecodeError, KeyError, IndexError):
-                                                pass  # SSE chunk 解析失败跳过（正常流中的噪声）
+                            for chunk in provider.chat_stream(
+                                messages,
+                                temperature=tool_temp,
+                                max_tokens=2000,
+                                tools=OPENAI_TOOLS,
+                                tool_choice="auto",
+                                **extra_kwargs,
+                            ):
+                                asyncio.run_coroutine_threadsafe(token_queue.put(chunk), loop)
                         except Exception as e:
-                            asyncio.run_coroutine_threadsafe(token_queue.put(e), loop)
+                            asyncio.run_coroutine_threadsafe(token_queue.put({"type": "error", "data": str(e)}), loop)
                         finally:
-                            asyncio.run_coroutine_threadsafe(token_queue.put(None), loop)
+                            asyncio.run_coroutine_threadsafe(token_queue.put({"type": "_eos"}), loop)
 
-                    loop = asyncio.get_running_loop()
                     threading.Thread(target=_stream_request, daemon=True).start()
 
                     parser = ThinkingParser() if not _is_system else None
                     fallback_triggered = False
-                    tool_calls_buffer = []  # 收集 tool_calls
+                    tool_calls_buffer = []
 
                     while True:
                         try:
-                            token = await asyncio.wait_for(token_queue.get(), timeout=90)
+                            chunk = await asyncio.wait_for(token_queue.get(), timeout=90)
                         except asyncio.TimeoutError:
                             print("[流式] token_queue 超时，强制结束")
                             break
-                        if token is None:
+
+                        # 流结束
+                        if chunk["type"] == "_eos":
                             if parser:
                                 if not fallback_triggered and parser.state == "thinking" and parser.buffer:
                                     print("[ThinkingParser] 流结束仍未找到【回复】，智能提取")
@@ -1043,21 +1005,18 @@ async def chat_websocket(websocket: WebSocket):
                                     if reply:
                                         await websocket.send_text(json.dumps({"type": "token", "content": reply}))
                             break
-                        if isinstance(token, Exception):
-                            raise token
-                        # 处理 tool_calls
-                        if isinstance(token, dict) and "tool_calls" in token:
-                            for tc in token["tool_calls"]:
-                                idx = tc.get("index", 0)
-                                while len(tool_calls_buffer) <= idx:
-                                    tool_calls_buffer.append({"id": "", "function": {"name": "", "arguments": ""}})
-                                if "id" in tc:
-                                    tool_calls_buffer[idx]["id"] = tc["id"]
-                                if "function" in tc:
-                                    if "name" in tc["function"]:
-                                        tool_calls_buffer[idx]["function"]["name"] = tc["function"]["name"]
-                                    if "arguments" in tc["function"]:
-                                        tool_calls_buffer[idx]["function"]["arguments"] += tc["function"]["arguments"]
+
+                        if chunk["type"] == "error":
+                            raise Exception(chunk["data"])
+
+                        # tool_calls（provider 已累积完成，直接赋值）
+                        if chunk["type"] == "tool_calls":
+                            tool_calls_buffer = chunk["data"]
+                            continue
+
+                        # token
+                        token = chunk["data"]
+                        if not token:
                             continue
                         full_reply.append(token)
 
@@ -1067,7 +1026,6 @@ async def chat_websocket(websocket: WebSocket):
                             continue
 
                         if fallback_triggered:
-                            # 过滤 DSML 工具调用
                             if "DSML" not in token:
                                 await websocket.send_text(json.dumps({"type": "token", "content": token}))
                             continue
@@ -1127,18 +1085,12 @@ async def chat_websocket(websocket: WebSocket):
                         messages.append({"role": "assistant", "tool_calls": tool_calls_buffer})
                         messages.extend(tool_results)
                         # 重新请求 LLM（非流式 + 低温，工具调用后简洁确认）
-                        payload2 = {
-                            "model": model,
-                            "messages": messages,
-                            "temperature": 0.3,
-                            "max_tokens": 300,
-                            "stream": False
-                        }
                         try:
-                            resp2 = await asyncio.to_thread(requests.post, api_url, headers=headers, json=payload2, timeout=60)
-                            resp2.raise_for_status()
-                            data2 = resp2.json()
-                            assistant_content = data2["choices"][0]["message"].get("content") or "工具已执行。"
+                            assistant_content = provider.chat(
+                                messages,
+                                temperature=0.3,
+                                max_tokens=300,
+                            ) or "工具已执行。"
                             # 去掉可能残留的思考标记
                             for marker in ["【思考】", "【回复】"]:
                                 if marker in assistant_content:

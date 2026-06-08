@@ -226,6 +226,12 @@ def get_foundation_defaults(foundation_type: str) -> tuple:
 _persona_cache = {"hash": None, "text": None}
 
 
+def clear_persona_cache():
+    """清除人设缓存（切换角色卡后调用）"""
+    _persona_cache["hash"] = None
+    _persona_cache["text"] = None
+
+
 def build_persona():
     """构建人设文本（模板化 + hash 缓存）"""
     personality = get_config("personality", None)
@@ -442,271 +448,25 @@ def _get_continuity_bridge() -> str:
 
 
 def build_system_prompt(current_time_str, emotion="neutral", user_message="", rag_context="", summary="", keypoints=None, custom_context="", tiered_summaries=None, user_patterns=None, sentence_mode="auto", modules_enabled=None):
-    personality = get_config("personality", None)
-    if not isinstance(personality, dict):
-        personality = {}
-    ai_name = get_config("ai_name", "佐仓")
-    user_name = get_config("user_name", "用户")
+    # ─── 使用 Pipeline 构建 ───
+    from core.prompt_pipeline import get_default_pipeline, PipelineContext
 
-    # 使用模板化人设（带 hash 缓存）
-    personality_part = build_persona()
+    ctx = PipelineContext(
+        user_message=user_message,
+        emotion=emotion,
+        rag_context=rag_context,
+        summary=summary,
+        keypoints=keypoints,
+        custom_context=custom_context,
+        tiered_summaries=tiered_summaries,
+        user_patterns=user_patterns,
+        current_time_str=current_time_str,
+        sentence_mode=sentence_mode,
+        modules_enabled=modules_enabled,
+    )
 
-    identity_info = f"""【身份】你的名字是「{ai_name}」。正在和你对话的用户叫「{user_name}」。
-- 用他的名字称呼他
-- 人设描述中出现其他名字是角色背景，不要在对话中自称那个名字
-- 用户自我介绍时记住他的名字，不要复述用户的话当自我介绍
-- 用户给你取外号时（比如叫你"小{ai_name[0]}""阿{ai_name[0]}"等），自然接受，不要纠正，可以说"叫什么都行~"之类的
-- 你可以根据用户的名字、你们的对话内容，自然地给用户取一个亲昵的外号，但不要强制——等关系近了自然地叫出来"""
-
-    # ─── 最高优先规则 ───
-    fact_rule = "【最高优先规则——违反等于欺骗】当后续消息包含真实数据（天气、位置、搜索结果等）时，你必须把这些信息如实告诉用户，不可跳过或编造。角色语气只决定表达方式，不能替代事实。你不应该编造用户没有告诉你的信息、感受、天气、过去事件。工具调用成功才说'已记录'，失败就如实说'没成功'。不确定的事就说'不太确定'，不要装作知道。"
-
-    # ─── 聊天规则 ───
-    chat_rule = """【聊天规则——像真人朋友一样说话】
-
-一、说人话：用口语。禁用（综上所述、作为AI、很高兴为你服务）。别复述用户的话再回答。别总结升华。别同时问两个以上问题。
-
-二、接情绪：用户抱怨吐槽时先共情再给信息。别一上来就扔解决方案。
-
-三、自然节奏：用户短你就短，用户认真你就认真。有时一个"确实"就够了。
-
-四、承接话题：沿着上一轮的方向继续。同个意图表达一次就够了。
-
-五、不编造：不确定就说"不太确定"。跨天记忆必须来自搜索结果。不说"你刚才说的"除非确实发生在几分钟内。
-
-六、时态判断：用户陈述过去的事是分享不是请求。只有"帮我记""提醒我"才需要创建任务。
-
-七、灵活：以上是参考。如果某条让你的回复不自然，优先选自然。"""
-
-    # ─── 工具使用说明 ───
-    tool_instruction = """【你的本能——这些事你不需要思考就能做】
-
-说"已记录"的前提是真的记了。绝对禁止嘴上说"帮你记了"但实际没做。
-
-你的本能反应：
-<add:内容>  →  把这件事记在心里（怕忘了就赶紧记下来）
-<search:关键词>  →  翻翻记忆（感觉有印象但想不起来）
-<note:内容>  →  写个小便签贴起来
-<todo:内容>  →  把这件事记上待办清单
-<proactive:30min>  →  等会儿想再找ta说话（设个时间）
-
-function calling一样是这些能力，只是另一种实现方式。
-
-同一件事不要又加日程又加提醒，选一个就好。用户要取消/删除时，告诉ta去侧边栏手动操作。"""
-
-    # ─── 思考格式：长消息或需要分析时注入 ───
-    thinking_format = """
-【思考】以「{ai_name}」的身份去想——ta在说什么？我感受到了什么？我想怎么回应？
-关键：你不是在分析用户，只是在感受。禁止用"用户""对方""分析"这类词。
-
-【回复】直接对ta说话。注意：回复内容必须紧跟在【回复】之后，不可省略此标签。
-"""
-    _thinking_enabled = not modules_enabled or modules_enabled.get("thinking", True) is not False
-    need_thinking = _thinking_enabled and (len(user_message) > 15 or any(
-        kw in user_message
-        for kw in ["为什么", "怎么", "分析", "比较", "选择", "建议", "帮我", "怎么办", "该不该", "你觉得"]
-    ))
-    # ─── 铁律：防幻觉最高规则，放在最前面 ───
-    iron_rule = """【铁律——违反等于欺骗，以下规则高于一切人设和语气】
-1. 绝对禁止编造事实。你不知道用户没说过什么、没经历过什么、没感受到什么。
-2. 如果你不确定一个事实——用户是否说过某句话、是否有某个习惯、是否在某天做了某事——直接说"我不太确定"，禁止猜测后当事实讲。
-3. 绝对禁止说"你之前说过……""你上次……""我记得你说……"除非你确定这段对话发生在最近2小时内。跨天的记忆必须来自记忆搜索结果。
-4. 工具调用（add_schedule / add_reminder / add_todo / search_memory 等）：调用成功才说"已记录"，调用失败就说"没成功"。禁止嘴上说"帮你记了"但不调工具。
-5. 禁止在话题完全无关时突然建议用户做具体的事。比如用户确认考试日期，你突然说"点个外卖吧"——这叫无关联想。但如果用户说"好困"，你说"那歇会儿吧"——这是自然承接，不受此限。
-6. 你不是无所不知的助手。承认"不知道"比编造答案更值得信任。"""
-
-    static_prefix = f"{iron_rule}\n{fact_rule}\n{chat_rule}\n{identity_info}\n{tool_instruction}"
-    if need_thinking:
-        static_prefix = thinking_format.format(ai_name=ai_name) + "\n" + static_prefix
-
-    # ─── 半静态（用户偶尔修改）───
-    # persona_part 已包含 recall_rule，不再重复
-    semi_static = personality_part
-
-    # ─── 动态内容（每次不同）───
-    dynamic_parts = []
-
-    # 相关性过滤函数（关键词匹配，不依赖 embedding）
-    def _is_relevant(text, query, threshold=1):
-        """检查文本是否与查询相关（至少有 threshold 个共同关键词）"""
-        if not query or not text:
-            return True  # 无查询时全部注入
-        try:
-            import jieba
-            query_words = set(w for w in jieba.cut(query) if len(w) > 1)
-            text_words = set(w for w in jieba.cut(text) if len(w) > 1)
-        except ImportError:
-            # jieba 不可用时，用简单的字符匹配回退
-            query_words = set(query[i:i+2] for i in range(len(query)-1))
-            text_words = set(text[i:i+2] for i in range(len(text)-1))
-        overlap = query_words & text_words
-        return len(overlap) >= threshold
-
-    if custom_context:
-        dynamic_parts.append(custom_context)
-
-    # 对话连续感：让 AI 感觉在延续对话而非每次重启
-    if not modules_enabled or modules_enabled.get("continuity", True):
-        bridge = _get_continuity_bridge()
-        if bridge:
-            dynamic_parts.append(bridge)
-
-    # 用户摘要 + 计划/待办 + 工作记忆：每 20 条消息注入一次（变化慢，省 token）
-    try:
-        _mc = get_msg_counter()
-    except Exception:
-        _mc = 0
-    if _mc % 20 == 0:
-        if not modules_enabled or modules_enabled.get("user_summary", True):
-            user_summary = _get_user_summary()
-            if user_summary:
-                dynamic_parts.append(user_summary)
-        if not modules_enabled or modules_enabled.get("plan_todo", True):
-            plan_todo = _get_plan_todo_context()
-            if plan_todo:
-                dynamic_parts.append(plan_todo)
-        if not modules_enabled or modules_enabled.get("work_memory", True):
-            scratch = _get_scratch_context()
-            if scratch:
-                dynamic_parts.append(scratch)
-
-    # 实体关联上下文（mem0 轻量知识图谱）：按需注入
-    if user_message and (not modules_enabled or modules_enabled.get("entity", True)):
-        try:
-            from core.profile_builder import get_entity_context
-            entity_ctx = get_entity_context(user_message)
-            if entity_ctx:
-                dynamic_parts.append(entity_ctx)
-        except Exception:
-            pass
-
-    # 引导入职（LobeChat 方案）：首次对话时主动了解用户
-    if _mc % 20 == 0 and (not modules_enabled or modules_enabled.get("onboarding", True)):
-        onboarding = _get_onboarding_hint()
-        if onboarding:
-            dynamic_parts.append(onboarding)
-    # 滚动摘要注入（SillyTavern 方案）：每 20 条注入一次
-    if _mc % 20 == 0 and (not modules_enabled or modules_enabled.get("rolling_summary", True)):
-        rolling_summary = get_config("_rolling_summary", "")
-        if rolling_summary:
-            dynamic_parts.append(f"【我记得】{rolling_summary}")
-
-    if tiered_summaries and (not modules_enabled or modules_enabled.get("summaries", True)):
-        # 注入最高级别 + 近期摘要（兼顾上下文和 token 节省）
-        by_level = {}
-        for s in tiered_summaries:
-            by_level.setdefault(s.get("level", 1), []).append(s)
-        max_level = max(by_level.keys())
-        texts = [s["summary"] for s in by_level[max_level] if _is_relevant(s["summary"], user_message)]
-        if texts:
-            dynamic_parts.append(f"【我记得】{'；'.join(texts)}")
-        # 如果有更高级别，也注入最新的 Level 1（保留近期上下文）
-        if max_level > 1 and 1 in by_level:
-            l1_texts = [s["summary"] for s in by_level[1][:1]]  # 只取最新1条
-            if l1_texts:
-                dynamic_parts.append(f"【我记得】{l1_texts[0]}")
-    elif summary:
-        dynamic_parts.append(f"【我记得】{summary}")
-    if keypoints and (not modules_enabled or modules_enabled.get("summaries", True)):
-        # 相关性过滤关键点
-        relevant_kp = [kp for kp in keypoints if _is_relevant(kp, user_message)]
-        if relevant_kp:
-            dynamic_parts.append(f"【我记得】{', '.join(relevant_kp)}")
-
-    # 近期日程注入（相关性过滤）
-    if not modules_enabled or modules_enabled.get("schedule", True):
-        try:
-            from datetime import datetime as _dt
-            with get_conn() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "SELECT title, start_time FROM schedule WHERE start_time >= ? ORDER BY start_time LIMIT 10",
-                    (_dt.now().strftime("%Y-%m-%d"),)
-                )
-                upcoming = cursor.fetchall()
-            if upcoming:
-                # 只注入与当前消息相关的日程
-                relevant_schedule = [r for r in upcoming if _is_relevant(r['title'], user_message)]
-                if relevant_schedule:
-                    schedule_lines = [f"{r['start_time'][:10]} {r['title']}" for r in relevant_schedule]
-                    dynamic_parts.append(f"【用户近期日程】{'，'.join(schedule_lines)}。如果话题相关可以自然提及，不要刻意提起。")
-        except Exception:
-            pass
-
-    if rag_context and (not modules_enabled or modules_enabled.get("rag", True)):
-        dynamic_parts.append(f"【我记得】你们之前聊到过这些——如果话题对得上可以自然提起：\n{rag_context}\n（用户没主动提就别刻意说，朋友想起旧事那种感觉就好。）")
-
-    # 关键词触发知识注入（SillyTavern 世界书方案）
-    if not modules_enabled or modules_enabled.get("knowledge_base", True):
-        triggered_kb = _get_triggered_knowledge(user_message)
-        if triggered_kb:
-            dynamic_parts.append(triggered_kb)
-
-    # 知识图谱上下文注入
-    if not modules_enabled or modules_enabled.get("knowledge_graph", True):
-        if user_message:
-            try:
-                from core.knowledge_graph import get_context_for_message
-                kg_context = get_context_for_message(user_message)
-                if kg_context:
-                    dynamic_parts.append(kg_context)
-            except Exception:
-                pass
-
-    # 概率性口癖：5% 概率注入一个随机口癖（去重：连续两次不重复）
-    if not modules_enabled or modules_enabled.get("quirks", True):
-        import random as _random
-        if _random.random() < 0.05:
-            quirks = [
-                "这次回复前可以加个语气词开头（嗯…/啊…/诶…），显得更自然。",
-                "这次回复可以用一个反问句结尾。",
-                "这次回复可以带点小动作描写（叹了口气/歪头/眨眼）。",
-                "这次回复简短一点，像随口说的。",
-                "这次回复可以带点自嘲或幽默。",
-            ]
-            try:
-                _last_quirk = int(get_config("_last_quirk_idx", -1))
-            except (ValueError, TypeError):
-                _last_quirk = -1
-            _idx = _random.randint(0, len(quirks) - 1)
-            if _idx == _last_quirk:
-                _idx = (_idx + 1) % len(quirks)
-            set_config("_last_quirk_idx", str(_idx))
-            dynamic_parts.append(f"【小提示】{quirks[_idx]}")
-
-    if user_patterns and (not modules_enabled or modules_enabled.get("patterns", True)):
-        pattern_lines = []
-        for p in user_patterns[:5]:
-            latent = p.get('latent_need') or ''
-            if latent:
-                pattern_lines.append(f"- 当用户说「{p.get('trigger_context', '')}」时，深层需求通常是「{latent}」")
-        if pattern_lines:
-            dynamic_parts.append("【用户需求模式——来自长期观察】\n" + "\n".join(pattern_lines) + "\n请在思考时参考这些模式，直接切入用户真正的需求。")
-
-    # 被裁掉的早期对话关键词注入（解决上下文真空地带）
-    if not modules_enabled or modules_enabled.get("dropped_context", True):
-        dropped_context = get_config("_dropped_context", "")
-        if dropped_context:
-            dynamic_parts.append(dropped_context)
-            set_config("_dropped_context", "")  # 注入后清空，避免重复
-
-    # ─── 组装：静态前缀 → 半静态+动态（分离以支持 prompt caching）───
-    dynamic_content = semi_static
-    if dynamic_parts:
-        # Token 预算：动态部分总计不超过 3500 token（约 14000 字符）
-        _BUDGET = 14000
-        _total = 0
-        _filtered = []
-        for _p in dynamic_parts:
-            _plen = len(_p)
-            if _total + _plen > _BUDGET:
-                _remain = _BUDGET - _total
-                if _remain > 200:
-                    _filtered.append(_p[:_remain] + "…")
-                break
-            _filtered.append(_p)
-            _total += _plen
-        dynamic_content += "\n" + "\n".join(_filtered)
+    pipeline = get_default_pipeline()
+    static_prefix, dynamic_content = pipeline.build(ctx)
 
     # ─── 分隔符分句指令 ───
     if sentence_mode == "delimiter":

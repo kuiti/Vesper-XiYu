@@ -575,3 +575,188 @@ def delete_document_vectors(doc_id):
 
 # 启动异步加载模型
 ensure_model_loaded_async()
+
+
+# ─── 记忆向量存储（memory + user_profile 向量化）───
+
+def add_memory_vector(key: str, value: str, meta: dict = None) -> bool:
+    """将 memory 表的一条记录写入向量库"""
+    if not is_model_ready() or not value or len(value.strip()) < 5:
+        return False
+    try:
+        model = get_embedding_model()
+        embedding = model.encode(value).tolist()
+        collection = get_collection("memory_store")
+        collection.upsert(
+            ids=[f"mem_{key}"],
+            embeddings=[embedding],
+            metadatas=[{
+                "key": key,
+                "type": meta.get("type", "memory") if meta else "memory",
+                "text": value[:200],
+            }],
+            documents=[value]
+        )
+        return True
+    except Exception as e:
+        print(f"[记忆向量] 写入失败: key={key} {e}")
+        return False
+
+
+def add_profile_vectors():
+    """将 user_profile 中有意义的画像写入向量库"""
+    if not is_model_ready():
+        return
+    try:
+        from core.db import get_conn
+        model = get_embedding_model()
+        collection = get_collection("memory_store")
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value, confidence FROM user_profile WHERE confidence >= 0.6")
+            rows = cursor.fetchall()
+        count = 0
+        for r in rows:
+            key = r["key"]
+            value = r["value"]
+            if not value or len(value) < 5:
+                continue
+            try:
+                import json
+                val = json.loads(value) if isinstance(value, str) and (value.startswith("{") or value.startswith("[")) else value
+                text = val.get("text", value) if isinstance(val, dict) else str(value)
+            except (json.JSONDecodeError, AttributeError):
+                text = str(value)
+            if len(text) < 5:
+                continue
+            embedding = model.encode(text).tolist()
+            collection.upsert(
+                ids=[f"profile_{key}"],
+                embeddings=[embedding],
+                metadatas=[{"key": key, "type": "profile", "text": text[:200]}],
+                documents=[text]
+            )
+            count += 1
+        if count:
+            print(f"[记忆向量] 同步了 {count} 条 user_profile")
+    except Exception as e:
+        print(f"[记忆向量] user_profile 同步失败: {e}")
+
+
+def search_memories(query: str, top_k: int = 5) -> list[dict]:
+    """向量检索记忆库（memory_store collection），返回 [{"key", "value", "score"}, ...]。
+    若向量模型未就绪或库为空，降级为关键词检索。
+    """
+    if not is_model_ready():
+        return _keyword_search_memories(query, top_k)
+
+    try:
+        model = get_embedding_model()
+        query_emb = model.encode(query).tolist()
+        collection = get_collection("memory_store")
+
+        # 检查 collection 是否为空
+        count = collection.count()
+        if count == 0:
+            return _keyword_search_memories(query, top_k)
+
+        results = collection.query(
+            query_embeddings=[query_emb],
+            n_results=top_k,
+            include=["documents", "distances", "metadatas"]
+        )
+        if not results or not results.get("documents") or not results["documents"][0]:
+            return _keyword_search_memories(query, top_k)
+
+        items = []
+        for doc, dist, meta in zip(
+            results["documents"][0],
+            results["distances"][0] if results.get("distances") else [],
+            results["metadatas"][0] if results.get("metadatas") else [{}] * top_k
+        ):
+            cos_score = 1.0 - dist if dist <= 2.0 else 0.5
+            items.append({
+                "key": (meta or {}).get("key", ""),
+                "value": doc,
+                "score": round(cos_score, 4),
+                "type": (meta or {}).get("type", "memory"),
+            })
+        return items
+    except Exception as e:
+        print(f"[记忆向量] 检索失败: {e}")
+        return _keyword_search_memories(query, top_k)
+
+
+def _keyword_search_memories(query: str, top_k: int = 5) -> list[dict]:
+    """关键词回退：从 memory 表和 user_profile 中模糊搜索"""
+    query_lower = query.lower()
+    results = []
+
+    # memory 表
+    try:
+        from core.db import get_conn
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM memory")
+            for r in cursor.fetchall():
+                key = r["key"]
+                value = r["value"]
+                if query_lower in key.lower() or query_lower in value.lower():
+                    results.append({"key": key, "value": value, "score": 0.5, "type": "memory"})
+    except Exception:
+        pass
+
+    # user_profile 表
+    try:
+        from core.db import get_conn
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM user_profile")
+            for r in cursor.fetchall():
+                key = r["key"]
+                value = str(r.get("value", ""))
+                if query_lower in key.lower() or query_lower in value.lower():
+                    results.append({"key": key, "value": value, "score": 0.4, "type": "profile"})
+    except Exception:
+        pass
+
+    return results[:top_k]
+
+
+def sync_memories_to_vector():
+    """后台同步：将 memory 表和 user_profile 写入向量库（去重）"""
+    if not is_model_ready():
+        return
+    try:
+        # memory 表
+        from core.db import get_conn
+        model = get_embedding_model()
+        collection = get_collection("memory_store")
+        count = 0
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM memory")
+            rows = cursor.fetchall()
+        for r in rows:
+            key = r["key"]
+            value = r["value"]
+            if not value or len(value) < 5:
+                continue
+            # 检查是否已存在
+            existing = collection.get(ids=[f"mem_{key}"])
+            if existing and existing.get("ids"):
+                continue
+            embedding = model.encode(value).tolist()
+            collection.upsert(
+                ids=[f"mem_{key}"],
+                embeddings=[embedding],
+                metadatas=[{"key": key, "type": "memory", "text": value[:200]}],
+                documents=[value]
+            )
+            count += 1
+        if count:
+            print(f"[记忆向量] 同步了 {count} 条 memory")
+        # user_profile
+        add_profile_vectors()
+    except Exception as e:
+        print(f"[记忆向量] 同步失败: {e}")

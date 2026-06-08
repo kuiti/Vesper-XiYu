@@ -8,6 +8,7 @@ from core.db import (
     search_chat_messages, get_config, set_config,
     get_conn,
 )
+from core.security import detect_sql_injection, detect_path_traversal, sanitize_display_text
 
 # ─── OpenAI Function Calling 格式 ───
 OPENAI_TOOLS = [
@@ -435,6 +436,15 @@ TOOLS = [
 
 def call_tool(name, arguments):
     """执行工具调用，返回结果字符串"""
+    # 安全校验：含 SQL 注入或路径遍历的输入直接拒绝
+    for k, v in arguments.items():
+        if isinstance(v, str):
+            if detect_sql_injection(v):
+                return f"安全拒绝: 参数 {k} 包含 SQL 注入模式"
+            if detect_path_traversal(v):
+                return f"安全拒绝: 参数 {k} 包含路径遍历模式"
+            arguments[k] = sanitize_display_text(v, max_length=5000)
+
     tool_found = False
     for tool in TOOLS:
         if tool["name"] == name:
@@ -446,9 +456,24 @@ def call_tool(name, arguments):
     if not tool_found:
         return f"未知工具: {name}"
     if name == "search_memory":
+        query = arguments.get("query", "")
+        # 向量检索优先
+        try:
+            from core.vector_store import search_memories, is_model_ready
+            if is_model_ready():
+                vec_results = search_memories(query, top_k=5)
+                if vec_results:
+                    lines = []
+                    for r in vec_results:
+                        label = "📌" if r.get("type") == "profile" else "💭"
+                        lines.append(f"{label} {r['key']}: {r['value'][:200]}")
+                    return "\n".join(lines)
+        except Exception:
+            pass
+        # 降级：关键词检索
         mems = get_memory()
-        query = arguments.get("query", "").lower()
-        results = [f"{k}: {v}" for k, v in mems.items() if query in k.lower() or query in v.lower()]
+        query_lower = query.lower()
+        results = [f"{k}: {v}" for k, v in mems.items() if query_lower in k.lower() or query_lower in v.lower()]
         return "\n".join(results[:5]) if results else "无相关记忆"
 
     if name == "get_todos":

@@ -32,7 +32,7 @@ _SETTINGS_WHITELIST = {
     "relationship_mode", "sentence_mode", "chat_font_size", "proactive_frequency",
     "proactive_style", "chat_bg_image", "bg_opacity", "bg_blur", "bg_mode",
     "pin_enabled", "quick_phrases", "snake_high", "2048_best", "minesweeper_wins",
-    "user_name", "ai_name", "api_key", "api_provider", "api_base_url", "api_model",
+    "user_name", "ai_name", "api_key", "api_provider", "llm_provider", "api_base_url", "api_model",
     "tts_enabled", "tts_engine", "tts_voice", "tts_api_key", "tts_server_url",
     "tts_api_url", "stt_enabled", "auto_play_voice", "tts_clone_audio",
 } | set(PERSONALITY_KEY_MAP.keys())
@@ -48,6 +48,7 @@ async def get_all_settings() -> Dict[str, Any]:
     return {
         "has_api_key": bool(get_config("api_key", "")),
         "api_provider": get_config("api_provider", ""),
+        "llm_provider": get_config("llm_provider", "deepseek"),
         "model_mode": get_config("model_mode", "auto"),
         "api_base_url": get_config("api_base_url", "https://api.deepseek.com/v1"),
         "api_model": get_config("api_model", "deepseek-chat"),
@@ -152,6 +153,10 @@ async def update_setting(update: ConfigUpdate):
         set_config("personality", p)
     else:
         set_config(update.key, update.value)
+    # 切换 provider 时清除缓存
+    if update.key in ("llm_provider", "api_base_url", "api_model", "api_key"):
+        from core.llm_provider import clear_provider_cache
+        clear_provider_cache()
     return {"status": "ok"}
 
 @router.get("/presets")
@@ -174,7 +179,11 @@ class FoundationUpdate(BaseModel):
     foundation_type: str
     reset_values: bool = False  # 是否重置好感/信任为基石默认值
 
-@router.get("/foundation-types")
+@router.get("/providers")
+async def list_providers():
+    """获取可用的 LLM Provider 列表"""
+    from core.llm_provider import get_available_providers
+    return {"providers": get_available_providers()}
 async def list_foundation_types():
     """获取所有可用的基石类型"""
     from core.prompt_builder import FOUNDATION_TEMPLATES

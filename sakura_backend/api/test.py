@@ -2,6 +2,7 @@ import asyncio
 import requests
 from fastapi import APIRouter
 from core.db import get_config
+from core.llm_provider import get_provider
 
 router = APIRouter(prefix="/test", tags=["test"])
 
@@ -36,26 +37,23 @@ async def fetch_models():
 
 @router.get("/deepseek")
 async def test_deepseek():
+    """测试 LLM API 连通性（使用 LLMProvider 抽象层）"""
+    from core.db import get_config
     api_key = get_config("api_key", "")
-    base_url = get_config("api_base_url", "https://api.deepseek.com/v1").rstrip("/")
-    is_ollama = get_config("api_provider", "") == "ollama" or "localhost:11434" in base_url
+    is_ollama = get_config("api_provider", "") == "ollama"
     if not api_key and not is_ollama:
         return {"ok": False, "message": "未配置 API Key"}
     try:
+        provider = get_provider()
         model = get_config("api_model", "deepseek-chat")
-        if is_ollama and not api_key:
-            headers = {"Content-Type": "application/json"}
-        else:
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-        payload = {
-            "model": model,
-            "messages": [{"role": "user", "content": "回复OK即可"}],
-            "max_tokens": 5,
-            "temperature": 0
-        }
-        resp = await asyncio.to_thread(requests.post, f"{base_url}/chat/completions", headers=headers, json=payload, timeout=15)
-        resp.raise_for_status()
-        return {"ok": True, "message": f"{model} API 正常"}
+        result = provider.chat(
+            [{"role": "user", "content": "回复OK即可"}],
+            max_tokens=5,
+            temperature=0,
+        )
+        if result:
+            return {"ok": True, "message": f"{model} API 正常"}
+        return {"ok": False, "message": "API 返回空"}
     except Exception as e:
         return {"ok": False, "message": str(e)}
 
@@ -76,21 +74,12 @@ async def test_weather():
             results.append({"source": "大模型联网", "ok": False, "reason": "未配置 API Key"})
         else:
             try:
-                model = get_config("api_model", "deepseek-chat")
-                payload = {
-                    "model": model,
-                    "messages": [{"role": "user", "content": f"{city}今天天气怎么样？用中文一句话回答，包含温度和天气状况。"}],
-                    "max_tokens": 100, "temperature": 0.3, "stream": False,
-                    "search": True,
-                }
-                resp = await asyncio.to_thread(
-                    requests.post, f"{base_url}/chat/completions",
-                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    json=payload, timeout=25
+                provider = get_provider()
+                content = provider.chat(
+                    [{"role": "user", "content": f"{city}今天天气怎么样？用中文一句话回答，包含温度和天气状况。"}],
+                    max_tokens=100, temperature=0.3,
+                    search=True,
                 )
-                resp.raise_for_status()
-                body = resp.json()
-                content = body.get("choices", [{}])[0].get("message", {}).get("content", "")
                 ok = bool(content and len(content.strip()) > 2)
                 results.append({"source": "大模型联网", "ok": ok,
                     "reason": "API 响应正常" if ok else "响应为空（模型可能不支持 search 参数，或需在聊天偏好中开启联网策略）",

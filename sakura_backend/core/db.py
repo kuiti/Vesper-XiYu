@@ -250,6 +250,8 @@ def _init_db_locked():
         cursor.execute('''CREATE TABLE IF NOT EXISTS achievements (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE, name TEXT, description TEXT, unlocked_at TEXT)''')
         # AI日记表
         cursor.execute('''CREATE TABLE IF NOT EXISTS ai_diary (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT UNIQUE, content TEXT, mood TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)''')
+        # 角色卡表
+        cursor.execute('''CREATE TABLE IF NOT EXISTS characters (name TEXT PRIMARY KEY, data TEXT, updated_at TEXT)''')
         # 实体存储（mem0 轻量知识图谱）
         cursor.execute('''CREATE TABLE IF NOT EXISTS entities (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

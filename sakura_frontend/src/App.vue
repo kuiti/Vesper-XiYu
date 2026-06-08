@@ -16,12 +16,17 @@ import { useDialog, useMessage } from 'naive-ui'
 import { useUiStore } from './stores/ui.js'
 import { useSettingsStore } from './stores/settings.js'
 
+import { initDialog } from './utils/dialog.js'
+
 const ui = useUiStore()
 const settings = useSettingsStore()
 
 onMounted(() => {
-  ui.registerDialog(useDialog())
-  ui.registerMessage(useMessage())
+  const dialog = useDialog()
+  const message = useMessage()
+  ui.registerDialog(dialog)
+  ui.registerMessage(message)
+  initDialog(dialog, message)  // 暴露给 Options API 旧组件
   settings.load()
 })
 </script>

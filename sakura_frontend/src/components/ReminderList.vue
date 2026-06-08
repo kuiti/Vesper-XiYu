@@ -32,6 +32,7 @@
 
 <script>
 import api from '../api.js'
+import { showConfirm, alert as showAlert } from '../utils/dialog.js'
 
 const LEVELS = [
   { level: 7, name: '强制', advance_minutes: 0 },
@@ -44,7 +45,7 @@ const LEVELS = [
 ]
 
 export default {
-  inject: { showConfirm: { default: () => (msg) => window.confirm(msg) } },
+  inject: { showConfirm: { default: () => async (msg) => await showConfirm({ content: msg }) } },
   data() {
     const now = new Date()
     return {

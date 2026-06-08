@@ -46,7 +46,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import { showConfirm, alert as showAlert } from '../utils/dialog.js'
 
 export default {
   data() {
@@ -70,7 +70,7 @@ export default {
         setTimeout(() => URL.revokeObjectURL(url), 10000)
       } catch (err) {
         console.error('导出失败', err)
-        alert('导出失败')
+        showAlert('导出失败')
       } finally {
         this.exporting = false
       }
@@ -78,7 +78,7 @@ export default {
     async doImport(e) {
       const file = e.target.files[0]
       if (!file) return
-      if (!confirm(`确定要导入 "${file.name}" 吗？当前数据将被覆盖！`)) {
+      if (!await showConfirm({ content: `确定要导入 "${file.name}" 吗？当前数据将被覆盖！`)) {
         this.$refs.fileInput.value = ''
         return
       }
@@ -90,7 +90,7 @@ export default {
         const res = await api.post('/migrate/import', formData)
         this.importResult = res.data
         if (res.data.status === 'ok') {
-          alert('数据恢复成功！页面将刷新。')
+          showAlert('数据恢复成功！页面将刷新。')
           location.reload()
         }
       } catch (err) {

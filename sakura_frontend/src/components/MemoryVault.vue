@@ -112,7 +112,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import { showConfirm, alert as showAlert } from '../utils/dialog.js'
 
 export default {
   props: { aiName: { type: String, default: '佐仓' } },
@@ -153,7 +153,7 @@ export default {
       this.loading = false
     },
     async removeItem(type, key) {
-      if (!confirm('确定删除该记忆？')) return
+      if (!await showConfirm({ content: '确定删除该记忆？' })) return
       try { await api.delete(`/memory/vault/${type}`, { params: { key } }); await this.load() } catch (e) { console.error(e) }
     },
     catLabel(cat) {

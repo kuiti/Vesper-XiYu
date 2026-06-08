@@ -27,6 +27,7 @@
 
 <script>
 import api from '../api.js'
+import { showConfirm, alert as showAlert } from '../utils/dialog.js'
 
 export default {
   data() {
@@ -60,7 +61,7 @@ export default {
       } catch (err) { console.error(err) }
     },
     async deleteMemory(key) {
-      if (!confirm(`删除记忆 "${key}"？`)) return
+      if (!await showConfirm({ content: `删除记忆 "${key}"？` })) return
       try {
         await api.delete(`/memory/${encodeURIComponent(key)}`)
         await this.loadMemory()
@@ -75,7 +76,7 @@ export default {
       } catch (err) { console.error(err) }
     },
     async resetSummary() {
-      if (!confirm('确定要重置摘要记忆？此操作不可撤销。')) return
+      if (!await showConfirm({ content: '确定要重置摘要记忆？此操作不可撤销。' })) return
       this.resetting = true
       try {
         await api.post('/summary/reset')

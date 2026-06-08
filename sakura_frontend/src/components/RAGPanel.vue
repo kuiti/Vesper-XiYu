@@ -16,7 +16,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import { showConfirm, alert as showAlert } from '../utils/dialog.js'
 
 export default {
   data() {
@@ -49,11 +49,11 @@ export default {
       this.loading = true
       try {
         await api.post('/rag/rebuild')
-        alert('索引重建已开始，请稍等几分钟（后台运行）')
+        showAlert('索引重建已开始，请稍等几分钟（后台运行）')
         if (!this._unmounted) this._statusTimer = setTimeout(() => this.loadStatus(), 5000)
       } catch (err) {
         console.error('重建失败', err)
-        alert('重建失败，请检查后端日志')
+        showAlert('重建失败，请检查后端日志')
       } finally {
         this.loading = false
       }

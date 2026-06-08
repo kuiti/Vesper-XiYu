@@ -20,9 +20,10 @@
 
 <script>
 import api from '../api.js'
+import { showConfirm, alert as showAlert } from '../utils/dialog.js'
 
 export default {
-  inject: { showConfirm: { default: () => (msg) => window.confirm(msg) } },
+  inject: { showConfirm: { default: () => async (msg) => await showConfirm({ content: msg }) } },
   props: { aiName: { type: String, default: '佐仓' } },
   data() { return { goals: [], newGoal: '', stats: null } },
   mounted() { this.load() },

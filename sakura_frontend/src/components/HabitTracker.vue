@@ -21,7 +21,7 @@
 const STORAGE_KEY = 'mellow_habits'
 
 export default {
-  inject: { showConfirm: { default: () => (msg) => window.confirm(msg) } },
+  inject: { showConfirm: { default: () => async (msg) => await showConfirm({ content: msg }) } },
   data() {
     return { habits: [], newHabit: '', _lastDate: '' }
   },

@@ -1,4 +1,4 @@
-# version: 5.0.0
+# version: 1.0.0
 """夕语启动入口 —— 命名管道单实例 + 系统托盘 + 后台运行"""
 import sys, os, threading, ctypes, logging as _log, json as _json, time as _time, socket
 
@@ -41,6 +41,12 @@ try:
 except Exception:
     pass
 
+# 打包后如果在 dist/ 子目录，回溯到项目根目录以共用 data/
+if getattr(sys, 'frozen', False):
+    _parent = os.path.dirname(BASE_DIR)
+    if os.path.exists(os.path.join(_parent, "data", "sakura.db")):
+        BASE_DIR = _parent
+
 try:
     os.chdir(BASE_DIR)
 except OSError as e:
@@ -72,7 +78,7 @@ def _kill_zombie_processes():
         try:
             req = urllib.request.Request(
                 f"http://127.0.0.1:{port}/health",
-                headers={"User-Agent": "SakuraLauncher/1.0"}
+                headers={"User-Agent": "VesperLauncher/1.0"}
             )
             with urllib.request.urlopen(req, timeout=2) as resp:
                 if resp.status == 200:
@@ -110,7 +116,7 @@ def _find_existing_instance():
         try:
             req = urllib.request.Request(
                 f"http://127.0.0.1:{port}/health",
-                headers={"User-Agent": "SakuraLauncher/1.0"}
+                headers={"User-Agent": "VesperLauncher/1.0"}
             )
             with urllib.request.urlopen(req, timeout=3) as resp:
                 text = resp.read().decode('utf-8', errors='ignore')
@@ -123,7 +129,7 @@ def _find_existing_instance():
 
 def _activate_existing_window(port):
     """尝试激活已有实例的窗口。先试命名管道，失败则用浏览器打开。"""
-    pipe_name = f'\\\\.\\pipe\\sakura_ai_{port}'
+    pipe_name = f'\\\\.\\pipe\\vesper_ai_{port}'
     try:
         handle = win32file.CreateFile(
             pipe_name,
@@ -147,7 +153,7 @@ def _activate_existing_window(port):
 
 def _start_pipe_server(port):
     """在后台线程启动命名管道服务器（管道名包含端口号）"""
-    pipe_name = f'\\\\.\\pipe\\sakura_ai_{port}'
+    pipe_name = f'\\\\.\\pipe\\vesper_ai_{port}'
 
     def _serve():
         while True:
@@ -254,7 +260,7 @@ def _read_theme():
 
 _last_theme = _read_theme()
 
-# config.js 延迟到主流程中写入（需要先确定 SAKURA_PORT）
+# config.js 延迟到主流程中写入（需要先确定 VESPER_PORT）
 
 # 加载页 HTML（主题自适应）
 loading_html = '''<!DOCTYPE html>
@@ -297,7 +303,7 @@ body[data-theme="light"] .progress{background:#d8cfc4}
 body[data-theme="light"] .progress-bar{background:#c9717a}
 body[data-theme="light"]::before{background-image:radial-gradient(1px 1px at 10% 20%,rgba(201,113,122,.12),transparent),radial-gradient(1.5px 1.5px at 30% 50%,rgba(201,113,122,.08),transparent),radial-gradient(1px 1px at 50% 15%,rgba(212,160,144,.15),transparent),radial-gradient(1px 1px at 70% 60%,rgba(201,113,122,.1),transparent),radial-gradient(1px 1px at 85% 30%,rgba(212,160,144,.12),transparent);animation:drift 10s ease-in-out infinite alternate}
 
-/* ═══ Sakura 樱·暗绯 ═══ */
+/* ═══ Vesper 夕语 ═══ */
 body[data-theme="sakura"]{--glow:#e8929b;background:#1c141a;color:#f0d8e0}
 body[data-theme="sakura"] .logo{color:#e8929b}
 body[data-theme="sakura"] .monologue{color:#b8959e}
@@ -372,6 +378,65 @@ def _set_titlebar_theme(hwnd, dark=True):
     except Exception as e:
         print(f"[启动] 深色标题栏设置失败: {e}")
 
+def _set_window_icon(hwnd=None):
+    """设置所有本进程窗口的图标（标题栏 + 任务栏）"""
+    import ctypes.wintypes as wintypes
+    WM_SETICON = 0x0080
+    ICON_SMALL = 0
+    ICON_BIG = 1
+    ico_path = os.path.join(BASE_DIR, "sakura.ico")
+    if not os.path.exists(ico_path):
+        return
+    pid = os.getpid()
+
+    def _set_icon_for_hwnd(h):
+        hicon_small = ctypes.windll.user32.LoadImageW(0, ico_path, 1, 16, 16, 0x00000010)
+        hicon_big = ctypes.windll.user32.LoadImageW(0, ico_path, 1, 256, 256, 0x00000010)
+        if hicon_small:
+            ctypes.windll.user32.SendMessageW(wintypes.HWND(h), WM_SETICON, ICON_SMALL, hicon_small)
+        if hicon_big:
+            ctypes.windll.user32.SendMessageW(wintypes.HWND(h), WM_SETICON, ICON_BIG, hicon_big)
+
+    if hwnd:
+        _set_icon_for_hwnd(hwnd)
+
+    # 枚举本进程所有顶层窗口
+    targets = []
+    WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
+    def _enum_all(h, _):
+        wpid = wintypes.DWORD()
+        ctypes.windll.user32.GetWindowThreadProcessId(h, ctypes.byref(wpid))
+        if wpid.value == pid and ctypes.windll.user32.IsWindowVisible(h):
+            targets.append(h)
+        return True
+    ctypes.windll.user32.EnumWindows(WNDENUMPROC(_enum_all), 0)
+    for h in targets:
+        _set_icon_for_hwnd(h)
+        # 在窗口上直接设置 AppUserModelID（任务栏图标关联）
+        try:
+            _set_window_appid(h, "Vesper.Xiyu")
+        except Exception:
+            pass
+
+def _set_window_appid(hwnd, appid):
+    """在窗口上设置 AppUserModelID（让任务栏关联图标）"""
+    from ctypes import wintypes
+    # SHGetPropertyStoreForWindow / IPropertyStore::SetValue
+    shell32 = ctypes.windll.shell32
+    # PKEY_AppUserModel_ID = GUID + pid
+    # We use a COM-based approach via ctypes
+    IID_IPropertyStore = (0x886D8EEB, 0x8CF2, 0x4446, 0x8D, 0x02, 0xCD, 0xBA, 0x1D, 0xBD, 0xCF, 0x99)
+    try:
+        pps = ctypes.c_void_p()
+        hr = shell32.SHGetPropertyStoreForWindow(wintypes.HWND(hwnd),
+            ctypes.byref(ctypes.c_void_p(ctypes.cast(ctypes.pointer(ctypes.create_string_buffer(16)), ctypes.c_void_p).value)),
+            ctypes.byref(pps))
+        if hr >= 0 and pps:
+            # Too complex, skip for now
+            pass
+    except Exception:
+        pass
+
 sw = ctypes.windll.user32.GetSystemMetrics(0)
 sh = ctypes.windll.user32.GetSystemMetrics(1)
 ww = min(int(sw * 0.65), 1300)
@@ -382,6 +447,12 @@ _has_winotify = None
 
 def _show_toast(title, body, duration="short"):
     """Windows 原生通知，不可用时回退到 pystray 气泡"""
+    try:
+        from core.db import get_config
+        if not get_config("use_system_notification", False):
+            return
+    except Exception:
+        pass
     global _has_winotify
     if _has_winotify is None:
         try:
@@ -405,8 +476,12 @@ _tray_icon = None
 _window = None
 
 def _create_tray_icon_image():
-    """创建托盘图标（简单的粉色圆形）"""
+    """加载 sakura.ico 作为托盘图标"""
     from PIL import Image
+    ico_path = os.path.join(BASE_DIR, "sakura.ico")
+    if os.path.exists(ico_path):
+        return Image.open(ico_path)
+    # 回退：简单粉色圆形
     img = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
     from PIL import ImageDraw
     draw = ImageDraw.Draw(img)
@@ -448,7 +523,7 @@ def _on_tray_quit(icon, item):
             os.remove(f)
         except OSError:
             pass
-    os._exit(0)
+    sys.exit(0)
 
 def _setup_tray():
     """设置系统托盘"""
@@ -491,9 +566,16 @@ def _find_and_set_dark():
         _time.sleep(0.1)
         ctypes.windll.user32.EnumWindows(WNDENUMPROC(_enum), 0)
         if found:
+            _set_window_icon(found[0])
             _set_titlebar_theme(found[0], True)
             _write_hwnd(found[0])
             _register_wnd_proc(found[0])
+            # 延迟重设图标（WebView2 初始化会重置）
+            def _reapply_icon():
+                for delay in [2, 5]:
+                    _time.sleep(delay)
+                    _set_window_icon(found[0])
+            threading.Thread(target=_reapply_icon, daemon=True).start()
             return
 
 def _register_wnd_proc(hwnd):
@@ -541,7 +623,8 @@ def _register_wnd_proc(hwnd):
     _orig_wndproc = ctypes.windll.user32.GetWindowLongPtrW(hwnd, GWLP_WNDPROC)
     new_wndproc = WNDPROC(_wnd_proc)
     ctypes.windll.user32.SetWindowLongPtrW(hwnd, GWLP_WNDPROC, new_wndproc)
-    _wnd_proc._ref = new_wndproc
+    global _persistent_wndproc
+    _persistent_wndproc = new_wndproc
 
 # ─── 文件锁单实例检测（先于端口扫描，堵住 uvicorn 未就绪的竞态窗口）───
 LOCK_FILE = os.path.join("data", "sakura.lock")
@@ -592,18 +675,23 @@ def _write_instance_lock(port):
 # ─── 主流程 ───
 
 # 0. Windows 命名互斥体（内核级原子操作，杜绝双进程）
-_MUTEX_NAME = "SakuraAI_SingleInstance_1A2B3C"
+_MUTEX_NAME = "VesperAI_SingleInstance_1A2B3C"
 _kernel32 = ctypes.windll.kernel32
 _mutex = _kernel32.CreateMutexW(None, False, _MUTEX_NAME)
 if _kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
-    # 互斥体已存在 → 找已有实例激活
-    existing_port, _ = _check_instance_lock()
-    if not existing_port:
-        existing_port, _ = _find_existing_instance()
-    if existing_port:
-        _activate_existing_window(existing_port)
-    print("[启动] 已有实例在运行，退出")
-    sys.exit(0)
+    # 检查旧进程是否已死（互斥体是否被抛弃）
+    _wait_rc = _kernel32.WaitForSingleObject(_mutex, 0)
+    if _wait_rc in (0, 128):  # WAIT_OBJECT_0 或 WAIT_ABANDONED → 旧进程已死
+        pass  # 本进程接管互斥体
+    else:
+        # 互斥体被活进程持有 → 找已有实例激活
+        existing_port, _ = _check_instance_lock()
+        if not existing_port:
+            existing_port, _ = _find_existing_instance()
+        if existing_port:
+            _activate_existing_window(existing_port)
+        print("[启动] 已有实例在运行，退出")
+        sys.exit(0)
 
 # 0.5 频率限制：距上次启动 < 2 秒则跳过
 import time as _time2
@@ -621,10 +709,10 @@ except Exception:
     pass
 
 # 1. 快速路径：找端口 → 立即出窗口（用户先看到加载动画）
-SAKURA_PORT = _find_free_port()
-_write_instance_lock(SAKURA_PORT)
-print(f"[启动] 使用端口: {SAKURA_PORT}")
-loading_html = loading_html.replace('__PORT__', _json.dumps(SAKURA_PORT)).replace('__THEME__', _json.dumps(_last_theme))
+VESPER_PORT = _find_free_port()
+_write_instance_lock(VESPER_PORT)
+print(f"[启动] 使用端口: {VESPER_PORT}")
+loading_html = loading_html.replace('__PORT__', _json.dumps(VESPER_PORT)).replace('__THEME__', _json.dumps(_last_theme))
 
 # 写 config.js（端口确定后）
 _meipass = getattr(sys, '_MEIPASS', None)
@@ -632,11 +720,51 @@ _frontend_dir = os.path.join(_meipass if _meipass else BASE_DIR, "frontend")
 if os.path.isdir(_frontend_dir):
     try:
         with open(os.path.join(_frontend_dir, "config.js"), "w", encoding="utf-8") as f:
-            f.write(f"window.__SAKURA_CONFIG__ = {{ backendPort: {SAKURA_PORT}, theme: \"{_last_theme}\" }};")
+            f.write(f"window.__VESPER_CONFIG__ = {{ backendPort: {VESPER_PORT}, theme: \"{_last_theme}\" }};")
     except OSError as e:
         print(f"[启动] 警告：无法写入 config.js: {e}")
 else:
     _frontend_dir = os.path.join(BASE_DIR, "static")
+
+# 1.5 在创建窗口前设置 AppUserModelID（决定任务栏图标）
+try:
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Vesper.Xiyu")
+except Exception:
+    pass
+
+# 1.6 在 WebView2 Preferences 中预授权地理位置，避免每次弹出系统权限对话框
+def _ensure_geo_prefs():
+    """写 WebView2 Preferences 文件预授权地理位置（启动时+窗口加载后各调一次，防止被覆盖）"""
+    _prefs_path = os.path.join(BASE_DIR, "data", "webview2_data", "EBWebView", "Default", "Preferences")
+    if not os.path.exists(_prefs_path):
+        try:
+            os.makedirs(os.path.dirname(_prefs_path), exist_ok=True)
+            with open(_prefs_path, "w", encoding="utf-8") as _f:
+                _json.dump({"profile": {"content_settings": {"exceptions": {"geolocation": {}}}}}, _f)
+        except Exception:
+            return
+    try:
+        with open(_prefs_path, "r", encoding="utf-8") as _f:
+            _prefs = _json.load(_f)
+        _geo = (_prefs.setdefault("profile", {})
+               .setdefault("content_settings", {})
+               .setdefault("exceptions", {})
+               .setdefault("geolocation", {}))
+        _ts = str(int(_time.time() * 1000000))
+        _granted = False
+        for _port in [VESPER_PORT, 8060, 8061, 8062, 8063, 8064]:
+            _key = f"http://127.0.0.1:{_port},*"
+            if _key not in _geo:
+                _geo[_key] = {"setting": 1, "last_modified": _ts}
+                _granted = True
+        if _granted:
+            with open(_prefs_path, "w", encoding="utf-8") as _f:
+                _json.dump(_prefs, _f, ensure_ascii=False)
+            print(f"[启动] 已预授权地理位置权限（端口 {VESPER_PORT}）")
+    except Exception:
+        pass
+
+_ensure_geo_prefs()
 
 # 2. 立即创建窗口（加载动画先出现，用户不再干等）
 import webview
@@ -646,11 +774,12 @@ try:
         x=(sw-ww)//2, y=(sh-wh)//2, resizable=True, min_size=(500, 350), text_select=True
     )
     _window.events.closing += _on_closing
+    _window.events.loaded += _ensure_geo_prefs
 except Exception as e:
     _log.error(f'Window start failed: {e}')
     import webbrowser
     print(f"WebView2 启动失败: {e}，回退到浏览器")
-    webbrowser.open(f"http://127.0.0.1:{SAKURA_PORT}/")
+    webbrowser.open(f"http://127.0.0.1:{VESPER_PORT}/")
     try: input("按 Ctrl+C 退出...")
     except (EOFError, KeyboardInterrupt): pass
     sys.exit(1)
@@ -662,9 +791,9 @@ if sys.platform == "win32":
 threading.Thread(target=_kill_zombie_processes, daemon=True).start()
 
 # 4. 后台：启动管道 + 后端
-_start_pipe_server(SAKURA_PORT)
-print(f"[启动] 命名管道服务器已启动 (sakura_ai_{SAKURA_PORT})")
-threading.Thread(target=start_backend, args=(SAKURA_PORT,), daemon=True).start()
+_start_pipe_server(VESPER_PORT)
+print(f"[启动] 命名管道服务器已启动 (vesper_ai_{VESPER_PORT})")
+threading.Thread(target=start_backend, args=(VESPER_PORT,), daemon=True).start()
 
 # 5. 后台：系统托盘（慢，放线程不阻塞窗口）
 threading.Thread(target=_setup_tray, daemon=True).start()

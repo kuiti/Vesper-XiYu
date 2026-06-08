@@ -13,37 +13,40 @@
       <div class="ep-error" v-else-if="error.curve">加载失败，请重试</div>
       <div v-else>
         <div class="ep-curve-box">
-          <div class="curve-hint">好感度 {{ relationship.affection }}/100 &nbsp; 信任度 {{ relationship.trust }}/100</div>
+          <div class="curve-hint">❤️ 好感 {{ relationship.affection }}/100 &nbsp; 🔒 信任 {{ relationship.trust }}/100</div>
 
-          <!-- 图1：情绪分 -->
+          <!-- 图1：好感度趋势（0-100 固定Y轴） -->
           <div class="curve-section">
-            <div class="curve-title"><span class="dot red"></span> 情绪分</div>
+            <div class="curve-title"><span class="dot red"></span> 好感度趋势（近14天）</div>
             <div class="curve-chart">
               <svg :width="chartWidth + 30" :height="chartHeight">
-                <template v-for="i in 5" :key="'sgy'+i">
-                  <line :x1="30" :y1="i*chartHeight/5" :x2="chartWidth + 30" :y2="i*chartHeight/5" stroke="var(--border)" stroke-dasharray="4" />
-                  <text :x="0" :y="i*chartHeight/5 + 4" fill="var(--tc2)" font-size="10" font-family="monospace">{{ scoreLabels[5-i] }}</text>
+                <line x1="30" y1="0" x2="310" y2="0" stroke="var(--border)" />
+                <line x1="30" y1="120" x2="310" y2="120" stroke="var(--border)" />
+                <line x1="30" y1="60" x2="310" y2="60" stroke="var(--border)" stroke-dasharray="2" />
+                <template v-for="i in [-100,-50,0,50,100]" :key="'al'+i">
+                  <line :x1="30" :y1="chartHeight-((i+100)/200*chartHeight)" :x2="chartWidth+30" :y2="chartHeight-((i+100)/200*chartHeight)" stroke="var(--border)" stroke-dasharray="4" />
+                  <text :x="5" :y="chartHeight-((i+100)/200*chartHeight) + 4" fill="var(--tc2)" font-size="10" font-family="monospace">{{ i }}</text>
                 </template>
-                <polyline :points="scorePoints" fill="none" stroke="#e74c3c" stroke-width="2" />
-                <circle v-for="(p, idx) in scoreDots" :key="'sd'+idx" :cx="p.x" :cy="p.y" r="5" fill="#e74c3c" class="hover-dot">
-                  <title>{{ p.date }}: {{ p.val }}</title>
+                <polyline :points="affectionPoints" fill="none" stroke="#f0a0b0" stroke-width="2" />
+                <circle v-for="(p, idx) in affectionDots" :key="'ad'+idx" :cx="p.x" :cy="p.y" r="5" fill="#f0a0b0" class="hover-dot">
+                  <title>{{ p.date }}: 好感 {{ p.val }}</title>
                 </circle>
               </svg>
             </div>
           </div>
 
-          <!-- 图2：消息数 -->
+          <!-- 图2：信任度趋势（0-100 固定Y轴） -->
           <div class="curve-section">
-            <div class="curve-title"><span class="dot blue"></span> 消息数</div>
+            <div class="curve-title"><span class="dot blue"></span> 信任度趋势（近14天）</div>
             <div class="curve-chart">
               <svg :width="chartWidth + 30" :height="chartHeight">
-                <template v-for="i in 5" :key="'mgy'+i">
-                  <line :x1="30" :y1="i*chartHeight/5" :x2="chartWidth + 30" :y2="i*chartHeight/5" stroke="var(--border)" stroke-dasharray="4" />
-                  <text :x="0" :y="i*chartHeight/5 + 4" fill="var(--tc2)" font-size="10" font-family="monospace">{{ msgLabels[5-i] }}</text>
+                <template v-for="i in [-100,-50,0,50,100]" :key="'tl'+i">
+                  <line :x1="30" :y1="chartHeight-((i+100)/200*chartHeight)" :x2="chartWidth+30" :y2="chartHeight-((i+100)/200*chartHeight)" stroke="var(--border)" stroke-dasharray="4" />
+                  <text :x="5" :y="chartHeight-((i+100)/200*chartHeight) + 4" fill="var(--tc2)" font-size="10" font-family="monospace">{{ i }}</text>
                 </template>
-                <polyline :points="msgPoints" fill="none" stroke="#3498db" stroke-width="2" />
-                <circle v-for="(p, idx) in msgDots" :key="'md'+idx" :cx="p.x" :cy="p.y" r="5" fill="#3498db" class="hover-dot">
-                  <title>{{ p.date }}: {{ p.val }} 条</title>
+                <polyline :points="trustPoints" fill="none" stroke="#5390d4" stroke-width="2" />
+                <circle v-for="(p, idx) in trustDots" :key="'td'+idx" :cx="p.x" :cy="p.y" r="5" fill="#5390d4" class="hover-dot">
+                  <title>{{ p.date }}: 信任 {{ p.val }}</title>
                 </circle>
               </svg>
             </div>
@@ -135,8 +138,10 @@ export default {
       ],
       loading: { curve: true, calendar: true, timeline: true, portrait: true },
       error: { curve: false, calendar: false, timeline: false, portrait: false },
-      relationship: { affection: 30, trust: 50 },
+      relationship: { affection: 30, trust: 30 },
       dailyEmotion: [],
+      affectionHistory: [],
+      trustHistory: [],
       events: [],
       profile: { traits: {}, descriptions: {}, summary: '' },
       chartWidth: 280,
@@ -144,70 +149,43 @@ export default {
     }
   },
   computed: {
-    scorePoints() {
+    // 好感趋势：-100到100 Y轴
+    affectionPoints() {
       const w = this.chartWidth, h = this.chartHeight
-      if (!this.dailyEmotion.length) return `30,${h/2} ${w+30},${h/2}`
-      const pts = this.dailyEmotion.slice(-14)
-      const scores = pts.map(d => (d.score || 0))
-      const smax = Math.max(...scores, 1), smin = Math.min(...scores, -1)
+      const pts = this.affectionHistory.slice(-14)
+      if (!pts.length) return `30,${h/2} ${w+30},${h/2}`
       return pts.map((d, i) => {
         const x = 30 + (i / Math.max(pts.length - 1, 1)) * w
-        const norm = smax === smin ? 0.5 : (d.score - smin) / (smax - smin)
-        const y = h - norm * h * 0.8 - h * 0.1
+        const norm = (d.value + 100) / 200
+        const y = h - norm * h
         return `${x.toFixed(0)},${y.toFixed(0)}`
       }).join(' ')
     },
-    msgPoints() {
+    trustPoints() {
       const w = this.chartWidth, h = this.chartHeight
-      if (!this.dailyEmotion.length) return `30,${h/2} ${w+30},${h/2}`
-      const pts = this.dailyEmotion.slice(-14)
-      const maxMsg = Math.max(...pts.map(p => p.total_messages || 1), 1)
+      const pts = this.trustHistory.slice(-14)
+      if (!pts.length) return `30,${h/2} ${w+30},${h/2}`
       return pts.map((d, i) => {
         const x = 30 + (i / Math.max(pts.length - 1, 1)) * w
-        const y = h - ((d.total_messages || 0) / maxMsg) * h * 0.8 - h * 0.1
+        const norm = (d.value + 100) / 200
+        const y = h - norm * h
         return `${x.toFixed(0)},${y.toFixed(0)}`
       }).join(' ')
     },
-    scoreDots() {
+    affectionDots() {
       const w = this.chartWidth, h = this.chartHeight
-      if (!this.dailyEmotion.length) return []
-      const pts = this.dailyEmotion.slice(-14)
-      const scores = pts.map(d => (d.score || 0))
-      const smax = Math.max(...scores, 1), smin = Math.min(...scores, -1)
-      return pts.map((d, i) => {
-        const x = 30 + (i / Math.max(pts.length - 1, 1)) * w
-        const norm = smax === smin ? 0.5 : (d.score - smin) / (smax - smin)
-        const y = h - norm * h * 0.8 - h * 0.1
-        return { x, y, val: d.score || 0, date: d.date }
+      return this.affectionHistory.slice(-14).map((d, i) => {
+        const x = 30 + (i / Math.max(this.affectionHistory.slice(-14).length - 1, 1)) * w
+        const norm = (d.value + 100) / 200
+        return { x, y: h - norm * h, val: d.value, date: d.date }
       })
     },
-    msgDots() {
+    trustDots() {
       const w = this.chartWidth, h = this.chartHeight
-      if (!this.dailyEmotion.length) return []
-      const pts = this.dailyEmotion.slice(-14)
-      const maxMsg = Math.max(...pts.map(p => p.total_messages || 1), 1)
-      return pts.map((d, i) => {
-        const x = 30 + (i / Math.max(pts.length - 1, 1)) * w
-        const y = h - ((d.total_messages || 0) / maxMsg) * h * 0.8 - h * 0.1
-        return { x, y, val: d.total_messages || 0, date: d.date }
-      })
-    },
-    scoreLabels() {
-      if (!this.dailyEmotion.length) return ['', '', '', '', '', '']
-      const pts = this.dailyEmotion.slice(-14)
-      const scores = pts.map(d => d.score || 0)
-      const smax = Math.max(...scores, 1), smin = Math.min(...scores, -1)
-      return [0, 1, 2, 3, 4, 5].map(i => {
-        const val = smax - (i / 5) * (smax - smin)
-        return val.toFixed(1)
-      })
-    },
-    msgLabels() {
-      if (!this.dailyEmotion.length) return ['', '', '', '', '', '']
-      const pts = this.dailyEmotion.slice(-14)
-      const maxMsg = Math.max(...pts.map(p => p.total_messages || 1), 1)
-      return [0, 1, 2, 3, 4, 5].map(i => {
-        return Math.round(maxMsg * (5 - i) / 5)
+      return this.trustHistory.slice(-14).map((d, i) => {
+        const x = 30 + (i / Math.max(this.trustHistory.slice(-14).length - 1, 1)) * w
+        const norm = (d.value + 100) / 200
+        return { x, y: h - norm * h, val: d.value, date: d.date }
       })
     },
     calendarWeeks() {
@@ -257,6 +235,8 @@ export default {
       try {
         const { data } = await api.get('/emotion/timeline?days=28')
         this.dailyEmotion = data.daily_emotion || []
+        this.affectionHistory = data.affection_history || []
+        this.trustHistory = data.trust_history || []
       } catch (e) { this.error.calendar = true; console.error('load timeline failed', e) }
       this.loading.calendar = false
     },

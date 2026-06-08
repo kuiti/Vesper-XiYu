@@ -35,7 +35,7 @@ export default {
       try {
         localStorage.setItem('_reset_pin', '1')
         location.reload()
-      } catch (e) { this.error = '重置失败，请手动删除 data/vesper.db 中 config 表的 pin_code 记录' }
+      } catch (e) { this.error = '重置失败，请手动删除 data/sakura.db 中 config 表的 pin_code 记录' }
     }
   }
 }

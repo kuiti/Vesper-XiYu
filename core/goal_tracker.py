@@ -54,12 +54,48 @@ def ingest_keypoints(key_points: list):
                     (now, category, existing["id"])
                 )
             else:
+                # 写入暂存区，等用户确认
                 cursor.execute(
-                    "INSERT INTO goal_tracking (goal_text, category, status, first_mentioned, last_mentioned, created_at) VALUES (?, ?, 'active', ?, ?, ?)",
-                    (text, category, now, now, now)
+                    "INSERT OR IGNORE INTO pending_goals (goal_text, category, extracted_at, status) VALUES (?, ?, ?, 'pending')",
+                    (text, category, now)
                 )
         if goals:
-            print(f"[GoalTracker] 录入 {len(goals)} 个目标: {[g['text'][:30] for g in goals]}")
+            print(f"[GoalTracker] 录入 {len(goals)} 个目标: {[g.get('text', '')[:30] for g in goals]}")
+
+
+def get_pending_goals(limit: int = 3) -> list:
+    """获取待确认的目标列表"""
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, goal_text, category FROM pending_goals WHERE status='pending' ORDER BY extracted_at DESC LIMIT ?", (limit,))
+        return [{"id": r["id"], "goal_text": r["goal_text"], "category": r["category"]} for r in cursor.fetchall()]
+
+
+def confirm_goal(pending_id: int) -> bool:
+    """确认目标：从暂存移入正式跟踪"""
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT goal_text, category FROM pending_goals WHERE id=?", (pending_id,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        now = datetime.now().isoformat()
+        cursor.execute("SELECT id FROM goal_tracking WHERE goal_text=?", (row["goal_text"],))
+        if not cursor.fetchone():
+            try:
+                cursor.execute("INSERT INTO goal_tracking (goal_text, category, status, first_mentioned, last_mentioned) VALUES (?, ?, 'active', ?, ?)",
+                              (row["goal_text"], row["category"], now, now))
+            except Exception:
+                pass  # UNIQUE 约束冲突（并发确认），静默跳过
+        cursor.execute("UPDATE pending_goals SET status='confirmed' WHERE id=?", (pending_id,))
+        return True
+
+
+def reject_goal(pending_id: int) -> bool:
+    """拒绝目标"""
+    with get_conn() as conn:
+        conn.cursor().execute("UPDATE pending_goals SET status='rejected' WHERE id=?", (pending_id,))
+    return True
 
 
 def get_stale_goals(days_threshold: int = 7, limit: int = 3) -> list:
@@ -122,11 +158,17 @@ def check_goal_completion(user_message: str) -> list:
     with get_conn() as conn:
         cursor = conn.cursor()
         for gid in completed:
-            cursor.execute("UPDATE goal_tracking SET status='done' WHERE id=?", (gid,))
-            print(f"[GoalTracker] 目标 #{gid} 标记为完成")
+            try:
+                cursor.execute("UPDATE goal_tracking SET status='done' WHERE id=?", (int(gid),))
+                print(f"[GoalTracker] 目标 #{gid} 标记为完成")
+            except (ValueError, TypeError):
+                print(f"[GoalTracker] 无效目标 ID: {gid}")
         for gid in abandoned:
-            cursor.execute("UPDATE goal_tracking SET status='abandoned' WHERE id=?", (gid,))
-            print(f"[GoalTracker] 目标 #{gid} 标记为放弃")
+            try:
+                cursor.execute("UPDATE goal_tracking SET status='abandoned' WHERE id=?", (int(gid),))
+                print(f"[GoalTracker] 目标 #{gid} 标记为放弃")
+            except (ValueError, TypeError):
+                print(f"[GoalTracker] 无效目标 ID: {gid}")
 
     return completed + abandoned
 

@@ -1,4 +1,4 @@
-# version: 5.0.0
+# version: 1.0.0
 from fastapi import APIRouter, BackgroundTasks
 from core.db import delete_chat_history_between, delete_chat_history_older_than, set_config, get_config, reset_active_memory, get_db_connection
 from pydantic import BaseModel
@@ -23,8 +23,26 @@ def _clear_vectors():
 @router.delete("/range")
 async def delete_range(range: DateRange, bg: BackgroundTasks):
     try:
-        start_iso = datetime.strptime(range.start, "%Y-%m-%d").isoformat()
-        end_iso = datetime.strptime(range.end, "%Y-%m-%d").replace(hour=23, minute=59, second=59).isoformat()
+        # 兼容 "YYYY-MM-DD" 和 "YYYY-MM-DDTHH:MM:SS" 两种格式
+        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+            try:
+                start_iso = datetime.strptime(range.start, fmt).isoformat()
+                break
+            except ValueError:
+                continue
+        else:
+            raise ValueError(f"无法解析日期: {range.start}")
+        for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+            try:
+                end_iso = datetime.strptime(range.end, fmt).isoformat()
+                break
+            except ValueError:
+                continue
+        else:
+            raise ValueError(f"无法解析日期: {range.end}")
+        # 如果是纯日期，end 默认补 23:59:59
+        if len(range.end) <= 10:
+            end_iso = datetime.strptime(range.end, "%Y-%m-%d").replace(hour=23, minute=59, second=59).isoformat()
     except ValueError:
         from fastapi.responses import JSONResponse
         return JSONResponse({"detail": "日期格式无效，需为 YYYY-MM-DD"}, status_code=400)
@@ -46,15 +64,17 @@ async def delete_recent(minutes: int, bg: BackgroundTasks):
     return {"deleted": count}
 
 @router.delete("/message/{msg_id}")
-async def delete_message(msg_id: int, bg: BackgroundTasks):
+async def delete_message(msg_id: int):
     """删除单条消息"""
     from core.db import get_conn
+    from core.vector_store import delete_message_vectors
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM chat_history WHERE id = ?", (msg_id,))
         cursor.execute("DELETE FROM chat_fts WHERE rowid = ?", (msg_id,))
+        cursor.execute("DELETE FROM sentence_index WHERE msg_id = ?", (msg_id,))
     reset_active_memory()
-    bg.add_task(_clear_vectors)
+    delete_message_vectors(msg_id)
     return {"status": "ok"}
 
 @router.delete("/older-than/{days}")
@@ -68,7 +88,6 @@ async def delete_older_than(days: int, bg: BackgroundTasks):
 async def delete_all(bg: BackgroundTasks):
     from core.db import clear_chat_history
     clear_chat_history()
-    reset_active_memory()
     bg.add_task(_clear_vectors)
     return {"status": "ok"}
 

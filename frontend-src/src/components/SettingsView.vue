@@ -6,9 +6,9 @@
     <div class="settings-content">
       <!-- 服务器连接 -->
       <div v-if="activeCat==='server'" class="sc-pane">
-        <div class="card"><h3>云端服务器连接</h3><p class="hint">连接到云端部署的佐仓后端。本地使用请留空。</p>
+        <div class="card"><h3>云端服务器连接</h3><p class="hint">连接到云端部署的夕语后端。本地使用请留空。</p>
           <div class="field"><label>服务器地址</label><input v-model="serverHost" placeholder="47.98.120.186（留空=本地模式）"></div>
-          <div class="field"><label>端口</label><input v-model="serverPort" placeholder="8060"></div>
+          <div class="field"><label>端口</label><input v-model="serverPort" placeholder="18060"></div>
           <div class="field"><label>访问令牌</label><input type="password" v-model="serverToken" placeholder="输入云端 Token"></div>
           <div class="btn-row">
             <button class="btn" @click="saveServer">保存并连接</button>
@@ -51,7 +51,7 @@
         </div>
         <div class="card"><h3>性格设置</h3>
           <div class="field"><label>语气</label><select v-model="tone" @change="saveCfg('personality_tone', tone)"><option value="冷静">冷静</option><option value="活泼">活泼</option><option value="温柔">温柔</option><option value="毒舌">毒舌</option><option value="傲娇">傲娇</option><option value="自由">自由</option></select></div>
-          <div class="field"><label>回复长度</label><select v-model="length" @change="saveCfg('length_level', length)"><option value="极短">极短 (5字)</option><option value="短">短 (10字)</option><option value="中等">中等 (20字)</option><option value="长">长 (40字)</option><option value="详细">详细 (80字)</option><option value="自由发挥">自由发挥</option><option value="不限">不限</option></select></div>
+          <div class="field"><label>回复长度</label><select v-model="length" @change="saveCfg('length_level', length)"><option value="极短">极短（一句话）</option><option value="短">短（两三句）</option><option value="中等">中等（一段话）</option><option value="长">长（详细展开）</option><option value="详细">非常详细</option><option value="自由发挥">自由发挥</option><option value="不限">不限</option></select></div>
           <div class="field"><label>记忆回调</label><select v-model="recall" @change="saveCfg('recall_past', recall)"><option value="从不">从不</option><option value="被动">被动</option></select><p class="hint">控制 AI 是否在对话中主动提及过去的记忆。被动模式仅在相关话题出现时引用。</p></div>
           <label class="switch"><input type="checkbox" v-model="allowEmotion" @change="saveCfg('allow_emotion', allowEmotion)"> 允许使用颜文字</label><p class="hint">开启后 AI 会在自然的时候用颜文字表达情绪，如（笑）（叹气）（歪头），而非 emoji 图标。</p>
         </div>
@@ -141,9 +141,9 @@
           <div class="btn-row"><button class="btn" @click="locateByIP" :disabled="!!locating">{{ locating === 'ip' ? '定位中...' : 'IP 定位' }}</button><button class="btn" @click="preciseLocate" :disabled="!!locating">{{ locating === 'gps' ? '定位中...' : 'GPS 精确定位' }}</button><button class="btn-s" @click="resetLocation">重置权限</button></div>
           <div v-if="locateResult" class="field" style="margin-top:8px"><span :class="locateOk ? 'ok' : 'fail'">{{ locateResult }}</span></div>
         </div>
-        <div class="card"><h3>手动选择</h3><p class="hint">精确城市（GPS获取）优先于手动城市。如果 GPS 定位不准或未授权，手动选择的城市会作为天气和问候的兜底。</p>
-          <div class="field"><label>省份</label><select v-model="selProvince" @change="loadCities"><option value="">-- 自动检测 --</option><option v-for="p in provinces" :key="p.adcode" :value="p.adcode">{{ p.name }}</option></select></div>
-          <div class="field"><label>城市</label><select v-model="selCity" @change="saveManualCity"><option value="">-- 选择城市 --</option><option v-for="c in cities" :key="c.adcode" :value="c.adcode">{{ c.name }}</option></select></div>
+        <div class="card"><h3>手动选择</h3><p class="hint">当前定位：{{ currentLocation || '未获取' }}（精确城市优先于手动城市，GPS结果覆盖IP结果）</p>
+          <div class="field"><label>省份</label><select v-model="selProvince" @change="loadCities"><option value="">{{ currentProvince || '-- 自动检测 --' }}</option><option v-for="p in provinces" :key="p.adcode" :value="p.adcode">{{ p.name }}</option></select></div>
+          <div class="field"><label>城市</label><select v-model="selCity" @change="saveManualCity"><option value="">{{ currentManualCity || '-- 选择城市 --' }}</option><option v-for="c in cities" :key="c.adcode" :value="c.adcode">{{ c.name }}</option></select></div>
         </div>
         <div class="card"><h3>大模型联网天气</h3>
           <label class="switch"><input type="checkbox" v-model="enableLlmWeather" @change="saveCfg('enable_llm_weather_search', enableLlmWeather)"> 使用大模型联网查询天气</label>
@@ -177,7 +177,7 @@
 
       <!-- 语音合成 -->
       <div v-if="activeCat==='tts'" class="sc-pane">
-        <div class="card"><h3>TTS 引擎</h3>
+        <div class="card"><h3>语音朗读（TTS）</h3>
           <label class="switch"><input type="checkbox" v-model="ttsEnabled" @change="saveVoice"> 启用语音合成</label><p class="hint">开启后 AI 回复旁会显示朗读按钮。</p>
           <label class="field-label" style="margin-top:8px">引擎</label>
           <select v-model="ttsEngine" @change="onEngineChange" class="input">
@@ -241,7 +241,7 @@
         </div>
 
         <div class="card"><h3>语音输入与播放</h3>
-          <label class="switch"><input type="checkbox" v-model="sttEnabled" @change="saveVoice"> STT 语音输入</label><p class="hint">长按发送按钮录音，自动转为文字。</p>
+          <label class="switch"><input type="checkbox" v-model="sttEnabled" @change="saveVoice"> 语音输入（语音转文字）</label><p class="hint">长按发送按钮录音，自动转为文字。</p>
           <label class="switch" style="margin-top:6px"><input type="checkbox" v-model="autoPlay" @change="saveVoice"> 自动播放语音</label><p class="hint">AI 回复后自动朗读。</p>
         </div>
       </div>
@@ -254,6 +254,22 @@
         </div>
         <div class="card"><h3>聊天管理</h3><ChatManagePanel @changed="loadFavorites" /></div>
         <div class="card"><h3>数据迁移</h3><p class="hint">导出完整备份（含配置和记忆），或从备份恢复。恢复后建议重建向量索引。</p><MigratePanel /></div>
+        <div class="card"><h3>云端同步</h3><p class="hint">加密备份到 WebDAV 服务器，防止数据丢失。</p>
+          <div class="cloud-panel">
+            <div class="cloud-row"><label>后端类型</label><select v-model="cloudBackend" @change="saveCloudCfg"><option value="webdav">WebDAV</option></select></div>
+            <div class="cloud-row"><label>服务器地址</label><input v-model="cloudUrl" placeholder="https://example.com/dav/" /></div>
+            <div class="cloud-row"><label>用户名</label><input v-model="cloudUser" placeholder="WebDAV 用户名" /></div>
+            <div class="cloud-row"><label>密码</label><input v-model="cloudPass" type="password" placeholder="WebDAV 密码" /></div>
+            <div class="cloud-row"><label>加密密码</label><input v-model="cloudPhrase" type="password" placeholder="可选：备份加密密码" /></div>
+            <div class="cloud-actions">
+              <button class="btn" @click="saveCloudCfg">保存配置</button>
+              <button class="btn-s" @click="testCloudConn">测试连接</button>
+              <button class="btn" @click="cloudUpload" :disabled="cloudUploading">{{ cloudUploading ? '上传中...' : '上传备份' }}</button>
+            </div>
+            <div v-if="cloudMsg" :class="['cloud-msg', cloudMsgOk ? 'ok' : 'err']">{{ cloudMsg }}</div>
+            <div v-if="cloudLastSync" class="cloud-last">上次同步：{{ cloudLastSync }}</div>
+          </div>
+        </div>
         <div class="card"><h3>重置</h3><div class="btn-row"><button class="btn-s" @click="resetRelationship">重置关系(好感/信任)</button><button class="btn-s" @click="resetMemory">重置摘要记忆</button><button class="btn-s danger" @click="fullReset">完全重置</button></div><p class="hint">完全重置：清除所有数据（聊天、提醒、日程、待办、记忆、人设），重新触发引导。API 设置保留。</p></div>
       </div>
     </div>
@@ -317,18 +333,33 @@ export default {
       ragStatus: '', ragCount: 0, ragMsg: '', ragMsgOk: false, installingRag: false, rebuildingRag: false,
       provinces: [], cities: [], selProvince: '', selCity: '',
       savedColorPresets: [],
+      cloudBackend: 'webdav', cloudUrl: '', cloudUser: '', cloudPass: '', cloudPhrase: '',
+      cloudMsg: '', cloudMsgOk: false, cloudUploading: false, cloudLastSync: '',
     }
   },
-  async mounted() { this._loadServerSettings(); await this.loadFromSettings(); this.loadPresets(); this.loadFavorites(); this.loadProvinces(); this.checkRagStatus(); this.loadFoundationTypes() },
+  computed: {
+    currentLocation() {
+      const precise = (this.settings || {}).precise_city || ''
+      const manual = (this.settings || {}).manual_city || ''
+      return precise || manual || this.ipCity || ''
+    },
+    currentProvince() {
+      return (this.settings || {}).ip_location_province || ''
+    },
+    currentManualCity() {
+      return (this.settings || {}).manual_city || ''
+    }
+  },
+  async mounted() { this._loadServerSettings(); await this.loadFromSettings(); this.loadPresets(); this.loadFavorites(); this.loadProvinces(); this.checkRagStatus(); this.loadFoundationTypes(); this.loadCloudCfg() },
   methods: {
     // ── 服务器连接 ──
     saveServer() {
-      localStorage.setItem('sakura_server_host', this.serverHost)
-      localStorage.setItem('sakura_server_port', this.serverPort)
-      localStorage.setItem('sakura_api_token', this.serverToken)
-      localStorage.setItem('sakura_server_protocol', this.serverProtocol)
+      localStorage.setItem('vesper_server_host', this.serverHost)
+      localStorage.setItem('vesper_server_port', this.serverPort)
+      localStorage.setItem('vesper_api_token', this.serverToken)
+      localStorage.setItem('vesper_server_protocol', this.serverProtocol)
       if (this.serverHost) {
-        window.__SAKURA_CONFIG__ = Object.assign({}, window.__SAKURA_CONFIG__ || {}, {
+        window.__VESPER_CONFIG__ = Object.assign({}, window.__VESPER_CONFIG__ || {}, {
           backendHost: this.serverHost,
           backendPort: parseInt(this.serverPort) || 8060,
           apiToken: this.serverToken,
@@ -355,13 +386,13 @@ export default {
       this.testingServer = false
     },
     _loadServerSettings() {
-      this.serverHost = localStorage.getItem('sakura_server_host') || ''
-      this.serverPort = localStorage.getItem('sakura_server_port') || '8060'
-      this.serverToken = localStorage.getItem('sakura_api_token') || ''
-      this.serverProtocol = localStorage.getItem('sakura_server_protocol') || 'http'
-      // 如果有云端配置，覆盖 __SAKURA_CONFIG__
+      this.serverHost = localStorage.getItem('vesper_server_host') || ''
+      this.serverPort = localStorage.getItem('vesper_server_port') || '8060'
+      this.serverToken = localStorage.getItem('vesper_api_token') || ''
+      this.serverProtocol = localStorage.getItem('vesper_server_protocol') || 'http'
+      // 如果有云端配置，覆盖 __VESPER_CONFIG__
       if (this.serverHost) {
-        window.__SAKURA_CONFIG__ = Object.assign({}, window.__SAKURA_CONFIG__ || {}, {
+        window.__VESPER_CONFIG__ = Object.assign({}, window.__VESPER_CONFIG__ || {}, {
           backendHost: this.serverHost,
           backendPort: parseInt(this.serverPort) || 8060,
           apiToken: this.serverToken,
@@ -377,7 +408,7 @@ export default {
       this.apiModel = s.api_model || ''
       this.apiKey = s.has_api_key ? '••••••••' : ''
       this.searchProvider = s.search_provider || 'ddg'
-      this.aiName = s.ai_name || '佐仓'; this.userName = s.user_name || ''
+      this.aiName = s.ai_name || '夕语'; this.userName = s.user_name || ''
       this.tone = s.personality_tone || '冷静'; this.length = s.length_level || '短'
       this.recall = s.recall_past || '从不'; this.allowEmotion = s.allow_emotion !== false
       this.customPrompt = s.custom_system_prompt || ''
@@ -555,8 +586,8 @@ export default {
     async delFav(id) { try { await api.delete(`/favorites/${id}`); await this.loadFavorites() } catch (e) {} },
     // ── 定位 ──
     async saveAmapKey() { await this.saveCfg('amap_key', this.amapKey); this.loadProvinces() },
-    async locateByIP() { this.locating = 'ip'; try { const r = await api.get('/location/ip'); if (r.data.city) { this.locateResult = `${r.data.province || ''} ${r.data.city}`; this.locateOk = true; this.$emit('config-changed', 'manual_city', r.data.city) } else { this.locateResult = r.data.error || '获取失败'; this.locateOk = false } } catch (e) { this.locateResult = '请求失败'; this.locateOk = false } this.locating = false },
-    async preciseLocate() { this.locating = 'gps'; try { let perm = 'prompt'; try { const ps = await navigator.permissions.query({ name: 'geolocation' }); perm = ps.state } catch (e) {} if (perm === 'denied') { this.locateResult = '定位权限已被拒绝，请在浏览器设置中允许'; this.locateOk = false; this.locating = false; return } const pos = await new Promise((resolve, reject) => { navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000, maximumAge: 300000 }) }); localStorage.setItem('gps_location_granted', '1'); const r = await api.post('/location/geo', { lat: pos.coords.latitude, lng: pos.coords.longitude }); if (r.data.city) { const loc = r.data.district ? r.data.city + '·' + r.data.district : r.data.city; this.locateResult = loc; this.locateOk = true; this.$emit('config-changed', 'precise_city', loc) } else { this.locateResult = '无法解析位置'; this.locateOk = false } } catch (e) { this.locateResult = e.code === 1 ? '定位权限被拒绝' : '定位失败，请检查权限'; this.locateOk = false } this.locating = false },
+    async locateByIP() { this.locating = 'ip'; try { const r = await api.get('/location/ip'); if (r.data.city) { this.locateResult = `${r.data.province || ''} ${r.data.city}`; this.locateOk = true; await this.saveCfg('manual_city', r.data.city); if (r.data.province) await this.saveCfg('ip_location_province', r.data.province); this.$emit('config-changed', 'manual_city', r.data.city) } else { this.locateResult = r.data.error || '获取失败'; this.locateOk = false } } catch (e) { this.locateResult = '请求失败'; this.locateOk = false } this.locating = false },
+    async preciseLocate() { this.locating = 'gps'; try { let perm = 'prompt'; try { const ps = await navigator.permissions.query({ name: 'geolocation' }); perm = ps.state } catch (e) {} if (perm === 'denied') { this.locateResult = '定位权限已被拒绝，请在浏览器设置中允许'; this.locateOk = false; this.locating = false; return } const pos = await new Promise((resolve, reject) => { navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000, maximumAge: 300000 }) }); localStorage.setItem('gps_location_granted', '1'); const r = await api.post('/location/geo', { lat: pos.coords.latitude, lng: pos.coords.longitude }); if (r.data.city) { const loc = r.data.district ? r.data.city + '·' + r.data.district : r.data.city; this.locateResult = loc; this.locateOk = true; await this.saveCfg('precise_city', loc); if (r.data.province) await this.saveCfg('ip_location_province', r.data.province); this.$emit('config-changed', 'precise_city', loc) } else { this.locateResult = '无法解析位置'; this.locateOk = false } } catch (e) { this.locateResult = e.code === 1 ? '定位权限被拒绝' : '定位失败，请检查权限'; this.locateOk = false } this.locating = false },
     resetLocation() { try { localStorage.removeItem('gps_location_granted'); localStorage.removeItem('location_granted'); localStorage.removeItem('location_denied') } catch (e) {} this.selProvince = ''; this.selCity = ''; this.cities = []; this.locateResult = '已重置'; this.locateOk = true },
     async loadProvinces() { try { const r = await api.get('/location/provinces'); this.provinces = r.data || [] } catch (e) {} },
     async loadCities() { this.selCity = ''; this.cities = []; if (!this.selProvince) return; try { const r = await api.get(`/location/cities/${this.selProvince}`); this.cities = r.data || [] } catch (e) {} },
@@ -573,12 +604,46 @@ export default {
       if (!confirm('确定要完全重置吗？\n\n将清除：\n- 所有聊天记录\n- 所有提醒、日程、待办\n- 所有记忆和摘要\n- 人设和性格设置\n\nAPI 设置会保留。\n\n此操作不可撤销！')) return
       try {
         await api.post('/settings/full-reset')
-        localStorage.removeItem('sakura_api_token')
+        localStorage.removeItem('vesper_api_token')
         location.reload()
       } catch (e) { alert('重置失败: ' + (e.message || '未知错误')) }
     },
     async uploadAvatar(role, e) { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('file', f); try { await api.post(`/avatar/upload/${role}`, fd); this.$emit('config-changed', 'avatar_updated'); e.target.value = '' } catch (err) { alert('上传失败') } },
     async uploadAvatarByUrl(role) { const url = role === 'assistant' ? this.aiAvatarUrlLocal : this.userAvatarUrlLocal; if (!url) return; try { await api.post(`/avatar/upload-url/${role}`, { url }); this.$emit('config-changed', 'avatar_updated'); if (role === 'assistant') this.aiAvatarUrlLocal = ''; else this.userAvatarUrlLocal = '' } catch (err) { alert('导入失败') } },
+    // 云端同步
+    async saveCloudCfg() {
+      try {
+        await api.post('/cloud/config', { backend_type: this.cloudBackend, url: this.cloudUrl, username: this.cloudUser, password: this.cloudPass, passphrase: this.cloudPhrase })
+        this.cloudMsg = '配置已保存'; this.cloudMsgOk = true
+        setTimeout(() => this.cloudMsg = '', 3000)
+      } catch (e) { this.cloudMsg = '保存失败'; this.cloudMsgOk = false }
+    },
+    async testCloudConn() {
+      try {
+        const r = await api.post('/cloud/test')
+        this.cloudMsg = r.data.message || '连接成功'; this.cloudMsgOk = r.data.status === 'ok'
+      } catch (e) { this.cloudMsg = '连接失败'; this.cloudMsgOk = false }
+    },
+    async cloudUpload() {
+      this.cloudUploading = true; this.cloudMsg = ''
+      try {
+        const r = await api.post('/cloud/upload', { passphrase: this.cloudPhrase })
+        this.cloudMsg = r.data.status === 'ok' ? '上传成功' : (r.data.message || '上传失败')
+        this.cloudMsgOk = r.data.status === 'ok'
+        if (r.data.status === 'ok') { const sr = await api.get('/cloud/status'); this.cloudLastSync = sr.data.last_sync || '' }
+      } catch (e) { this.cloudMsg = '上传失败'; this.cloudMsgOk = false }
+      finally { this.cloudUploading = false }
+    },
+    async loadCloudCfg() {
+      try {
+        const r = await api.get('/cloud/config')
+        const cfg = r.data.config || {}
+        this.cloudUrl = cfg.url || ''; this.cloudUser = cfg.username || ''; this.cloudPass = cfg.password || ''
+        this.cloudBackend = cfg.backend_type || 'webdav'
+        const sr = await api.get('/cloud/status')
+        this.cloudLastSync = sr.data.last_sync || ''
+      } catch (e) {}
+    },
   }
 }
 </script>
@@ -693,4 +758,13 @@ textarea { resize: vertical; }
 .foundation-confirm .btn { padding: 6px 16px; font-size: 13px; }
 .btn-secondary { background: var(--border, #30363d); color: var(--tc, #e6edf3); }
 .btn-secondary:hover { background: var(--tc2, #8b949e); }
+.cloud-panel { display: flex; flex-direction: column; gap: 8px; }
+.cloud-row { display: flex; align-items: center; gap: 8px; }
+.cloud-row label { font-size: 12px; color: var(--tc2); min-width: 80px; flex-shrink: 0; }
+.cloud-row input, .cloud-row select { flex: 1; padding: 6px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--tc); font-size: 12px; }
+.cloud-actions { display: flex; gap: 8px; margin-top: 4px; }
+.cloud-msg { font-size: 12px; padding: 4px 0; }
+.cloud-msg.ok { color: #4caf50; }
+.cloud-msg.err { color: #e74c3c; }
+.cloud-last { font-size: 11px; color: var(--tc2); }
 </style>

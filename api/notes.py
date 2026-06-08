@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from core.db import get_notes, add_note, delete_note
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -10,8 +10,8 @@ class NoteCreate(BaseModel):
     content: str
 
 class NoteUpdate(BaseModel):
-    title: str = ""
-    content: str = ""
+    title: Optional[str] = None
+    content: Optional[str] = None
 
 class NoteOut(BaseModel):
     id: int
@@ -35,9 +35,9 @@ async def update_note(note_id: int, note: NoteUpdate):
     with get_conn() as conn:
         c = conn.cursor()
         updates = {}
-        if note.title:
+        if note.title is not None:
             updates["title"] = note.title
-        if note.content:
+        if note.content is not None:
             updates["content"] = note.content
         if not updates:
             raise HTTPException(400, "没有需要更新的字段")

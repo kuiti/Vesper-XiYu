@@ -19,7 +19,7 @@
         </div>
         <div class="field">
           <label>你的名字</label>
-          <input v-model="userNameInput" placeholder="彦祖">
+          <input v-model="userNameInput" placeholder="你的名字">
         </div>
       </div>
 
@@ -129,7 +129,7 @@ export default {
       currentStep: 0,
       steps: ['取名字', '选角色', '选关系', '配 API', '开始'],
       aiNameInput: '夕语',
-      userNameInput: '彦祖',
+      userNameInput: '',
       selectedPreset: '',
       selectedFoundation: '空白',
       provider: 'deepseek',

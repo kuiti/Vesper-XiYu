@@ -26,6 +26,9 @@ def record_emotion(emotion: str):
         pos = 1 if emotion == "positive" else 0
         neg = 1 if emotion == "negative" else 0
         neu = 1 if emotion == "neutral" else 0
+        allowed_fields = {"positive_count", "negative_count", "neutral_count"}
+        if field not in allowed_fields:
+            field = "neutral_count"
         cursor.execute(
             f"INSERT INTO emotion_daily (date, score, positive_count, negative_count, neutral_count, total_messages, updated_at) "
             f"VALUES (?, ?, ?, ?, ?, 1, ?) "

@@ -7,7 +7,7 @@ from core.db import (
     get_todos, get_notes, get_countdowns, get_reminders, get_presets,
     get_last_summary, set_config, set_memory, add_chat_message,
     add_todo, add_note, add_countdown, add_reminder, save_preset,
-    add_summary, reset_active_memory, reset_msg_counter, clear_chat_history, init_db,
+    add_summary, reset_active_memory, reset_msg_counter, clear_chat_history,
     get_active_tiered_summaries, get_death_archive, get_msg_counter,
     add_tiered_summary
 )
@@ -27,6 +27,14 @@ def _get_counter_detail():
         return {"count": row["count"], "last_level1_at": row["last_level1_at"],
                 "last_level2_at": row["last_level2_at"], "last_level3_at": row["last_level3_at"]}
     return {"count": 0, "last_level1_at": 0, "last_level2_at": 0, "last_level3_at": 0}
+
+
+def _query_all(table: str) -> list:
+    """通用查询：导出某张表的全部行"""
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT * FROM {table}")
+        return [dict(r) for r in cursor.fetchall()]
 
 
 def _collect_export_data() -> dict:
@@ -59,7 +67,29 @@ def _collect_export_data() -> dict:
         "tiered_summaries": get_active_tiered_summaries(),
         "death_archive": get_death_archive(),
         "msg_counter": get_msg_counter(),
-        "msg_counter_detail": _get_counter_detail()
+        "msg_counter_detail": _get_counter_detail(),
+        # 新增表
+        "user_profile": _query_all("user_profile"),
+        "ai_personality_traits": _query_all("ai_personality_traits"),
+        "goal_tracking": _query_all("goal_tracking"),
+        "pending_goals": _query_all("pending_goals"),
+        "empathy_feedback": _query_all("empathy_feedback"),
+        "emotion_log": _query_all("emotion_log"),
+        "emotion_daily": _query_all("emotion_daily"),
+        "achievements": _query_all("achievements"),
+        "favorites": _query_all("favorites"),
+        "ai_diary": _query_all("ai_diary"),
+        "demand_patterns": _query_all("demand_patterns"),
+        "sentence_index": _query_all("sentence_index"),
+        # 新增表（本轮改造）
+        "entities": _query_all("entities"),
+        "memory_history": _query_all("memory_history"),
+        "knowledge_graph": _query_all("knowledge_graph"),
+        "memory_importance": _query_all("memory_importance"),
+        "relationship": _query_all("relationship"),
+        "schedule": _query_all("schedule"),
+        "proactive_response_log": _query_all("proactive_response_log"),
+        "user_activity_stats": _query_all("user_activity_stats"),
     }
 
 
@@ -68,7 +98,7 @@ async def export_all():
     """导出全部数据为一个 JSON 文件"""
     return JSONResponse(
         content=_collect_export_data(),
-        headers={"Content-Disposition": "attachment; filename=sakura_backup.json"}
+        headers={"Content-Disposition": "attachment; filename=vesper_backup.json"}
     )
 
 
@@ -188,6 +218,46 @@ async def import_all(file: UploadFile = File(...), bg: BackgroundTasks = None):
                     ts.get("source_summary_ids")
                 )
 
+        # 恢复新增表（通用方式：从数据推断列名，逐表处理）
+        _extra_tables = [
+            "user_profile", "ai_personality_traits", "goal_tracking", "pending_goals",
+            "emotion_log", "emotion_daily", "achievements", "favorites", "ai_diary",
+            "demand_patterns", "empathy_feedback", "relationship", "proactive_flags",
+            "user_activity_stats", "sentence_index",
+            # 本轮新增
+            "entities", "memory_history", "knowledge_graph", "memory_importance",
+            "schedule", "proactive_response_log",
+        ]
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            for table_name in _extra_tables:
+                rows = data.get(table_name, [])
+                if not rows:
+                    continue
+                # 从第一行推断列名
+                columns = list(rows[0].keys())
+                # 检查表是否存在这些列
+                try:
+                    cursor.execute(f"PRAGMA table_info({table_name})")
+                    actual_cols = {r[1] for r in cursor.fetchall()}
+                    valid_cols = [c for c in columns if c in actual_cols]
+                    if not valid_cols:
+                        continue
+                except Exception:
+                    continue
+                col_str = ", ".join(valid_cols)
+                placeholders = ", ".join(["?"] * len(valid_cols))
+                try:
+                    cursor.execute(f"DELETE FROM {table_name}")
+                    for row in rows:
+                        try:
+                            vals = [row.get(c) for c in valid_cols]
+                            cursor.execute(f"INSERT INTO {table_name} ({col_str}) VALUES ({placeholders})", vals)
+                        except Exception as e:
+                            print(f"[导入] {table_name} 跳过一行: {e}")
+                except Exception as e:
+                    print(f"[导入] {table_name} 失败: {e}")
+
     except Exception as e:
         print(f"[导入] 恢复数据异常: {e}")
         return {"status": "error", "message": f"导入过程中出错: {e}，部分数据可能未恢复"}
@@ -205,6 +275,13 @@ async def import_all(file: UploadFile = File(...), bg: BackgroundTasks = None):
             "presets": len(data.get("presets", {})),
             "memories": len(data.get("memory", {})),
             "tiered_summaries": len(data.get("tiered_summaries", [])),
-            "death_archive": len(data.get("death_archive", []))
+            "death_archive": len(data.get("death_archive", [])),
+            "user_profile": len(data.get("user_profile", [])),
+            "ai_personality_traits": len(data.get("ai_personality_traits", [])),
+            "goal_tracking": len(data.get("goal_tracking", [])),
+            "emotion_log": len(data.get("emotion_log", [])),
+            "achievements": len(data.get("achievements", [])),
+            "ai_diary": len(data.get("ai_diary", [])),
+            "sentence_index": len(data.get("sentence_index", [])),
         }
     }

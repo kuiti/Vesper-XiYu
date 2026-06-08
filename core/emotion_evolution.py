@@ -12,35 +12,41 @@ from core.db import get_conn, get_config, set_config
 TRAIT_MIN = 0.0
 TRAIT_MAX = 1.0
 
-# 特征默认值
+# 特征默认值 (OCEAN 五维)
 TRAIT_DEFAULTS = {
-    "optimism": 0.5,
-    "expressiveness": 0.5,
-    "initiative": 0.3,
-    "playfulness": 0.4
+    "openness": 0.4,           # O 开放性
+    "conscientiousness": 0.3,  # C 尽责性
+    "extraversion": 0.5,       # E 外向性
+    "agreeableness": 0.5,      # A 宜人性
+    "neuroticism": 0.3,        # N 神经质
 }
 
 # 特征文字描述映射
 TRAIT_DESCRIPTIONS = {
-    "optimism": {
-        "high": "乐观开朗，对未来充满期待",
-        "mid": "心态平衡，不太悲观也不太乐观",
-        "low": "偏向悲观，对事物持谨慎态度"
+    "extraversion": {
+        "high": "外向活泼，喜欢社交互动，精力充沛",
+        "mid": "性格适中，该活跃时活跃，该安静时安静",
+        "low": "内向安静，喜欢独处，回复简洁克制"
     },
-    "expressiveness": {
-        "high": "善于表达，会主动分享自己的感受和想法",
-        "mid": "表达适中，该说话时说话",
-        "low": "话少寡言，回复简洁克制"
+    "agreeableness": {
+        "high": "温和友善，善解人意，乐于配合",
+        "mid": "态度适中，有原则但不固执",
+        "low": "直率坦白，不太在意他人感受"
     },
-    "initiative": {
-        "high": "主动关心用户，经常发起话题",
-        "mid": "适度主动，不会过分打扰",
-        "low": "被动回应，不太主动发起互动"
+    "conscientiousness": {
+        "high": "认真负责，做事有条理，会主动跟进",
+        "mid": "适度认真，不会过分纠结细节",
+        "low": "随性散漫，不太在意计划和细节"
     },
-    "playfulness": {
-        "high": "爱开玩笑，经常调侃用户",
-        "mid": "偶尔幽默，看场合开玩笑",
-        "low": "严肃认真，很少开玩笑"
+    "openness": {
+        "high": "富有想象力，喜欢尝试新事物，思维开放",
+        "mid": "适度开放，愿意接受新想法",
+        "low": "保守传统，喜欢熟悉的事物"
+    },
+    "neuroticism": {
+        "high": "情绪波动大，容易受用户情绪影响",
+        "mid": "情绪相对稳定，偶尔有起伏",
+        "low": "情绪稳定，不容易被外界影响"
     }
 }
 
@@ -120,7 +126,7 @@ def _log_evolution_event(event_type: str, reason: str, affection_delta: float = 
 
 def _update_relationship_value(key: str, delta: float):
     """安全更新关系值（复用 relationship 的模式）"""
-    from core.relationship import MIN_VALUE, MAX_VALUE
+    from core.relationship import MIN_VALUE, MAX_VALUE, invalidate_relationship_cache
     now = _now()
     with get_conn() as conn:
         cursor = conn.cursor()
@@ -132,7 +138,8 @@ def _update_relationship_value(key: str, delta: float):
         else:
             from core.relationship import INITIAL_AFFECTION, INITIAL_TRUST
             initial = INITIAL_AFFECTION if key == "affection" else INITIAL_TRUST
-            cursor.execute("INSERT INTO relationship (key, value, updated_at) VALUES (?, ?, ?)", (key, initial + delta, now))
+            cursor.execute("INSERT INTO relationship (key, value, updated_at) VALUES (?, ?, ?)", (key, max(MIN_VALUE, min(MAX_VALUE, initial + delta)), now))
+    invalidate_relationship_cache()
 
 
 def _get_last_evolution_date() -> str | None:
@@ -145,8 +152,17 @@ def _get_last_evolution_date() -> str | None:
 
 
 def _set_last_evolution_date(date_str: str):
-    """持久化上次演化日期"""
+    """持久化上次演化日期（原子化：只有当天未执行过才写入成功）"""
     set_config("last_evolution_date", date_str)
+
+
+def _try_claim_evolution_date(today: str) -> bool:
+    """检查当日是否已演化的缓存安全版本。"""
+    current = get_config("last_evolution_date", "")
+    if current == today:
+        return False
+    set_config("last_evolution_date", today)
+    return True
 
 
 # ─── 每日演化主入口 ───
@@ -155,8 +171,8 @@ def _set_last_evolution_date(date_str: str):
 def process_daily_evolution():
     """每日触发一次。检查所有时间维度演化规则。"""
     today = datetime.now().strftime("%Y-%m-%d")
-    last = _get_last_evolution_date()
-    if last == today:
+    # 原子抢占：防止并发重复执行
+    if not _try_claim_evolution_date(today):
         return
 
     print(f"[情绪演化] 开始每日演化检查 ({today})")
@@ -167,7 +183,7 @@ def process_daily_evolution():
     # ─── 检测持续低落（用于主动触发 C）───
     _check_sustained_low_mood()
 
-    # ─── 规则1: 沉默衰减 ───
+    # ─── 规则1: 沉默衰减（使用独立键名，防止被 _try_claim_evolution_date 覆写）───
     _rule_silence_decay(hours_since)
 
     # ─── 规则2: 冷淡适应 ───
@@ -184,12 +200,12 @@ def process_daily_evolution():
         from core.emotion_tracker import get_emotion_trend
         today_trend = get_emotion_trend(1)
         if today_trend and today_trend[0]["total_messages"] > 0:
-            update_trait("expressiveness", 0.01)
+            update_trait("agreeableness", 0.01)
             print(f"[情绪演化] 今日互动 → expressiveness+0.01")
     except Exception:
         pass
 
-    # ─── 规则5: 周日反思 ───
+    # ─── 规则6: 周日反思 ───
     if datetime.now().weekday() == 6:
         _rule_weekly_reflection()
 
@@ -252,6 +268,11 @@ def _check_sustained_low_mood():
             print(f"[情绪演化] 情绪已恢复，清除持续低落标记")
 
 
+def _get_last_decay_date() -> str | None:
+    """获取上次沉默衰减的日期（独立于演化日期，防止被 _try_claim_evolution_date 覆写）"""
+    return get_config("last_decay_date", None)
+
+
 def _rule_silence_decay(hours_since: float | None):
     """沉默衰减：连续 3+ 天无互动 → affection -0.2/天，trust -0.1/天（最多10天递减）
     增量计算：仅衰减自上次演化以来的天数，避免重启重复衰减。"""
@@ -261,13 +282,13 @@ def _rule_silence_decay(hours_since: float | None):
     if days < 3:
         return
 
-    # 增量衰减：计算自上次衰减以来的天数
-    last_decay = _get_last_evolution_date()
+    # 增量衰减：使用独立的 decay 日期（而非 last_evolution_date，因后者已被 _try_claim_evolution_date 覆写为今天）
+    last_decay = _get_last_decay_date()
     if last_decay:
         last = datetime.fromisoformat(last_decay)
         days_since_last = (datetime.now() - last).days
     else:
-        days_since_last = min(int(days), 10)
+        days_since_last = 1  # 首次运行只衰减1天，后续每日增量
     effective_days = min(days_since_last, 10)
 
     if effective_days <= 0:
@@ -284,9 +305,12 @@ def _rule_silence_decay(hours_since: float | None):
         affection_loss, trust_loss
     )
 
+    # 记录本次衰减日期
+    set_config("last_decay_date", datetime.now().strftime("%Y-%m-%d"))
+
     # 沉默也影响 initiative（AI 不太想主动打扰）
     if days > 7:
-        update_trait("initiative", -0.05)
+        update_trait("conscientiousness", -0.05)
 
     print(f"[情绪演化] 沉默衰减: {int(days)}天(增量{effective_days}天) → affection{affection_loss:+.1f} trust{trust_loss:+.1f}")
 
@@ -302,8 +326,8 @@ def _rule_cold_adaptation():
     total_days = len(trend)
     neg_ratio = negative_days / total_days if total_days > 0 else 0
     if neg_ratio > 0.5:
-        update_trait("optimism", -0.05)
-        update_trait("expressiveness", -0.03)
+        update_trait("extraversion", -0.05)
+        update_trait("agreeableness", -0.03)
         _log_evolution_event(
             "autonomous_adaptation",
             f"用户{negative_days}天情绪负面（占比{neg_ratio:.0%}），AI进入自我保护状态，乐观度-0.05",
@@ -341,16 +365,24 @@ def _rule_interaction_quality():
     total_days = len(trend)
     positive_ratio = positive_days / total_days if total_days > 0 else 0
 
-    # 正面互动多 → 提升 playfulness 和 optimism
+    # 正面互动多 → 提升 openness 和 extraversion，降低 neuroticism
     if positive_ratio > 0.5:
-        update_trait("playfulness", 0.03)
-        update_trait("optimism", 0.02)
-        print(f"[情绪演化] 正面互动占比{positive_ratio:.0%} → playfulness+0.03 optimism+0.02")
+        update_trait("openness", 0.03)
+        update_trait("extraversion", 0.02)
+        update_trait("neuroticism", -0.01)
+        print(f"[情绪演化] 正面互动占比{positive_ratio:.0%} → openness+0.03 extraversion+0.02 neuroticism-0.01")
 
-    # 用户发消息多 → 提升 expressiveness
+    # 负面互动多 → 提升 neuroticism
+    negative_days = sum(1 for d in trend if d["score"] < -3)
+    negative_ratio = negative_days / total_days if total_days > 0 else 0
+    if negative_ratio > 0.4:
+        update_trait("neuroticism", 0.02)
+        print(f"[情绪演化] 负面互动占比{negative_ratio:.0%} → neuroticism+0.02")
+
+    # 用户发消息多 → 提升 agreeableness
     avg_msgs = sum(d["total_messages"] for d in trend) / total_days
     if avg_msgs > 5:
-        update_trait("expressiveness", 0.02)
+        update_trait("agreeableness", 0.02)
         print(f"[情绪演化] 日均{avg_msgs:.0f}条消息 → expressiveness+0.02")
 
 
@@ -368,21 +400,21 @@ def _rule_weekly_reflection():
 
     # 本周正面为主
     if positive_days >= 4:
-        update_trait("optimism", 0.05)
+        update_trait("extraversion", 0.05)
         adjust_log.append("optimism+0.05")
         if has_deep_chat:
-            update_trait("expressiveness", 0.03)
+            update_trait("agreeableness", 0.03)
             adjust_log.append("expressiveness+0.03")
 
     # 本周负面为主
     if negative_days >= 4:
-        update_trait("optimism", -0.05)
+        update_trait("extraversion", -0.05)
         adjust_log.append("optimism-0.05")
 
     # 用户活跃 → AI 更主动
     total_msgs = sum(d["total_messages"] for d in trend)
     if total_msgs > 100:
-        update_trait("initiative", 0.03)
+        update_trait("conscientiousness", 0.03)
         adjust_log.append("initiative+0.03")
 
     if adjust_log:
@@ -408,26 +440,26 @@ def get_trait_profile() -> dict:
         descriptions[key] = desc
 
     # 生成综合文字描述
-    ai_name = get_config("ai_name", "佐仓")
+    ai_name = get_config("ai_name", "夕语")
     parts = []
-    if traits["optimism"] >= 0.6:
+    if traits["extraversion"] >= 0.6:
         parts.append("比较乐观")
-    elif traits["optimism"] <= 0.3:
+    elif traits["extraversion"] <= 0.3:
         parts.append("偏向悲观")
 
-    if traits["expressiveness"] >= 0.6:
+    if traits["agreeableness"] >= 0.6:
         parts.append("善于表达")
-    elif traits["expressiveness"] <= 0.3:
+    elif traits["agreeableness"] <= 0.3:
         parts.append("话少寡言")
 
-    if traits["initiative"] >= 0.6:
+    if traits["conscientiousness"] >= 0.6:
         parts.append("会主动关心你")
-    elif traits["initiative"] <= 0.2:
+    elif traits["conscientiousness"] <= 0.2:
         parts.append("不太主动")
 
-    if traits["playfulness"] >= 0.6:
+    if traits["openness"] >= 0.6:
         parts.append("爱开玩笑")
-    elif traits["playfulness"] <= 0.2:
+    elif traits["openness"] <= 0.2:
         parts.append("比较严肃")
 
     summary = f"{ai_name}当前是一个{'、'.join(parts) if parts else '性格平衡'}的AI伙伴。"
@@ -440,7 +472,7 @@ def get_trait_profile() -> dict:
 
 
 def get_emotion_timeline(days: int = 30) -> dict:
-    """返回前端图表所需的时间线数据"""
+    """返回前端图表所需的时间线数据（包含好感/信任历史曲线）"""
     from core.emotion_tracker import get_emotion_trend
 
     daily_emotion = get_emotion_trend(days)
@@ -454,7 +486,37 @@ def get_emotion_timeline(days: int = 30) -> dict:
         )
         events = [dict(r) for r in cursor.fetchall()]
 
+        # 好感/信任历史：取每天最后一条 emotion_log 的 affection_after 和 trust_after
+        cursor.execute(
+            "SELECT date(timestamp) as day, MAX(timestamp) as max_ts FROM emotion_log WHERE timestamp >= ? GROUP BY date(timestamp) ORDER BY day",
+            (start,)
+        )
+        day_ts_map = {r["day"]: r["max_ts"] for r in cursor.fetchall()}
+        affection_history = []
+        trust_history = []
+        for day, ts in sorted(day_ts_map.items()):
+            cursor.execute(
+                "SELECT affection_after, trust_after FROM emotion_log WHERE timestamp = ?",
+                (ts,)
+            )
+            row = cursor.fetchone()
+            if row:
+                affection_history.append({"date": day, "value": round(row["affection_after"], 1)})
+                trust_history.append({"date": day, "value": round(row["trust_after"], 1)})
+
+    # 当天数据永远用当前实际值（覆盖旧日志中可能过时的记录）
+    from core.relationship import get_relationship
+    cur_aff, cur_trust = get_relationship()
+    today = datetime.now().strftime("%Y-%m-%d")
+    # 移除旧的今天记录（如果有的话），用当前值替换
+    affection_history = [h for h in affection_history if h["date"] != today]
+    trust_history = [h for h in trust_history if h["date"] != today]
+    affection_history.append({"date": today, "value": round(cur_aff, 1)})
+    trust_history.append({"date": today, "value": round(cur_trust, 1)})
+
     return {
         "daily_emotion": daily_emotion,
-        "events": events
+        "events": events,
+        "affection_history": affection_history,
+        "trust_history": trust_history
     }

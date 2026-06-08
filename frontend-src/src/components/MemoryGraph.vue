@@ -16,7 +16,7 @@
 import api from '../api.js'
 
 export default {
-  props: { aiName: { type: String, default: '佐仓' } },
+  props: { aiName: { type: String, default: '夕语' } },
   data() { return { w: 300, h: 250, nodes: [], links: [], _unmounted: false } },
   async mounted() {
     try {
@@ -38,14 +38,25 @@ export default {
         const r = 70
         const x = cx + Math.cos(angle) * r
         const y = cy + Math.sin(angle) * r
-        const label = p.key.length > 6 ? p.key.slice(0, 6) + '..' : p.key
+        const label = p.label || this.graphLabel(p.key)
         nodes.push({ key: p.key, label, x, y, color: colors[i % colors.length], labelX: 8, anchor: 'start' })
         links.push({ key: p.key, x1: cx, y1: cy, x2: x, y2: y, color: colors[i % colors.length] })
       })
       if (!this._unmounted) { this.nodes = nodes; this.links = links }
     } catch (e) { console.error(e) }
   },
-  beforeUnmount() { this._unmounted = true }
+  beforeUnmount() { this._unmounted = true },
+  methods: {
+    graphLabel(key) {
+      const map = { user_student: '学生', user_habit_stay_up: '熬夜', user_habit: '习惯',
+        name: '名字', user_name: '称呼', city: '城市', gender: '性别', age: '年龄',
+        occupation: '职业', hobby: '爱好', personality: '性格',
+      }
+      if (map[key]) return map[key]
+      const clean = key.replace(/^user_/, '').replace(/_/g, ' ')
+      return clean.length > 6 ? clean.slice(0, 5) + '..' : clean
+    }
+  }
 }
 </script>
 

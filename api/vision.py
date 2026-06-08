@@ -24,10 +24,13 @@ async def upload_image(file: UploadFile = File(...)):
             while chunk := await file.read(1024 * 1024):
                 total_bytes += len(chunk)
                 if total_bytes > 10 * 1024 * 1024:
+                    f.close()
                     os.remove(filepath)
                     return {"status": "error", "message": "图片大小不能超过10MB"}
                 f.write(chunk)
     except Exception as e:
+        if os.path.exists(filepath):
+            os.remove(filepath)
         return {"status": "error", "message": str(e)}
     with open(filepath, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()

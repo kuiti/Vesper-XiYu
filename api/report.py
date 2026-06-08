@@ -9,7 +9,7 @@ async def monthly_report(month: str = Query(default="")):
     if not month:
         month = datetime.now().strftime("%Y-%m")
     start = month + "-01"
-    ai_name = get_config("ai_name", "佐仓")
+    ai_name = get_config("ai_name", "夕语")
     user_name = get_config("user_name", "我")
 
     with get_conn() as conn:
@@ -45,15 +45,15 @@ async def monthly_report(month: str = Query(default="")):
         f"- 活跃天数：**{active_days}** 天",
         f"- 最活跃的一天：{peak_day}",
         f"",
-        f"## 😊 情绪概况",
+        f"## 情绪概况",
         f"- {mood}",
         f"- 正面：{pos} | 负面：{neg} | 中性：{neu}",
         f"",
     ]
     if achievements:
-        lines.append(f"## 🏆 本月解锁成就\n- " + "\n- ".join(achievements) + "\n")
+        lines.append(f"## 本月解锁成就\n- " + "\n- ".join(achievements) + "\n")
     if rel:
-        lines.append(f"## 💕 关系状态\n- 好感度：{rel['affection_after']} | 信任度：{rel['trust_after']}\n")
+        lines.append(f"## 关系状态\n- 好感度：{rel['affection_after']} | 信任度：{rel['trust_after']}\n")
 
     lines.append(f"\n> 报告由 {ai_name} 自动生成 · {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 

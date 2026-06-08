@@ -41,6 +41,8 @@ def decrypt_data(encrypted: str, key: bytes) -> str:
     if not _CRYPTO_AVAILABLE:
         raise ImportError("cryptography 库未安装")
     raw = base64.b64decode(encrypted)
+    if len(raw) < 13:
+        raise ValueError("密文数据过短")
     nonce, ciphertext = raw[:12], raw[12:]
     aesgcm = AESGCM(key)
     return aesgcm.decrypt(nonce, ciphertext, None).decode()

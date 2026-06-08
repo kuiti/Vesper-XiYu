@@ -85,7 +85,7 @@ def extract_patterns_via_llm():
 
     from core.llm_client import call_llm
     result = call_llm(prompt=prompt, temperature=0.3, max_tokens=800, timeout=30, json_mode=True)
-    if not result:
+    if not result or not isinstance(result, dict):
         return
     patterns = result.get("patterns", [])
 

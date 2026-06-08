@@ -1,11 +1,11 @@
+import asyncio
 from fastapi import APIRouter
 from core.db import get_conn, get_config
 from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
-@router.get("/overview")
-async def get_overview():
+def _get_overview_sync():
     now = datetime.now()
     with get_conn() as conn:
         cursor = conn.cursor()
@@ -35,16 +35,25 @@ async def get_overview():
         thirty_ago = (now - timedelta(days=30)).isoformat()[:10]
         cursor.execute("SELECT substr(timestamp,1,10) as date, COUNT(*) as cnt FROM chat_history WHERE timestamp >= ? GROUP BY date ORDER BY date", (thirty_ago,))
         daily_trend = [{"date": r["date"], "count": r["cnt"]} for r in cursor.fetchall()]
-        # 关键词云 (消息中最常见的词)
+        # 关键词云 (jieba 分词)
         cursor.execute("SELECT content FROM chat_history WHERE role='user' ORDER BY id DESC LIMIT 500")
         words = {}
-        import re
-        for r in cursor.fetchall():
-            for w in re.findall(r'[一-鿿]{2,4}', r["content"]):
-                words[w] = words.get(w, 0) + 1
+        try:
+            import jieba
+            _stopwords = {"可以", "已经", "不是", "我们", "他们", "她们", "什么", "怎么", "这个", "那个", "因为", "所以", "如果", "但是", "可以", "就是", "没有", "知道", "现在", "自己", "出来", "起来", "时候", "觉得", "可能", "应该", "这样", "那样", "这些", "那些", "还是", "或者", "而且", "不过", "然后", "已经", "正在", "一直", "一个", "一些", "这个", "那个"}
+            for r in cursor.fetchall():
+                for w in jieba.cut(r["content"]):
+                    w = w.strip()
+                    if len(w) >= 2 and w not in _stopwords:
+                        words[w] = words.get(w, 0) + 1
+        except ImportError:
+            import re
+            for r in cursor.fetchall():
+                for w in re.findall(r'[一-鿿]{2,4}', r["content"]):
+                    words[w] = words.get(w, 0) + 1
         top_words = sorted(words.items(), key=lambda x: -x[1])[:20]
 
-    ai_name = get_config("ai_name", "佐仓")
+    ai_name = get_config("ai_name", "夕语")
     return {
         "total_messages": total,
         "user_messages": user_msgs,
@@ -58,3 +67,8 @@ async def get_overview():
         "top_words": [{"word": w, "count": c} for w, c in top_words],
         "ai_name": ai_name
     }
+
+
+@router.get("/overview")
+async def get_overview():
+    return await asyncio.to_thread(_get_overview_sync)

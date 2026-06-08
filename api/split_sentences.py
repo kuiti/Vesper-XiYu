@@ -3,7 +3,7 @@
 对角色扮演/对话类文本中的省略号、括号、引号等复杂场景做准确切分
 更新: 新增 API 端点 POST /text/split，fallback 本地正则
 """
-# version: 5.0.0
+# version: 1.0.0
 import asyncio
 from fastapi import APIRouter
 from pydantic import BaseModel

@@ -2,6 +2,7 @@ import asyncio
 import requests
 from fastapi import APIRouter
 from core.db import get_config
+from core.llm_provider import get_provider
 
 router = APIRouter(prefix="/test", tags=["test"])
 
@@ -15,7 +16,6 @@ async def fetch_models():
         return {"ok": False, "models": [], "message": "未配置 API Key"}
     try:
         if is_ollama:
-            # Ollama 用 /api/tags 获取模型列表（从 base_url 提取 host:port）
             from urllib.parse import urlparse
             parsed = urlparse(base_url)
             ollama_host = f"{parsed.scheme}://{parsed.netloc}"
@@ -37,44 +37,101 @@ async def fetch_models():
 
 @router.get("/deepseek")
 async def test_deepseek():
+    """测试 LLM API 连通性（使用 LLMProvider 抽象层）"""
+    from core.db import get_config
     api_key = get_config("api_key", "")
-    base_url = get_config("api_base_url", "https://api.deepseek.com/v1").rstrip("/")
-    is_ollama = get_config("api_provider", "") == "ollama" or "localhost:11434" in base_url
+    is_ollama = get_config("api_provider", "") == "ollama"
     if not api_key and not is_ollama:
         return {"ok": False, "message": "未配置 API Key"}
     try:
+        provider = get_provider()
         model = get_config("api_model", "deepseek-chat")
-        if is_ollama and not api_key:
-            headers = {"Content-Type": "application/json"}
-        else:
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-        payload = {
-            "model": model,
-            "messages": [{"role": "user", "content": "回复OK即可"}],
-            "max_tokens": 5,
-            "temperature": 0
-        }
-        resp = await asyncio.to_thread(requests.post, f"{base_url}/chat/completions", headers=headers, json=payload, timeout=15)
-        resp.raise_for_status()
-        return {"ok": True, "message": f"{model} API 正常"}
+        result = provider.chat(
+            [{"role": "user", "content": "回复OK即可"}],
+            max_tokens=5,
+            temperature=0,
+        )
+        if result:
+            return {"ok": True, "message": f"{model} API 正常"}
+        return {"ok": False, "message": "API 返回空"}
     except Exception as e:
         return {"ok": False, "message": str(e)}
 
 @router.get("/weather")
 async def test_weather():
-    api_key = get_config("amap_key", "")
-    if not api_key:
-        return {"ok": False, "message": "未配置高德 API Key"}
-    city = get_config("precise_city") or get_config("default_city") or "北京"
+    """独立测试所有天气源，互不跳过"""
+    city = get_config("precise_city") or get_config("manual_city") or get_config("default_city") or "北京"
+    results = []
+
+    # ── 1. 大模型联网：勾选了就测，未勾选注明 ──
+    llm_weather = get_config("enable_llm_weather_search", False)
+    if not llm_weather:
+        results.append({"source": "大模型联网", "ok": False, "reason": "未勾选「使用大模型联网查询天气」"})
+    else:
+        api_key = get_config("api_key", "")
+        base_url = get_config("api_base_url", "https://api.deepseek.com/v1").rstrip("/")
+        if not api_key:
+            results.append({"source": "大模型联网", "ok": False, "reason": "未配置 API Key"})
+        else:
+            try:
+                provider = get_provider()
+                content = provider.chat(
+                    [{"role": "user", "content": f"{city}今天天气怎么样？用中文一句话回答，包含温度和天气状况。"}],
+                    max_tokens=100, temperature=0.3,
+                    search=True,
+                )
+                ok = bool(content and len(content.strip()) > 2)
+                results.append({"source": "大模型联网", "ok": ok,
+                    "reason": "API 响应正常" if ok else "响应为空（模型可能不支持 search 参数，或需在聊天偏好中开启联网策略）",
+                    "preview": content.strip()[:120] if ok else ""})
+            except Exception as e:
+                results.append({"source": "大模型联网", "ok": False, "reason": f"调用失败: {str(e)[:100]}"})
+
+    # ── 2. wttr.in：始终独立测试 ──
     try:
-        from api.intent import get_weather_forecast, build_weather_text
-        forecast = get_weather_forecast(city)
-        if "error" not in forecast:
-            text = build_weather_text(forecast["casts"])
-            return {"ok": True, "city": city, "report": text}
-        return {"ok": False, "message": "获取失败"}
+        from core.weather import get_wttr_weather
+        w = await asyncio.to_thread(get_wttr_weather, city)
+        if "error" not in w and w.get("temp") is not None:
+            results.append({"source": "wttr.in", "ok": True, "reason": f'{w["weather"]} {w["temp"]}°C，湿度{w.get("humidity","?")}%'})
+        else:
+            results.append({"source": "wttr.in", "ok": False, "reason": w.get("error", "无数据") or "API 返回空"})
     except Exception as e:
-        return {"ok": False, "message": str(e)}
+        results.append({"source": "wttr.in", "ok": False, "reason": str(e)[:100]})
+
+    # ── 3. Open-Meteo：始终独立测试 ──
+    try:
+        from api.intent import get_city_coords, get_openmeteo_weather
+        coords = await asyncio.to_thread(get_city_coords, city)
+        if coords:
+            om = await asyncio.to_thread(get_openmeteo_weather, coords["lat"], coords["lng"])
+            if "error" not in om and om.get("temp") is not None:
+                results.append({"source": "Open-Meteo", "ok": True, "reason": f'{om["weather"]} {om["temp"]}°C，湿度{om.get("humidity","?")}%'})
+            else:
+                results.append({"source": "Open-Meteo", "ok": False, "reason": om.get("error", "无数据") or "API 返回空"})
+        else:
+            results.append({"source": "Open-Meteo", "ok": False, "reason": f'无法解析城市「{city}」的坐标'})
+    except Exception as e:
+        results.append({"source": "Open-Meteo", "ok": False, "reason": str(e)[:100]})
+
+    # ── 4. 高德 ──
+    amap_key = get_config("amap_key", "")
+    if not amap_key:
+        results.append({"source": "高德地图", "ok": False, "reason": "未配置高德 API Key"})
+    else:
+        try:
+            url = f"https://restapi.amap.com/v3/weather/weatherInfo?key={amap_key}&city={city}&extensions=base"
+            resp = await asyncio.to_thread(requests.get, url, timeout=10)
+            data = resp.json()
+            if data.get("status") == "1" and data.get("lives"):
+                live = data["lives"][0]
+                results.append({"source": "高德地图", "ok": True, "reason": f'{live.get("weather","")} {live.get("temperature","")}°C'})
+            else:
+                results.append({"source": "高德地图", "ok": False, "reason": data.get("info", "获取失败")})
+        except Exception as e:
+            results.append({"source": "高德地图", "ok": False, "reason": str(e)[:100]})
+
+    ok_count = sum(1 for r in results if r["ok"])
+    return {"ok": ok_count > 0, "city": city, "sources": results, "summary": f"{ok_count}/{len(results)} 个天气源可用"}
 
 @router.get("/search")
 async def test_search():

@@ -30,7 +30,7 @@ const CFG = { easy: { w:9, h:9, m:10 }, medium: { w:16, h:16, m:40 }, hard: { w:
 
 export default {
   emits: ['ai-event', 'help'],
-  props: { aiName: { type: String, default: '佐仓' } },
+  props: { aiName: { type: String, default: '夕语' } },
   data() {
     const cfg = CFG.easy
     return {

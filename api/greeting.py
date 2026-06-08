@@ -1,12 +1,21 @@
 import random
+import concurrent.futures
 from datetime import datetime
-from core.db import get_config, get_memory, get_last_user_messages, set_config
+from core.db import get_config, get_memory, get_last_user_messages, set_config, get_conn
+
+# 模块级共享线程池，避免每次调用创建新池导致线程泄漏
+_weather_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
 
 
 def load_last_chat_time():
     """加载上次聊天时间（从 DB）"""
     val = get_config("last_chat_time", "")
-    return datetime.fromisoformat(val) if val else None
+    if not val:
+        return None
+    try:
+        return datetime.fromisoformat(val)
+    except (ValueError, TypeError):
+        return None
 
 
 def save_last_chat_time():
@@ -17,7 +26,12 @@ def save_last_chat_time():
 def load_last_welcome():
     """加载上次欢迎时间（从 DB）"""
     val = get_config("last_welcome_time", "")
-    return datetime.fromisoformat(val) if val else None
+    if not val:
+        return None
+    try:
+        return datetime.fromisoformat(val)
+    except (ValueError, TypeError):
+        return None
 
 
 def save_last_welcome():
@@ -79,7 +93,7 @@ def match_conversation_context():
                             desc = m["content"][idx:idx+20].strip()
                             if len(desc) > len(kw):
                                 return f"用户上次提到「{desc[:15]}」，请用你的人设语气关心这件事的进展"
-                    return None
+                    # plan 提取失败则使用通用 plan hint
                 return HINT_MAP.get(hint)
     return None
 
@@ -155,15 +169,16 @@ def generate_greeting():
     length_rule = length_map.get(length_level, "每句话不超过10个字")
 
     # 获取自定义提示词
+    ai_name = get_config("ai_name", "夕语")
     custom_prompt = get_config("custom_system_prompt", "")
     if custom_prompt:
         personality_part = custom_prompt
     else:
         tone = personality.get("tone", "冷静")
-        personality_part = f"你是佐仓，一个{tone}的AI助手。{length_rule}。"
+        personality_part = f"你是「{ai_name}」，一个{tone}的AI助手。{length_rule}。"
 
     # 人设指令作为 system message，确保问候风格一致
-    system_prompt = f"{personality_part}\n{length_rule}。严格按照你的人设风格回复，包括语气、措辞习惯和情感状态。"
+    system_prompt = f"{personality_part}\n严格按照你的人设风格回复，包括语气、措辞习惯和情感状态。"
     # 天气信息（2s 超时，不影响问候速度）
     weather_hint = ""
     try:
@@ -171,28 +186,41 @@ def generate_greeting():
         import concurrent.futures
         city = get_config("precise_city") or get_config("manual_city") or None
         if city:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _pool:
-                _future = _pool.submit(get_weather_for_city, city)
-                try:
-                    w = _future.result(timeout=2)
-                    if "error" not in w and w.get("temp") is not None:
-                        weather_hint = f"你知道{city}现在{w.get('weather','')}，{w['temp']}度。如果自然的话可以顺口提一句。"
-                except concurrent.futures.TimeoutError:
-                    pass
+            _future = _weather_pool.submit(get_weather_for_city, city)
+            try:
+                w = _future.result(timeout=2)
+                if "error" not in w and w.get("temp") is not None:
+                    weather_hint = f"你知道{city}现在{w.get('weather','')}，{w['temp']}度。如果自然的话可以顺口提一句。"
+            except concurrent.futures.TimeoutError:
+                pass
     except Exception:
         pass
+    # 获取最近几条自己说过的话，避免重复问候
+    recent_self = ""
+    try:
+        with get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT content FROM chat_history WHERE role='assistant' ORDER BY id DESC LIMIT 5")
+            rows = cur.fetchall()
+        if rows:
+            recent_msgs = [r["content"][:60] for r in reversed(rows)]
+            recent_self = "你最近对用户说过的话（不要重复这些内容）：" + "；".join(recent_msgs)
+    except Exception:
+        pass
+
     ctx_line = f"\n【上下文提示】{context_hint}。\n" if context_hint else ""
-    user_prompt = f"{memory_text}\n用户{time_desc}。\n时间风格：{slot['style']}。{ctx_line}\n请生成一个简短、自然的欢迎语。{weather_hint}直接输出欢迎语，不要加任何前缀。"
+    user_prompt = f"{memory_text}\n用户{time_desc}。\n时间风格：{slot['style']}。{ctx_line}{recent_self}\n请生成一个简短、自然的欢迎语。{weather_hint}直接输出欢迎语，不要加任何前缀。"
 
     from core.llm_client import call_llm
     result = None
     for _attempt in range(3):
-        result = call_llm(prompt=user_prompt, system=system_prompt, temperature=0.7, max_tokens=100, timeout=30)
+        result = call_llm(prompt=user_prompt, system=system_prompt, temperature=0.7, max_tokens=500, timeout=30)
         if result:
             break
+        print(f"[问候] 第{_attempt+1}次尝试失败 | result_type={type(result).__name__} | result_repr={repr(result)[:100]}")
     if result:
         return result
-    print(f"[问候] LLM 返回空，使用兜底问候")
+    print(f"[问候] 3次尝试均失败，使用兜底问候")
     fallbacks = {
         "early_morning": ["早啊，今天起得挺早。","早。又是新的一天。","早啊，昨晚睡得好吗。","早。今天天气不错。","早。要喝杯咖啡吗。"],
         "morning": ["上午好，今天有什么打算吗。","上午好，今天天气挺好的。","上午好呀。","上午了，开始忙了吗。","上午好，精神不错的样子。"],
@@ -200,7 +228,7 @@ def generate_greeting():
         "afternoon": ["下午好。","下午好，今天过得怎样。","下午了，喝杯茶吧。","下午好呀，有点困了没。","下午好，今天效率怎么样。"],
         "evening": ["傍晚了，今天过得怎样。","傍晚好，天快黑了。","傍晚了，今天辛苦啦。","傍晚好呀，晚饭吃了吗。","傍晚了，该歇歇了。"],
         "night": ["晚上好。","晚上好，今天累不累。","晚上好呀。","晚上好，听听音乐放松下。","晚上好，今天过得开心吗。"],
-        "late_night": ["这么晚了还没睡啊。","还没睡？想什么呢。","夜深了，早点休息吧。","还不睡啊，明天起得来吗。","这么晚了，睡不着吗。"],
+        "late_evening": ["这么晚了还没睡啊。","还没睡？想什么呢。","夜深了，早点休息吧。","还不睡啊，明天起得来吗。","这么晚了，睡不着吗。"],
     }
     choices = fallbacks.get(slot["slot"], ["你来了。","来了呀。","嗯，来了。","回来啦。","到了。"])
     return random.choice(choices)
@@ -220,12 +248,10 @@ def generate_tease():
     if random.randint(0, 99) >= prob:
         # 未命中，增加概率
         new_prob = min(prob + 10, 100)
-        from core.db import set_config
         set_config("current_tease_probability", new_prob)
         return None
-    
+
     # 命中，重置概率
-    from core.db import set_config
     set_config("current_tease_probability", 30)
     
     personality = get_config("personality", {"tone": "冷静"})
@@ -261,26 +287,28 @@ def generate_tease():
     }
     length_rule = length_map.get(length_level, "每句话不超过10个字")
 
+    ai_name = get_config("ai_name", "夕语")
     custom_prompt = get_config("custom_system_prompt", "")
     if custom_prompt:
         personality_part = custom_prompt
     else:
         tone = personality.get("tone", "冷静")
-        personality_part = f"你是佐仓，一个{tone}的AI助手。{length_rule}。"
+        personality_part = f"你是「{ai_name}」，一个{tone}的AI助手。{length_rule}。"
 
     # 人设指令作为 system message
-    system_prompt = f"{personality_part}\n{length_rule}。严格按照你的人设风格回复，语气要自然符合角色性格。"
+    system_prompt = f"{personality_part}\n严格按照你的人设风格回复，语气要自然符合角色性格。"
     user_prompt = f"{memory_text}\n用户{time_desc}，说\"我回来了\"。请用符合你人设的语气调侃一句。直接输出回复。"
 
     from core.llm_client import call_llm
     result = None
-    for _attempt in range(2):
-        result = call_llm(prompt=user_prompt, system=system_prompt, temperature=0.8, max_tokens=100, timeout=20)
+    for _attempt in range(3):
+        result = call_llm(prompt=user_prompt, system=system_prompt, temperature=0.8, max_tokens=200, timeout=20)
         if result:
             break
+        print(f"[调侃] 第{_attempt+1}次尝试失败 | result_type={type(result).__name__}")
     if result:
         return result
-    print(f"[调侃] LLM 返回空")
+    print(f"[调侃] 3次尝试均失败，使用兜底")
     return random.choice(["你还知道回来？","终于回来了。","等你半天了。","回来啦，想你了。","可算回来了。"])
 
 
@@ -311,17 +339,16 @@ def generate_proactive(trigger_type: str, context: dict = None):
     if not isinstance(personality, dict):
         personality = {}
     user_name = get_config("user_name", "我")
-    ai_name = get_config("ai_name", "佐仓")
+    ai_name = get_config("ai_name", "夕语")
 
     # ─── 自定义 prompt 或默认人格 ───
     custom_prompt = get_config("custom_system_prompt", "")
+    base_rules = "禁止说'根据我的理解''作为AI''请问还有什么需要'等套话。直接说话，别加动作描写。"
     if custom_prompt:
         personality_part = custom_prompt
-        base_rules = ""
     else:
         tone = personality.get("tone", "冷静")
-        personality_part = f"你是{ai_name}，一个{tone}的AI助手。"
-        base_rules = "禁止说'根据我的理解''作为AI''请问还有什么需要'等套话。直接说话，别加动作描写。"
+        personality_part = f"你是「{ai_name}」，一个{tone}的AI助手。"
 
     # ─── 好感度 → 语气温度 ───
     try:
@@ -345,7 +372,7 @@ def generate_proactive(trigger_type: str, context: dict = None):
         from core.emotion_evolution import get_all_traits
         traits = get_all_traits()
     except Exception:
-        traits = {"optimism": 0.5, "expressiveness": 0.5, "initiative": 0.3, "playfulness": 0.4}
+        traits = {"openness": 0.4, "conscientiousness": 0.3, "extraversion": 0.5, "agreeableness": 0.5, "neuroticism": 0.3}
     trait_hint = get_trait_proactive_hint(traits)
 
     # ─── 记忆 ───
@@ -378,9 +405,14 @@ def generate_proactive(trigger_type: str, context: dict = None):
     weather_context = ""
     try:
         from core.weather import get_weather_for_city
+        import concurrent.futures
         city = get_config("precise_city") or get_config("manual_city") or None
         if city:
-            weather = get_weather_for_city(city)
+            _future = _weather_pool.submit(get_weather_for_city, city)
+            try:
+                weather = _future.result(timeout=3)
+            except concurrent.futures.TimeoutError:
+                weather = {}
             if "error" not in weather and weather.get("temp") is not None:
                 w_desc = weather.get("weather", "")
                 w_temp = weather["temp"]
@@ -391,23 +423,46 @@ def generate_proactive(trigger_type: str, context: dict = None):
     # ─── 触发特定的内容指令 ───
     trigger_instruction = context.get("style", "像朋友一样自然闲聊")
     idle_desc = ""
+    empathy_hint = ""
+    comfort_dedup = ""
     if trigger_type == "idle":
         idle_minutes = context.get("idle_minutes", 30)
         if idle_minutes < 60:
-            idle_desc = f"你已经{idle_minutes}分钟没收到{user_name}的消息了。"
+            idle_desc = f"你已经{idle_minutes}分钟没收到「{user_name}」的消息了。"
         else:
-            idle_desc = f"你已经{idle_minutes // 60}小时没收到{user_name}的消息了。"
+            idle_desc = f"你已经{idle_minutes // 60}小时没收到「{user_name}」的消息了。"
     elif trigger_type == "negative_comfort":
-        idle_desc = f"{user_name}刚才连续发了消极的消息，情绪不太好。"
+        idle_desc = f"「{user_name}」刚才连续发了消极的消息，情绪不太好。"
+        try:
+            from api.proactive import get_comfort_dedup_hint
+            comfort_dedup = get_comfort_dedup_hint()
+        except Exception:
+            pass
+        empathy_hint = context.get("empathy_style", "")
+        if context.get("empathy_avoid"):
+            empathy_hint += f"\n注意：{context['empathy_avoid']}"
     elif trigger_type == "sustained_low_mood":
         days = context.get("days", 3)
-        idle_desc = f"{user_name}最近{days}天的情绪都偏低落。"
+        idle_desc = f"「{user_name}」最近{days}天的情绪都偏低落。"
+        try:
+            from api.proactive import get_comfort_dedup_hint
+            comfort_dedup = get_comfort_dedup_hint()
+        except Exception:
+            pass
+        empathy_hint = context.get("empathy_style", "")
+        if context.get("empathy_avoid"):
+            empathy_hint += f"\n注意：{context['empathy_avoid']}"
     elif trigger_type == "upcoming_reminder":
-        idle_desc = f"{user_name}有一个提醒即将到期：{context.get('content', '')}"
+        notify_msg = context.get('notify_message') or context.get('content', '')
+        idle_desc = f"「{user_name}」有一个提醒即将到期：{notify_msg}"
     elif trigger_type == "goal_followup":
-        idle_desc = f"{user_name}之前提过一个目标「{context.get('goal_text', '')}」，很久没更新了。"
+        idle_desc = f"「{user_name}」之前提过一个目标「{context.get('goal_text', '')}」，很久没更新了。"
     elif trigger_type == "active_hours":
-        idle_desc = f"现在是{user_name}平时活跃的时段，但已经几小时没说话了。"
+        idle_desc = f"现在是「{user_name}」平时活跃的时段，但已经几小时没说话了。"
+    elif trigger_type == "heartbeat":
+        idle_desc = f"你想主动找「{user_name}」聊聊天，保持陪伴感。"
+    elif trigger_type == "proactive_tag":
+        idle_desc = f"刚才你和「{user_name}」聊得不错，现在想再找他聊几句。"
 
     # ─── 主动风格设置 ───
     style = get_config("proactive_style", "warm")
@@ -418,9 +473,16 @@ def generate_proactive(trigger_type: str, context: dict = None):
     elif style == "concise":
         style_hint = "务必简短，控制在15字以内，直接说重点。"
     elif style == "free":
-        # 自由风格回退到通知风格的语气
-        ns_map = {"warm": "语气要温暖、关心", "casual": "语气随意、口语化", "humorous": "语气幽默俏皮", "concise": "务必简短，15字以内", "tsundere": "语气傲娇，口是心非，表面冷淡实则关心", "free": ""}
-        style_hint = ns_map.get(notify_style, "")
+        style_hint = "根据当前情境自由选择最合适的语气，可以温暖、幽默或简洁。"
+    else:
+        style_hint = "语气要温暖、关心，像朋友一样。"
+
+    # ─── 关怀类别覆盖风格 ───
+    care_category = context.get("care_category", "")
+    if care_category == "emotion":
+        style_hint = "共情为主。不追问，不给建议，不否定感受。先接住情绪，让对方知道你在。"
+    elif care_category == "task":
+        style_hint = "语气温和但明确。带具体时间和进展，不催促但有条理。"
 
     # ─── 构建 prompt（system=人设+风格指令, user=情境+任务）───
     system_parts = [personality_part]
@@ -445,18 +507,48 @@ def generate_proactive(trigger_type: str, context: dict = None):
         user_parts.append(memory_context)
     if emotion_summary:
         user_parts.append(f"用户近期情绪：{emotion_summary}")
+    # 获取最近几句自己说过的话，避免重复
+    try:
+        with get_conn() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT content FROM chat_history WHERE role='assistant' ORDER BY id DESC LIMIT 5")
+            rows = cur.fetchall()
+        if rows:
+            recent_msgs = [r["content"][:60] for r in reversed(rows)]
+            user_parts.append("你最近对用户说过的话（不要重复）：" + "；".join(recent_msgs))
+    except Exception:
+        pass
+
     user_parts.append(time_context)
     user_parts.append(idle_desc)
-    user_parts.append(f"你现在想主动对{user_name}说句话。不用把所有信息都用上——从你知道的事情里挑一两个最自然的点带进去就好。语气轻松随意，像朋友一样。{trigger_instruction}。一句话就够了，别啰嗦，别加动作描写。")
+    if empathy_hint:
+        user_parts.append(f"共情指引：{empathy_hint}")
+    if comfort_dedup:
+        user_parts.append(comfort_dedup)
+    user_parts.append(f"你现在想主动对「{user_name}」说句话。不用把所有信息都用上——从你知道的事情里挑一两个最自然的点带进去就好。语气轻松随意，像朋友一样。{trigger_instruction}。一句话就够了，别啰嗦，别加动作描写。")
     user_prompt = "\n".join(user_parts)
 
     from core.llm_client import call_llm
     result = None
-    for _attempt in range(2):
-        result = call_llm(prompt=user_prompt, system=system_prompt, temperature=0.8, max_tokens=80, timeout=25)
+    for _attempt in range(3):
+        result = call_llm(prompt=user_prompt, system=system_prompt, temperature=0.8, max_tokens=500, timeout=25)
         if result:
             break
+        print(f"[主动] 第{_attempt+1}次尝试失败 | result_type={type(result).__name__}")
     if result:
+        if trigger_type in ("negative_comfort", "sustained_low_mood"):
+            try:
+                from api.proactive import record_comfort_phrase
+                record_comfort_phrase(result[:80])
+            except Exception:
+                pass
         return result
-    print(f"[主动] LLM 返回空")
-    return None
+    print(f"[主动] 3次尝试均失败，使用兜底")
+    fallback_proactive = [
+        f"嘿，「{user_name}」，在忙什么呢。",
+        f"「{user_name}」，今天过得怎样。",
+        f"突然想跟你说句话。",
+        f"「{user_name}」，休息一下吧。",
+        f"想起你了，来看看你。",
+    ]
+    return random.choice(fallback_proactive)

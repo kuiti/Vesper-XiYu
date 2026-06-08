@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from core.db import (
     get_active_tiered_summaries, get_all_active_keypoints,
     get_death_archive, get_msg_counter, get_config, set_config,
-    get_messages_since_last_tiered_summary
+    get_messages_since_last_tiered_summary, get_last_trigger_at
 )
 
 router = APIRouter(prefix="/summary", tags=["summary"])
@@ -26,6 +26,13 @@ async def get_active():
 async def summary_status():
     summaries = get_active_tiered_summaries()
     msg_count = get_msg_counter()
+    # 使用实际触发阈值计算下次触发剩余消息数
+    thresholds = {1: 10, 2: 50, 3: 100}
+    next_levels = {}
+    for level, threshold in thresholds.items():
+        last = get_last_trigger_at(level)
+        remaining = threshold - (msg_count - last)
+        next_levels[f"next_level{level}"] = max(1, remaining)
     return {
         "active_count": len(summaries),
         "by_level": {
@@ -33,9 +40,7 @@ async def summary_status():
             for l in [1, 2, 3]
         },
         "msg_count": msg_count,
-        "next_level1": (10 - (msg_count % 10)) % 10 or 10,
-        "next_level2": (50 - (msg_count % 50)) % 50 or 50,
-        "next_level3": (100 - (msg_count % 100)) % 100 or 100,
+        **next_levels,
     }
 
 

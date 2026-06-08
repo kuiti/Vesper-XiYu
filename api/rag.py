@@ -23,18 +23,24 @@ async def rag_status():
     installed = _check_installed()
     model_ok = is_model_ready()
     count = 0
+    sentence_count = 0
     if model_ok:
         try:
             col = get_collection()
             count = col.count()
         except Exception:
             pass
-    return {"model_loaded": model_ok, "vector_count": count, "installed": installed}
+        try:
+            col2 = get_collection("sentence_index")
+            sentence_count = col2.count()
+        except Exception:
+            pass
+    return {"model_loaded": model_ok, "vector_count": count, "sentence_count": sentence_count, "total_vectors": count + sentence_count, "installed": installed}
 
 @router.post("/install")
 async def rag_install():
     if _check_installed():
-        return {"ok": True, "msg": "向量引擎已安装，重启佐仓后自动加载模型"}
+        return {"ok": True, "msg": "向量引擎已安装，重启夕语后自动加载模型"}
     try:
         import subprocess, sys
         r = subprocess.run(
@@ -42,7 +48,7 @@ async def rag_install():
             capture_output=True, text=True, timeout=300
         )
         if r.returncode == 0:
-            return {"ok": True, "msg": "安装成功！模型约420MB，首次启动时自动下载。重启佐仓生效。"}
-        return {"ok": False, "error": f"安装失败: {r.stderr[-200:]}"}
+            return {"ok": True, "msg": "安装成功！模型约420MB，首次启动时自动下载。重启夕语生效。"}
+        return {"ok": False, "error": "安装失败，请查看终端日志"}
     except Exception as e:
         return {"ok": False, "error": str(e)}

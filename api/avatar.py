@@ -1,5 +1,6 @@
 import os
 import shutil
+import asyncio
 import requests
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, HTTPException
@@ -19,15 +20,8 @@ async def upload_avatar(role: str, file: UploadFile = File(...)):
     if role not in ["user", "assistant", "bg"]:
         raise HTTPException(400, "角色只能是 user、assistant 或 bg")
 
-    # 删除旧头像
-    old_avatar = get_config(f"avatar_{role}", "")
-    if old_avatar:
-        old_path = os.path.join(AVATAR_DIR, old_avatar)
-        if os.path.exists(old_path):
-            os.remove(old_path)
-
-    # 校验文件类型
-    allowed_types = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp"}
+    # 校验文件类型（允许 application/octet-stream，通过扩展名判断）
+    allowed_types = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/bmp", "application/octet-stream"}
     if file.content_type and file.content_type not in allowed_types:
         raise HTTPException(400, f"不支持的文件类型: {file.content_type}，仅支持 JPEG/PNG/GIF/WebP/BMP")
 
@@ -39,16 +33,28 @@ async def upload_avatar(role: str, file: UploadFile = File(...)):
     new_filename = f"{role}_{timestamp}.{ext}"
     file_path = os.path.join(AVATAR_DIR, new_filename)
 
-    # 限制 5MB，流式写入
+    # 先写临时文件，成功后再替换旧头像
+    tmp_path = file_path + ".tmp"
     total = 0
-    with open(file_path, "wb") as f:
-        while chunk := file.file.read(8192):
-            total += len(chunk)
-            if total > 5 * 1024 * 1024:
-                f.close()
-                os.remove(file_path)
-                raise HTTPException(400, "头像文件不能超过 5MB")
-            f.write(chunk)
+    try:
+        with open(tmp_path, "wb") as f:
+            while chunk := file.file.read(8192):
+                total += len(chunk)
+                if total > 5 * 1024 * 1024:
+                    raise HTTPException(400, "头像文件不能超过 5MB")
+                f.write(chunk)
+    except HTTPException:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        raise
+
+    # 成功：删除旧头像，重命名临时文件
+    old_avatar = get_config(f"avatar_{role}", "")
+    if old_avatar:
+        old_path = os.path.join(AVATAR_DIR, old_avatar)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+    os.rename(tmp_path, file_path)
 
     set_config(f"avatar_{role}", new_filename)
     return {"filename": new_filename, "url": f"/avatars/{new_filename}"}
@@ -77,7 +83,7 @@ async def upload_avatar_by_url(role: str, data: AvatarUrl):
         pass
 
     try:
-        resp = requests.get(data.url, timeout=10, stream=True)
+        resp = await asyncio.to_thread(requests.get, data.url, timeout=10, stream=True)
         resp.raise_for_status()
     except Exception as e:
         raise HTTPException(400, f"下载图片失败: {e}")
@@ -93,17 +99,11 @@ async def upload_avatar_by_url(role: str, data: AvatarUrl):
     else:
         ext = "jpg"
 
-    # 删除旧头像
-    old_avatar = get_config(f"avatar_{role}", "")
-    if old_avatar:
-        old_path = os.path.join(AVATAR_DIR, old_avatar)
-        if os.path.exists(old_path):
-            os.remove(old_path)
-
-    # 保存新头像
+    # 保存新头像（先保存，成功后再删旧的）
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     new_filename = f"{role}_{timestamp}.{ext}"
     file_path = os.path.join(AVATAR_DIR, new_filename)
+    old_avatar = get_config(f"avatar_{role}", "")
 
     total = 0
     with open(file_path, "wb") as f:
@@ -115,12 +115,38 @@ async def upload_avatar_by_url(role: str, data: AvatarUrl):
                 raise HTTPException(400, "头像文件不能超过 5MB")
             f.write(chunk)
 
+    # 删除旧头像（新头像保存成功后）
+    if old_avatar:
+        old_path = os.path.join(AVATAR_DIR, old_avatar)
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
     set_config(f"avatar_{role}", new_filename)
     return {"filename": new_filename, "url": f"/avatars/{new_filename}"}
 
 @router.get("/{role}")
 async def get_avatar_url(role: str):
+    import json as _json
     filename = get_config(f"avatar_{role}", "")
     if not filename:
+        # 回退到默认头像
+        avatars = get_config("avatars", "")
+        if avatars:
+            if isinstance(avatars, dict):
+                default = avatars.get(role, "")
+            elif isinstance(avatars, str):
+                try:
+                    default = _json.loads(avatars).get(role, "")
+                except _json.JSONDecodeError:
+                    default = ""
+            else:
+                default = ""
+            if default and os.path.exists(os.path.join(AVATAR_DIR, default)):
+                return {"url": f"/avatars/{default}"}
+        # 硬回退：检查默认文件名
+        for ext in ("jpg", "jpeg", "png"):
+            df = f"{role}_default.{ext}"
+            if os.path.exists(os.path.join(AVATAR_DIR, df)):
+                return {"url": f"/avatars/{df}"}
         return {"url": None}
     return {"url": f"/avatars/{filename}"}

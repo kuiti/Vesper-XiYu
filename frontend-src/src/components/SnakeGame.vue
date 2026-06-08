@@ -20,7 +20,7 @@ const GS = 20, COLS = 18, ROWS = 18
 
 export default {
   emits: ['ai-event', 'help'],
-  props: { aiName: { type: String, default: '佐仓' } },
+  props: { aiName: { type: String, default: '夕语' } },
   data() {
     return {
       snake: [{x:8,y:8},{x:7,y:8},{x:6,y:8}],

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from core.db import get_countdowns, add_countdown, delete_countdown
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 router = APIRouter(prefix="/countdowns", tags=["countdowns"])
 
@@ -10,8 +10,8 @@ class CountdownCreate(BaseModel):
     target_date: str
 
 class CountdownUpdate(BaseModel):
-    name: str = ""
-    target_date: str = ""
+    name: Optional[str] = None
+    target_date: Optional[str] = None
 
 class CountdownOut(BaseModel):
     id: int
@@ -34,9 +34,9 @@ async def update_countdown(cd_id: int, cd: CountdownUpdate):
     with get_conn() as conn:
         c = conn.cursor()
         updates = {}
-        if cd.name:
+        if cd.name is not None:
             updates["name"] = cd.name
-        if cd.target_date:
+        if cd.target_date is not None:
             updates["target_date"] = cd.target_date
         if not updates:
             raise HTTPException(400, "没有需要更新的字段")

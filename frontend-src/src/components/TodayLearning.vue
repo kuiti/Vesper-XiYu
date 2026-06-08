@@ -3,7 +3,7 @@
     <div v-if="show" class="tl-side-card">
       <div class="tl-header">今天了解到的你</div>
       <div v-if="data" class="tl-items">
-        <span v-for="p in data.new_profile" :key="p.key" class="tl-chip">{{ p.key }}: {{ p.value }}</span>
+        <span v-for="p in data.new_profile" :key="p.key" class="tl-chip">{{ p.label || tlLabel(p.key) }}: {{ p.value }}</span>
         <span v-if="!data.new_profile?.length" class="tl-empty">暂无新发现</span>
       </div>
       <button class="tl-close" @click="dismiss">×</button>
@@ -28,7 +28,21 @@ export default {
       this.show = false
       localStorage.setItem('tl_last_hash', JSON.stringify(this.data?.new_profile || []))
       this.$emit('close')
-    }
+    },
+    tlLabel(key) {
+      const map = { user_student: '身份', user_habit_stay_up: '习惯', user_habit: '习惯',
+        name: '名字', user_name: '称呼', city: '城市', gender: '性别', age: '年龄',
+        occupation: '职业', hobby: '爱好', personality: '性格', language: '语言',
+      }
+      if (map[key]) return map[key]
+      return key.replace(/^user_/, '').replace(/_/g, ' ')
+    },
+    tlValue(val) {
+      if (!val) return ''
+      try { const o = JSON.parse(val); if (typeof o === 'object' && o) return o.text || o.value || o.name || o.summary || '' }
+      catch (e) {}
+      return val
+    },
   }
 }
 </script>

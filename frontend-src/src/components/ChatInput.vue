@@ -17,7 +17,7 @@
       ></textarea>
       <button class="send-btn" @click="send" :disabled="!text.trim()">发送</button>
     </div>
-    <div class="input-hint">Enter 发送 · Shift+Enter 换行 · End 回到底部 · Ctrl+1-5 切换视图</div>
+    <div class="input-hint">Enter 发送 · Shift+Enter 换行 · 右键消息可收藏或删除</div>
   </div>
 </template>
 
@@ -27,7 +27,7 @@ export default {
   emits: ['update:input', 'send', 'clear-quote'],
   data() { return { text: '', showEmoji: false, placeholderText: '输入消息…', _placeIdx: 0 } },
   watch: { input(v) { if (v !== undefined && v !== this.text) this.text = v } },
-  created() { this.text = this.input || ''; this._placeTimer = setInterval(() => { const tips = ['输入消息…', '说「提醒我明天9点开会」', '说「/reroll」重新生成', '直接聊天也行…']; this._placeIdx = (this._placeIdx + 1) % tips.length; this.placeholderText = tips[this._placeIdx] }, 5000) },
+  created() { this.text = this.input || ''; this._placeTimer = setInterval(() => { const tips = ['输入消息…', '比如：提醒我明天9点开会', '随便聊聊也行～', '可以问天气、记待办、设提醒']; this._placeIdx = (this._placeIdx + 1) % tips.length; this.placeholderText = tips[this._placeIdx] }, 5000) },
   beforeUnmount() { if (this._placeTimer) { clearInterval(this._placeTimer); this._placeTimer = null } },
   methods: {
     send() { const msg = this.text.trim(); if (!msg) return; this.$emit('send', msg); this.text = ''; this.showEmoji = false },

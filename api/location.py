@@ -1,6 +1,6 @@
 import asyncio
 import requests
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from core.db import get_config
 from pydantic import BaseModel
 
@@ -68,12 +68,21 @@ async def get_districts(city_adcode: str):
     raise HTTPException(500, "获取区县失败")
 
 @router.get("/ip")
-async def get_location_by_ip():
+async def get_location_by_ip(request: Request):
     """通过 IP 获取当前城市（高德优先，失败则用备用服务）"""
+    # 获取客户端真实 IP
+    client_ip = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    if not client_ip:
+        client_ip = request.headers.get("X-Real-IP", "")
+    if not client_ip:
+        client_ip = request.client.host if request.client else ""
+
     key = get_config("amap_key", "")
     if key:
         try:
-            resp = await asyncio.to_thread(requests.get, f"https://restapi.amap.com/v3/ip?key={key}", timeout=10)
+            # 传入客户端 IP
+            url = f"https://restapi.amap.com/v3/ip?key={key}&ip={client_ip}" if client_ip else f"https://restapi.amap.com/v3/ip?key={key}"
+            resp = await asyncio.to_thread(requests.get, url, timeout=10)
             data = resp.json()
             if data.get("status") == "1":
                 province = data.get("province", "")
@@ -85,9 +94,13 @@ async def get_location_by_ip():
         except Exception as e:
             print(f"[定位] 异常: {e}")
 
-    # 备用: ip-api.com
+    # 备用: ip-api.com（用客户端 IP）
     try:
-        resp = await asyncio.to_thread(requests.get, "https://ip-api.com/json/?lang=zh-CN", timeout=5)
+        if client_ip:
+            url = f"https://ip-api.com/json/{client_ip}?lang=zh-CN"
+        else:
+            url = f"https://ip-api.com/json/?lang=zh-CN"
+        resp = await asyncio.to_thread(requests.get, url, timeout=5)
         data = resp.json()
         if data.get("status") == "success":
             return {"province": data.get("regionName", ""), "city": data.get("city", ""), "adcode": ""}

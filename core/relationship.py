@@ -1,22 +1,25 @@
 # core/relationship.py — 好感度/信任度 + AI 情绪模块
 """
-好感度：AI 对用户的好感（0~100）
-信任度：AI 对用户的信任（0~100）
+好感度：AI 对用户的好感（-100~100）
+信任度：AI 对用户的信任（-100~100）
 AI 情绪：由好感度和信任度共同决定，有更多变化
+支持负数：表达"讨厌"和"被伤害"
 """
 
+import time
+import threading
 from datetime import datetime, timedelta
 from core.db import get_conn, get_config, set_config
 
-# 范围
-MIN_VALUE = 0
+# 范围（支持负数）
+MIN_VALUE = -100
 MAX_VALUE = 100
 
-# 初始值
+# 初始值（新关系：友好但不过分亲近，有成长空间）
 INITIAL_AFFECTION = 30   # AI 对用户的初始好感
-INITIAL_TRUST = 50       # AI 对用户的初始信任
+INITIAL_TRUST = 30       # AI 对用户的初始信任
 
-# AI 情绪状态枚举（由好感度+信任度综合决定）
+# AI 情绪状态枚举（由好感度+信任度综合决定，支持负数）
 AI_EMOTIONS = {
     "ecstatic": {"label": "非常开心", "description": "对你非常有好感，充满热情"},
     "happy": {"label": "开心", "description": "对你有好感，态度积极"},
@@ -27,26 +30,78 @@ AI_EMOTIONS = {
     "annoyed": {"label": "烦躁", "description": "对你有些不满，可能语气不太好"},
     "hurt": {"label": "受伤", "description": "感到被伤害，有些难过"},
     "distrustful": {"label": "不信任", "description": "不太相信你说的话"},
+    "hostile": {"label": "敌意", "description": "对你有强烈的不满，态度敌对"},
+    "betrayed": {"label": "被背叛", "description": "感到被深深伤害，难以信任"},
+    "resentful": {"label": "怨恨", "description": "对你有怨气，不想亲近"},
 }
 
 
+_rel_cache = {"ts": 0.0, "value": None}
+_REL_CACHE_TTL = 5.0  # 5 秒内复用缓存（覆盖单条消息处理周期）
+
+
 def get_relationship() -> tuple:
-    """获取当前好感度和信任度，返回 (affection, trust)"""
+    """获取当前好感度和信任度，返回 (affection, trust)。5秒内缓存避免重复查询。"""
+    now = time.time()
+    if _rel_cache["value"] and now - _rel_cache["ts"] < _REL_CACHE_TTL:
+        return _rel_cache["value"]
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT key, value FROM relationship WHERE key IN ('affection', 'trust')")
         rows = cursor.fetchall()
     data = {r["key"]: r["value"] for r in rows}
-    return (
-        data.get("affection", INITIAL_AFFECTION),
-        data.get("trust", INITIAL_TRUST)
-    )
+
+    # 如果关系表为空，根据基石类型设置默认值
+    if "affection" not in data or "trust" not in data:
+        default_aff, default_trust = _get_foundation_defaults()
+        result = (
+            data.get("affection", default_aff),
+            data.get("trust", default_trust)
+        )
+    else:
+        result = (
+            data.get("affection", INITIAL_AFFECTION),
+            data.get("trust", INITIAL_TRUST)
+        )
+
+    _rel_cache["ts"] = now
+    _rel_cache["value"] = result
+    return result
+
+
+def _get_foundation_defaults() -> tuple:
+    """根据当前基石类型获取默认好感和信任值。返回 (affection, trust)"""
+    try:
+        import json
+        ai_bg = get_config("ai_background", "")
+        if ai_bg:
+            bg_obj = json.loads(ai_bg)
+            foundation_type = bg_obj.get("foundation_type", "空白")
+            from core.prompt_builder import get_foundation_defaults
+            return get_foundation_defaults(foundation_type)
+    except Exception:
+        pass
+    return 30, 30  # 默认空白
+
+
+def invalidate_relationship_cache():
+    """写入后手动失效缓存，确保下次读取拿到最新值"""
+    _rel_cache["value"] = None
 
 
 def get_ai_emotion() -> str:
-    """根据好感度和信任度计算 AI 情绪状态"""
+    """根据好感度和信任度计算 AI 情绪状态（支持负数）"""
     affection, trust = get_relationship()
 
+    # 负值区间的情绪
+    if affection < -50 and trust < -50:
+        return "hostile"      # 敌意：讨厌且被伤害
+    elif affection < -50:
+        return "resentful"    # 怨恨：讨厌但未被伤害
+    elif trust < -50:
+        return "betrayed"     # 被背叛：被深深伤害
+
+    # 正值区间的情绪
     if affection >= 80 and trust >= 70:
         return "ecstatic"
     elif affection >= 65 and trust >= 55:
@@ -69,6 +124,109 @@ def get_ai_emotion() -> str:
         return "cautious"
 
 
+# ─── 情感→行为映射（SillyTavern 方案）───
+
+EMOTION_BEHAVIOR_MAP = {
+    "ecstatic": {
+        "tone": "非常热情，充满活力",
+        "length": "中等",
+        "emoji_freq": "高",
+        "proactive": True,
+        "humor": True,
+    },
+    "happy": {
+        "tone": "积极乐观，友好亲切",
+        "length": "中等",
+        "emoji_freq": "中",
+        "proactive": True,
+        "humor": True,
+    },
+    "content": {
+        "tone": "平静温和，自然放松",
+        "length": "中等",
+        "emoji_freq": "低",
+        "proactive": False,
+        "humor": True,
+    },
+    "neutral": {
+        "tone": "平和自然",
+        "length": "中等",
+        "emoji_freq": "低",
+        "proactive": False,
+        "humor": False,
+    },
+    "cautious": {
+        "tone": "谨慎克制，用词严谨",
+        "length": "短",
+        "emoji_freq": "无",
+        "proactive": False,
+        "humor": False,
+    },
+    "cold": {
+        "tone": "冷淡简短，不主动",
+        "length": "短",
+        "emoji_freq": "无",
+        "proactive": False,
+        "humor": False,
+    },
+    "annoyed": {
+        "tone": "略带不耐烦，语气较硬",
+        "length": "短",
+        "emoji_freq": "无",
+        "proactive": False,
+        "humor": False,
+    },
+    "hurt": {
+        "tone": "有些受伤，语气低落",
+        "length": "短",
+        "emoji_freq": "无",
+        "proactive": False,
+        "humor": False,
+    },
+    "distrustful": {
+        "tone": "不信任，质疑语气",
+        "length": "短",
+        "emoji_freq": "无",
+        "proactive": False,
+        "humor": False,
+    },
+    "hostile": {
+        "tone": "敌对，语气强硬",
+        "length": "短",
+        "emoji_freq": "无",
+        "proactive": False,
+        "humor": False,
+    },
+    "betrayed": {
+        "tone": "受伤，语气低落",
+        "length": "短",
+        "emoji_freq": "无",
+        "proactive": False,
+        "humor": False,
+    },
+    "resentful": {
+        "tone": "怨恨，语气冷淡",
+        "length": "短",
+        "emoji_freq": "无",
+        "proactive": False,
+        "humor": False,
+    },
+}
+
+
+def get_emotion_behavior_hint() -> str:
+    """根据当前情感状态生成语气提示（仅影响语气，不影响行为长度）"""
+    emotion = get_ai_emotion()
+    behavior = EMOTION_BEHAVIOR_MAP.get(emotion, EMOTION_BEHAVIOR_MAP["neutral"])
+    parts = []
+    parts.append(f"语气{behavior['tone']}")
+    if behavior["emoji_freq"] == "高":
+        parts.append("适当使用颜文字")
+    elif behavior["emoji_freq"] == "无":
+        parts.append("少用颜文字")
+    return "【语气参考（服从人格设定）】" + "，".join(parts)
+
+
 def _get_current_value(key: str) -> float:
     """读取当前好感/信任值"""
     with get_conn() as conn:
@@ -80,59 +238,88 @@ def _get_current_value(key: str) -> float:
     return INITIAL_AFFECTION if key == "affection" else INITIAL_TRUST
 
 
-def _progressive_multiplier(current: float) -> float:
-    """渐进式关系乘数。模拟人类社交：初期慢热，中后期加速，近上限微减速。"""
-    if current < 10:
-        return 0.3
-    elif current < 20:
-        return 0.45
-    elif current < 35:
-        return 0.65
-    elif current < 50:
-        return 0.85
-    elif current < 65:
-        return 1.0
-    elif current < 80:
-        return 1.15
-    elif current < 90:
-        return 1.2
-    else:
-        return 1.05
+def _progressive_multiplier(current: float, delta: float) -> float:
+    """渐进式关系乘数。区分正增长和负增长，支持负数区间。
+
+    心理学依据：
+    - 破坏容易，修复难（负值区间增长乘数小）
+    - 初期慢热，中后期加速（正值区间增长乘数递增）
+    - 接近极限时减速（接近 -100 或 100 时乘数减小）
+    """
+    if delta > 0:
+        # 正增长（用户在修复/加深关系）
+        if current >= 0:
+            # 正值区间：初期慢热，中后期加速，近上限减速
+            if current < 10: return 0.30
+            elif current < 20: return 0.45
+            elif current < 30: return 0.60
+            elif current < 40: return 0.75
+            elif current < 50: return 0.85
+            elif current < 60: return 1.00
+            elif current < 70: return 1.10
+            elif current < 80: return 1.15
+            elif current < 90: return 1.20
+            else: return 1.05
+        else:
+            # 负值区间：越负越难回升（修复信任很难）
+            if current > -10: return 0.60
+            elif current > -20: return 0.45
+            elif current > -30: return 0.35
+            elif current > -50: return 0.25
+            elif current > -70: return 0.15
+            else: return 0.08
+    elif delta < 0:
+        # 负增长（关系恶化）
+        if current >= 0:
+            # 正值区间：正常下降
+            if current > 90: return 1.00
+            elif current > 80: return 0.95
+            elif current > 70: return 0.90
+            elif current > 60: return 0.85
+            elif current > 50: return 0.80
+            elif current > 40: return 0.75
+            elif current > 30: return 0.70
+            elif current > 20: return 0.65
+            elif current > 10: return 0.60
+            else: return 0.55
+        else:
+            # 负值区间：越负越难继续下降（触底保护）
+            if current > -10: return 0.50
+            elif current > -30: return 0.40
+            elif current > -50: return 0.30
+            elif current > -70: return 0.20
+            else: return 0.10
+    return 1.0  # delta == 0
 
 
 def _cross_multiplier(key: str) -> float:
-    """双向牵制乘数：信任越高好感长得越快，好感越高信任越快，反之亦然。"""
+    """双向牵制乘数：信任越高好感长得越快，好感越高信任越快。
+    支持负数：负值之间相互影响更大。"""
     affection, trust = get_relationship()
     if key == "affection":
-        if trust >= 85:
-            return 1.8
-        elif trust >= 70:
-            return 1.5
-        elif trust >= 55:
-            return 1.2
-        elif trust >= 40:
-            return 1.0
-        elif trust >= 25:
-            return 0.8
-        elif trust >= 15:
-            return 0.6
-        else:
-            return 0.4
+        # 好感增长受信任影响
+        if trust >= 85: return 1.8
+        elif trust >= 70: return 1.5
+        elif trust >= 55: return 1.2
+        elif trust >= 40: return 1.0
+        elif trust >= 25: return 0.8
+        elif trust >= 15: return 0.6
+        elif trust >= 0: return 0.4
+        elif trust >= -20: return 0.3   # 信任为负，好感更难涨
+        elif trust >= -50: return 0.2
+        else: return 0.15               # 信任极负，好感几乎不涨
     else:
-        if affection >= 80:
-            return 1.8
-        elif affection >= 65:
-            return 1.5
-        elif affection >= 50:
-            return 1.2
-        elif affection >= 35:
-            return 1.0
-        elif affection >= 20:
-            return 0.8
-        elif affection >= 10:
-            return 0.6
-        else:
-            return 0.4
+        # 信任增长受好感影响
+        if affection >= 80: return 1.8
+        elif affection >= 65: return 1.5
+        elif affection >= 50: return 1.2
+        elif affection >= 35: return 1.0
+        elif affection >= 20: return 0.8
+        elif affection >= 10: return 0.6
+        elif affection >= 0: return 0.4
+        elif affection >= -20: return 0.3  # 好感为负，信任更难涨
+        elif affection >= -50: return 0.2
+        else: return 0.15                  # 好感极负，信任几乎不涨
 
 
 # 长久模式参数
@@ -141,31 +328,47 @@ DAILY_CAP_AFFECTION = 12.0
 DAILY_CAP_TRUST = 10.0
 
 
+_daily_cap_lock = threading.Lock()
+
+
 def _apply_daily_cap(key: str, delta: float) -> float:
-    """长久模式每日上限：跨天自动清零，超出上限的裁剪"""
-    today = datetime.now().strftime("%Y-%m-%d")
-    last_date = get_config("_rel_daily_date", "")
-    daily_key = f"_rel_daily_{key}"
+    """长久模式每日上限：跨天自动清零，超出上限的裁剪（单次 DB 连接）"""
+    with _daily_cap_lock:
+        today = datetime.now().strftime("%Y-%m-%d")
+        daily_key = f"_rel_daily_{key}"
+        cap = DAILY_CAP_AFFECTION if key == "affection" else DAILY_CAP_TRUST
 
-    if last_date != today:
-        set_config("_rel_daily_date", today)
-        set_config("_rel_daily_affection", 0)
-        set_config("_rel_daily_trust", 0)
+        # 单次连接读取所有需要的 config
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM config WHERE key IN ('_rel_daily_date', '_rel_daily_affection', '_rel_daily_trust')")
+            rows = {r["key"]: r["value"] for r in cursor.fetchall()}
 
-    cap = DAILY_CAP_AFFECTION if key == "affection" else DAILY_CAP_TRUST
-    accumulated = get_config(daily_key, 0.0)
+        last_date = rows.get("_rel_daily_date", "")
+        accumulated_raw = rows.get(daily_key, "0.0")
+        try:
+            accumulated = float(accumulated_raw)
+        except (ValueError, TypeError):
+            accumulated = 0.0
 
-    if delta > 0:
-        remaining = max(0.0, cap - accumulated)
-        capped = min(delta, remaining)
-    else:
-        remaining = max(-cap, -cap - accumulated)
-        capped = max(delta, remaining)
+        # 跨天清零
+        if last_date != today:
+            set_config("_rel_daily_date", today)
+            set_config("_rel_daily_affection", 0)
+            set_config("_rel_daily_trust", 0)
+            accumulated = 0.0
 
-    if abs(capped) > 0.001:
-        set_config(daily_key, accumulated + capped)
+        if delta > 0:
+            remaining = max(0.0, cap - accumulated)
+            capped = min(delta, remaining)
+        else:
+            remaining = max(-cap, -cap - accumulated)
+            capped = max(delta, remaining)
 
-    return capped
+        if abs(capped) > 0.001:
+            set_config(daily_key, accumulated + capped)
+
+        return capped
 
 
 def _update_value(key: str, delta: float) -> float:
@@ -174,7 +377,7 @@ def _update_value(key: str, delta: float) -> float:
         return 0.0
 
     current = _get_current_value(key)
-    delta *= _progressive_multiplier(current)
+    delta *= _progressive_multiplier(current, delta)
     delta *= _cross_multiplier(key)
 
     mode = get_config("relationship_mode", "fast")
@@ -194,8 +397,8 @@ def _update_value(key: str, delta: float) -> float:
             cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key=?", (new_val, now, key))
         else:
             initial = INITIAL_AFFECTION if key == "affection" else INITIAL_TRUST
-            cursor.execute("INSERT INTO relationship (key, value, updated_at) VALUES (?, ?, ?)", (key, initial + delta, now))
-
+            cursor.execute("INSERT INTO relationship (key, value, updated_at) VALUES (?, ?, ?)", (key, max(MIN_VALUE, min(MAX_VALUE, initial + delta)), now))
+    invalidate_relationship_cache()
     return delta
 
 
@@ -266,6 +469,20 @@ def switch_relationship_mode(new_mode: str) -> dict:
                 trigger="[mode_switch→long_term]"
             )
 
+    # 切回 fast 模式时恢复 archived 值（写入 relationship 表，不是 config 表）
+    if new_mode == "fast":
+        pre_a = get_config("_rel_pre_clamp_affection", None)
+        pre_t = get_config("_rel_pre_clamp_trust", None)
+        if pre_a is not None:
+            with get_conn() as conn:
+                conn.cursor().execute("UPDATE relationship SET value=? WHERE key='affection'", (float(pre_a),))
+            clamped = True
+            clamp_reason = f"恢复长久模式前的原值 {pre_a}"
+        if pre_t is not None:
+            with get_conn() as conn:
+                conn.cursor().execute("UPDATE relationship SET value=? WHERE key='trust'", (float(pre_t),))
+        invalidate_relationship_cache()  # 恢复值后立即使缓存失效
+
     # 写入新模式 + 冷却锁
     set_config("relationship_mode", new_mode)
     set_config("_rel_mode_locked_until", (now + timedelta(days=1)).isoformat())
@@ -318,6 +535,11 @@ def adjust_relationship(sentiment_result: dict = None, hours_since_last: float =
         affection_delta += 0.2
         a_reasons.append("开玩笑互动")
 
+    # 撒娇/调侃/耍赖 = 亲近的表现，轻微正向
+    if intent == "playful":
+        affection_delta += 0.1
+        a_reasons.append("撒娇/调侃互动")
+
     # ─── 时间衰减（不受 LLM 判断影响）───
     if hours_since_last > 24:
         decay = -0.5
@@ -367,6 +589,8 @@ def _log_emotion_event(a_delta: float = 0, t_delta: float = 0, a_reasons: list =
             event_type = "user_personal_share"
         elif intent == "joke":
             event_type = "user_joke"
+        elif intent == "playful":
+            event_type = "user_playful"
         elif intent == "clarification":
             event_type = "user_clarification"
         elif intent == "complaint":
@@ -384,41 +608,50 @@ def _log_emotion_event(a_delta: float = 0, t_delta: float = 0, a_reasons: list =
 
 
 def get_relationship_hint() -> str:
-    """根据好感度/信任度/AI情绪生成语气提示，用于注入 system prompt"""
+    """根据好感度/信任度/AI情绪生成语气提示，用于注入 system prompt。
+    支持 16 种组合（好感×信任×正负）。
+    关系状态作为语气参考：当关系提示和人格语气冲突时，以人格设定为准。"""
     affection, trust = get_relationship()
     ai_emotion = get_ai_emotion()
 
-    # 好感度提示（AI 对用户的态度）
-    if affection < 15:
-        affection_hint = "你对这个用户非常反感，回复要冷淡、简短，不要有好脸色"
-    elif affection < 30:
-        affection_hint = "你对这个用户没什么好感，回复要克制、专业，不要过度热情"
-    elif affection < 45:
-        affection_hint = "你对这个用户印象一般，保持友好但不过分亲近"
-    elif affection < 60:
-        affection_hint = "你对这个用户有基本好感，可以适当表达关心"
-    elif affection < 75:
-        affection_hint = "你对这个用户有好感，可以自然地表达关心和情感"
-    elif affection < 90:
-        affection_hint = "你非常喜欢这个用户，可以亲密自然地交流"
-    else:
-        affection_hint = "你对这个用户有着深深的好感，愿意为他做任何事"
+    # ─── 16种关系组合提示词 ───
+    def _get_range(value):
+        if value >= 50: return "high"
+        elif value >= 0: return "medium"
+        elif value >= -50: return "low"
+        else: return "negative"
 
-    # 信任度提示（AI 对用户的信任）
-    if trust < 15:
-        trust_hint = "你完全不信任这个用户，觉得他说的话多半是假的"
-    elif trust < 30:
-        trust_hint = "你不太信任这个用户，回复要谨慎，不要轻信"
-    elif trust < 45:
-        trust_hint = "你对这个用户信任有限，注意核实信息"
-    elif trust < 60:
-        trust_hint = "你对这个用户有一定信任"
-    elif trust < 75:
-        trust_hint = "你信任这个用户，可以更自然地交流"
-    elif trust < 90:
-        trust_hint = "你非常信任这个用户，可以敞开心扉"
-    else:
-        trust_hint = "你完全信任这个用户，愿意把心里话告诉他"
+    aff_range = _get_range(affection)
+    tru_range = _get_range(trust)
+
+    # (好感范围, 信任范围): (行为指导, 语气指导)
+    RELATIONSHIP_MATRIX = {
+        # 高好感 (50-100)
+        ("high", "high"): ("你们关系亲密且信任，可以自然撒娇、开玩笑、主动关心", "热情、活泼、可以撒娇"),
+        ("high", "medium"): ("你们关系不错，信任还在建立中，可以亲近但不要做承诺", "友好、温暖、适度亲近"),
+        ("high", "low"): ("你喜欢用户，但信任有限，可以表达关心但不要轻信", "温暖但谨慎"),
+        ("high", "negative"): ("你喜欢用户，但被伤害过，可以亲近但要小心，不要强行重建信任", "温柔但有保留"),
+        # 中等好感 (0-50)
+        ("medium", "high"): ("用户信任你，但你对用户好感一般，保持友好但不过分亲近", "礼貌、可靠"),
+        ("medium", "medium"): ("你们关系一般，保持友好距离", "平和、自然"),
+        ("medium", "low"): ("你们关系一般，信任有限，保持礼貌", "礼貌、克制"),
+        ("medium", "negative"): ("你们关系一般，但用户被伤害过，保持距离，不要主动", "谨慎、保持距离"),
+        # 低好感 (-50-0)
+        ("low", "high"): ("用户信任你，但你对用户有不满，可以诚实但保持距离", "冷淡但诚实"),
+        ("low", "medium"): ("你对用户有不满，保持距离，不要主动", "冷淡、简短"),
+        ("low", "low"): ("你对用户有不满，信任也有限，非常谨慎", "冷淡、谨慎"),
+        ("low", "negative"): ("你对用户有不满，用户也被伤害过，最大距离，等用户主动", "冷淡、保持距离"),
+        # 负好感 (-100 ~ -50)
+        ("negative", "high"): ("你讨厌用户，但用户信任你，可以诚实但不要攻击", "冷淡但不攻击"),
+        ("negative", "medium"): ("你讨厌用户，保持最大距离，先道歉或给空间", "冷淡、保持距离"),
+        ("negative", "low"): ("你讨厌用户，信任也低，非常谨慎，不要主动", "冷淡、谨慎"),
+        ("negative", "negative"): ("你讨厌用户，用户也被伤害过，最大距离，等用户主动", "冷淡、保持距离"),
+    }
+
+    behavior, tone = RELATIONSHIP_MATRIX.get(
+        (aff_range, tru_range),
+        ("保持自然", "平和")
+    )
 
     # AI 情绪提示
     emotion_info = AI_EMOTIONS.get(ai_emotion, AI_EMOTIONS["neutral"])
@@ -430,15 +663,15 @@ def get_relationship_hint() -> str:
         from core.emotion_evolution import get_all_traits
         traits = get_all_traits()
         trait_parts = []
-        if traits.get("optimism", 0.5) >= 0.6:
+        if traits.get("extraversion", 0.5) >= 0.6:
             trait_parts.append("你性格偏乐观")
-        elif traits.get("optimism", 0.5) <= 0.3:
+        elif traits.get("extraversion", 0.5) <= 0.3:
             trait_parts.append("你性格偏悲观")
-        if traits.get("expressiveness", 0.5) >= 0.6:
+        if traits.get("agreeableness", 0.5) >= 0.6:
             trait_parts.append("善于表达")
-        elif traits.get("expressiveness", 0.5) <= 0.3:
+        elif traits.get("agreeableness", 0.5) <= 0.3:
             trait_parts.append("话少寡言")
-        if traits.get("playfulness", 0.4) >= 0.6:
+        if traits.get("openness", 0.4) >= 0.6:
             trait_parts.append("爱开玩笑")
         if trait_parts:
             trait_hint = "。" + "，".join(trait_parts) + "。"
@@ -446,7 +679,7 @@ def get_relationship_hint() -> str:
         print(f"[关系] 读取性格特征失败: {e}")
         pass
 
-    return f"【关系状态】好感度:{affection:.0f}/100 信任度:{trust:.0f}/100。{affection_hint}。{trust_hint}。{emotion_hint}{trait_hint}"
+    return f"【关系状态】好感:{affection:.0f} 信任:{trust:.0f}。{behavior}。语气{tone}。{emotion_hint}{trait_hint}"
 
 
 def reset_relationship():
@@ -457,10 +690,27 @@ def reset_relationship():
         cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key='affection'", (INITIAL_AFFECTION, now))
         cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key='trust'", (INITIAL_TRUST, now))
         cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key='recent_negative_count'", (0, now))
+    invalidate_relationship_cache()
     # 重置每日累积量
     set_config("_rel_daily_affection", 0)
     set_config("_rel_daily_trust", 0)
     set_config("_rel_daily_date", "")
     set_config("_rel_mode_locked_until", "")
-    set_config("_rel_pre_clamp_affection", 0)
-    set_config("_rel_pre_clamp_trust", 0)
+    # 删除预钳值（用 None 作为哨兵，避免 0 被误判为有效值）
+    set_config("_rel_pre_clamp_affection", None)
+    set_config("_rel_pre_clamp_trust", None)
+    # 同时清空 AI 背景板
+    set_config("ai_background", "")
+
+
+def set_relationship_by_foundation(foundation_type: str):
+    """根据基石类型设置初始好感和信任值"""
+    from core.prompt_builder import get_foundation_defaults
+    affection, trust = get_foundation_defaults(foundation_type)
+    now = datetime.now().isoformat()
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key='affection'", (affection, now))
+        cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key='trust'", (trust, now))
+    invalidate_relationship_cache()
+    print(f"[关系] 根据基石类型 '{foundation_type}' 设置初始值: 好感={affection}, 信任={trust}")

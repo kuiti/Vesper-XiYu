@@ -108,7 +108,7 @@ export default {
   },
   methods: {
     async fetchRelationship() { try { const res = await api.get('/relationship/'); this.affection = res.data.affection; this.trust = res.data.trust } catch (e) {} },
-    safeLinkify(t) { return t?.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/(https?:\/\/[^\s<&]+)/g,'<a href="$1" target="_blank">$1</a>') || '' },
+    safeLinkify(t) { if (!t) return ''; const parts=[]; const urlRe=/(https?:\/\/[^\s<>]+)/gi; let last=0; let m; while((m=urlRe.exec(t))!==null){ if(m.index>last) parts.push(t.slice(last,m.index).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')); parts.push('<a href=\"'+m[1].replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'\" target=\"_blank\">'+m[1].replace(/&/g,'&amp;')+'</a>'); last=urlRe.lastIndex } if(last<t.length) parts.push(t.slice(last).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')); return parts.join('') },
     fmtTime(ts) { if (!ts) return ''; const d = new Date(ts); if (isNaN(d.getTime())) return ''; const now = new Date(this._now); const diffMs = now - d; const diffMin = Math.floor(diffMs / 60000); if (diffMin < 1) return '刚刚'; if (diffMin < 60) return diffMin + '分钟前'; if (d.toDateString() === now.toDateString()) { const h = String(d.getHours()).padStart(2,'0'); const m = String(d.getMinutes()).padStart(2,'0'); return h + ':' + m }; const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1); if (d.toDateString() === yesterday.toDateString()) { const h = String(d.getHours()).padStart(2,'0'); const m = String(d.getMinutes()).padStart(2,'0'); return '昨天 ' + h + ':' + m }; const h = String(d.getHours()).padStart(2,'0'); const m = String(d.getMinutes()).padStart(2,'0'); return (d.getMonth()+1) + '/' + d.getDate() + ' ' + h + ':' + m },
     dateSep(msg, idx) {
       if (!msg.timestamp) return ''
@@ -186,12 +186,7 @@ export default {
       this.ttsPlaying = false
       this.ttsMsgId = null
     },
-    // 自动播放（流式结束后调用）
-    autoPlayTTS(msg) {
-      if (!this.voiceSettings?.tts_enabled || !this.voiceSettings?.auto_play) return
-      if (!msg?.content || msg.role !== 'assistant') return
-      setTimeout(() => this.speakText(msg), 300)
-    },
+    // autoPlayTTS 已移除重复定义，使用上文行165的队列版本
     isWeatherContent(c) { return typeof c === 'string' && c.startsWith('__WEATHER_CARD__') },
     parseWeatherContent(c) { try { return JSON.parse(c.replace('__WEATHER_CARD__', '')) } catch (e) { return null } },
     copyText(t) { navigator.clipboard.writeText(t).catch(() => {}) },
@@ -280,10 +275,10 @@ export default {
 .msg-time { font-size: 10px; color: var(--tc2); }
 .msg.user .msg-footer { justify-content: flex-end; }
 .feedback-btns { display: flex; gap: 6px; }
-.fb-btn { background: none; border: none; cursor: pointer; color: var(--tc2); opacity: 0.25; transition: all .15s; padding: 2px; display: flex; align-items: center; }
-.fb-btn:hover { opacity: 0.8; color: var(--p); }
-.tts-btn { background: none; border: none; cursor: pointer; color: var(--tc2); opacity: 0.25; transition: all .15s; padding: 2px; display: flex; align-items: center; }
-.tts-btn:hover { opacity: 0.8; color: var(--p); }
+.fb-btn { background: none; border: none; cursor: pointer; color: var(--tc2); opacity: 0.5; transition: all .15s; padding: 2px; display: flex; align-items: center; }
+.fb-btn:hover { opacity: 1; color: var(--p); }
+.tts-btn { background: none; border: none; cursor: pointer; color: var(--tc2); opacity: 0.5; transition: all .15s; padding: 2px; display: flex; align-items: center; }
+.tts-btn:hover { opacity: 1; color: var(--p); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; }
 .fb-done { display: flex; align-items: center; }

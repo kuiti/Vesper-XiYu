@@ -20,8 +20,8 @@
       <div v-if="profile.length" class="vault-section">
         <h4>关于你 ({{ profile.length }})</h4>
         <div v-for="item in profile.slice(0, showAll.profile ? 999 : 5)" :key="item.key" class="vault-item">
-          <span class="vault-key">{{ item.key }}</span>
-          <span class="vault-val">{{ item.value }}</span>
+          <span class="vault-key">{{ item.label || profileLabel(item.key) }}</span>
+          <span class="vault-val">{{ profileValue(item.value) }}</span>
           <button class="vault-del" @click="removeItem('profile', item.key)" title="删除">✕</button>
         </div>
         <button v-if="profile.length > 5" class="vault-more" @click="showAll.profile = !showAll.profile">
@@ -115,7 +115,7 @@
 import api from '../api.js'
 
 export default {
-  props: { aiName: { type: String, default: '佐仓' } },
+  props: { aiName: { type: String, default: '夕语' } },
   data() {
     return {
       profile: [],
@@ -159,6 +159,27 @@ export default {
     catLabel(cat) {
       const map = { bio: '基本', pref: '偏好', exp: '经历', social: '社交', work: '工作', psy: '心理', event: '事件', memory: '记忆', general: '其他' }
       return map[cat] || cat
+    },
+    profileLabel(key) {
+      const map = {
+        name: '名字', user_name: '称呼', city: '城市', gender: '性别', age: '年龄',
+        occupation: '职业', hobby: '爱好', personality: '性格', language: '语言',
+        user_student: '身份', user_habit_stay_up: '习惯', user_habit: '习惯',
+      }
+      if (map[key]) return map[key]
+      // 去掉常见前缀
+      return key.replace(/^user_/, '').replace(/_/g, ' ')
+    },
+    profileValue(val) {
+      if (!val) return ''
+      // 尝试解析 JSON
+      try {
+        const obj = JSON.parse(val)
+        if (typeof obj === 'object' && obj !== null) {
+          return obj.text || obj.value || obj.name || obj.summary || JSON.stringify(obj)
+        }
+      } catch (e) {}
+      return val
     },
     entityTypeLabel(type) {
       const map = { PERSON: '人', PLACE: '地', ORG: '机构', THING: '物', PET: '宠物' }

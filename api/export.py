@@ -21,15 +21,16 @@ async def export_chat(format: str = "json") -> Dict[str, Any]:
         lines.append(f"导出时间：{__import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n---\n")
         for msg in messages:
             role_label = f"**{user_name}**" if msg['role'] == 'user' else f"**{ai_name}**"
-            ts = msg.get('timestamp', '')[:19]
-            lines.append(f"> {role_label} _{ts}_\n\n{msg['content']}\n\n---\n")
+            ts = (msg.get('timestamp') or '')[:19]
+            lines.append(f"> {role_label} _{ts}_\n\n{msg.get('content', '')}\n\n---\n")
         content = "\n".join(lines)
         filename = "chat_history.md"
         content_type = "text/markdown"
     else:
         lines = []
         for msg in messages:
-            lines.append(f"[{msg['timestamp']}] {msg['role']}: {msg['content']}\n")
+            ts = msg.get('timestamp') or ''
+            lines.append(f"[{ts}] {msg['role']}: {msg.get('content', '')}\n")
         content = "".join(lines)
         filename = "chat_history.txt"
         content_type = "text/plain"

@@ -22,7 +22,7 @@
 import api from '../api.js'
 
 export default {
-  props: { aiName: { type: String, default: '佐仓' } },
+  props: { aiName: { type: String, default: '夕语' } },
   data() { return { diaries: [], generating: false, showAll: false, pageSize: 5 } },
   computed: { visibleDiaries() { return this.showAll ? this.diaries : this.diaries.slice(0, this.pageSize) } },
   mounted() { this.load() },

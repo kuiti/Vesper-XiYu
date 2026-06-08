@@ -61,10 +61,19 @@ async def upload_backup(passphrase: str = ""):
         backend = get_backend(cfg.get("backend_type", "webdav"), cfg)
 
         data = json.dumps(_collect_export_data(), ensure_ascii=False)
-        pp = passphrase or cfg.get("passphrase", "")
-        if pp:
+
+        # 优先使用已存储的密钥，否则从 passphrase 派生
+        stored_salt = cfg.get("passphrase_salt", "")
+        stored_key = cfg.get("passphrase_key", "")
+        if stored_salt and stored_key:
+            from core.crypto import encrypt_data
+            salt = bytes.fromhex(stored_salt)
+            key = bytes.fromhex(stored_key)
+            encrypted = encrypt_data(data, key)
+            payload = salt + encrypted.encode()
+        elif passphrase:
             from core.crypto import encrypt_data, derive_key
-            key, salt = derive_key(pp)
+            key, salt = derive_key(passphrase)
             encrypted = encrypt_data(data, key)
             payload = salt + encrypted.encode()
         else:
@@ -94,11 +103,19 @@ async def download_backup(filename: str = "", passphrase: str = ""):
             filename = "vesper_backup_latest.enc"
 
         raw = await asyncio.to_thread(backend.download, filename)
-        pp = passphrase or cfg.get("passphrase", "")
-        if pp:
+
+        # 优先使用已存储的密钥，否则从 passphrase 派生
+        stored_salt = cfg.get("passphrase_salt", "")
+        stored_key = cfg.get("passphrase_key", "")
+        if stored_salt and stored_key:
+            from core.crypto import decrypt_data
+            salt, encrypted = raw[:16], raw[16:]
+            key = bytes.fromhex(stored_key)
+            data = decrypt_data(encrypted.decode(), key)
+        elif passphrase:
             from core.crypto import decrypt_data, derive_key
             salt, encrypted = raw[:16], raw[16:]
-            key, _ = derive_key(pp, salt)
+            key, _ = derive_key(passphrase, salt)
             data = decrypt_data(encrypted.decode(), key)
         else:
             data = raw.decode()

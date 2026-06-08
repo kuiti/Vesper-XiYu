@@ -1,225 +1,257 @@
-"""TTS API — text-to-speech via genie_tts (GPT-SoVITS ONNX)."""
+"""TTS API — 多引擎语音合成。"""
 import os
 import re
 import time
-import uuid
-import wave
-import shutil
 import asyncio
 import tempfile
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from core.tts_adapters import (
+    TTS_ENGINES, ENGINE_LABELS, BaseTTS, TTSResult,
+    EdgeTTS, XiaomiTTS,
+    _strip_markdown,
+)
 from core.voice_emotion import get_voice_preset
-
-AUDIO_TTL = 600  # 10 minutes before cleanup
+from core.db import get_config, set_config
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tts", tags=["tts"])
 
-SCRIPT_DIR = Path(__file__).parent.parent
-DATA_DIR = SCRIPT_DIR / "data" / "voice"
-GENIE_DATA_DIR = DATA_DIR / "GenieData"
-GENIE_TTS_DIR = DATA_DIR / "Genie-TTS"
+AUDIO_TTL = 600
+import asyncio as _asyncio
+_lock = _asyncio.Lock()
 
-os.environ.setdefault("GENIE_DATA_DIR", str(GENIE_DATA_DIR))
-os.environ.setdefault("PYTHONIOENCODING", "utf-8")
-
-_genie = None
-_loaded = False
-_current_preset = {}
-_lock = None
+# 当前引擎实例（懒加载）
+_engine: BaseTTS = None
+_engine_name: str = ""
 
 
-def _strip_markdown(text: str) -> str:
-    # Remove parenthetical actions/emotions first
-    text = re.sub(r'[（(][^）)]*[）)]', '', text)
-    text = re.sub(r'【[^】]*】', '', text)
-    text = re.sub(r'「[^」]*」', '', text)
-    # Remove markdown formatting
-    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
-    text = re.sub(r'\*(.+?)\*', r'\1', text)
-    text = re.sub(r'__(.+?)__', r'\1', text)
-    text = re.sub(r'_(.+?)_', r'\1', text)
-    text = re.sub(r'`{1,3}[^`]*`{1,3}', '', text)
-    text = re.sub(r'~~(.+?)~~', r'\1', text)
-    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
-    text = re.sub(r'^[-*+]\s+', '', text, flags=re.MULTILINE)
-    text = re.sub(r'^>\s+', '', text, flags=re.MULTILINE)
-    return text.strip()
+def _get_engine_name() -> str:
+    """从配置获取当前 TTS 引擎名。"""
+    try:
+        voice_cfg = get_config("voice", {})
+        return voice_cfg.get("tts_engine", "off")
+    except Exception:
+        return os.environ.get("TTS_BACKEND", "off")
 
 
-def _get_genie():
-    global _genie
-    if _genie is None:
-        import genie_tts as g
-        _genie = g
-    return _genie
+def _get_engine_config() -> dict:
+    """获取当前引擎配置。"""
+    try:
+        voice_cfg = get_config("voice", {})
+        return {
+            "api_key": voice_cfg.get("tts_api_key", ""),
+            "voice": voice_cfg.get("tts_voice", ""),
+            "server_url": voice_cfg.get("tts_server_url", "http://127.0.0.1:9880"),
+            "api_url": voice_cfg.get("tts_api_url", ""),
+            "clone_audio_path": get_config("tts_clone_audio", ""),
+        }
+    except Exception:
+        return {}
 
+
+def _get_engine() -> BaseTTS:
+    """获取当前 TTS 引擎（懒加载，配置变更时自动切换）。"""
+    global _engine, _engine_name
+    name = _get_engine_name()
+    if name != _engine_name or _engine is None:
+        config = _get_engine_config()
+        _engine = _create_engine(name, config)
+        _engine_name = name
+    return _engine
+
+
+def _create_engine(name: str, config: dict) -> BaseTTS:
+    """创建引擎实例。"""
+    if name == "off" or name not in TTS_ENGINES:
+        return None
+    cls = TTS_ENGINES[name]
+    # 过滤掉不属于该引擎的参数
+    import inspect
+    sig = inspect.signature(cls.__init__)
+    valid_params = set(sig.parameters.keys()) - {'self'}
+    filtered = {k: v for k, v in config.items() if k in valid_params and v is not None}
+    try:
+        return cls(**filtered)
+    except Exception as e:
+        logger.error(f"Create engine {name} failed: {e}")
+        return None
+
+
+# ===== Pydantic 模型 =====
 
 class TTSRequest(BaseModel):
     text: str
-    character: str = "YUKI"
+    # 通用参数
+    voice: str = ""
+    speed: float = 1.0
     affection: int = 0
     trust: int = 50
+    # 模式：preset=预设音色, clone=声音克隆, auto=自动（默认）
+    mode: str = "auto"
 
 
 class TTSResponse(BaseModel):
     success: bool
     audio_url: str = ""
+    audio_path: str = ""
+    duration: float = 0.0
+    inference_time: float = 0.0
+    engine: str = ""
     error: str = ""
+
+
+class EngineInfo(BaseModel):
+    name: str
+    label: str
+    available: bool
+
+
+# ===== API 端点 =====
+
+@router.get("/engines")
+async def list_engines():
+    """列出所有可用 TTS 引擎。"""
+    engines = []
+    for name, label in ENGINE_LABELS.items():
+        engines.append(EngineInfo(
+            name=name,
+            label=label,
+            available=name in TTS_ENGINES and name != "off",
+        ))
+    current = _get_engine_name()
+    return {"engines": engines, "current": current}
+
+
+@router.get("/health")
+async def health():
+    """检查当前 TTS 引擎状态。"""
+    engine = _get_engine()
+    if engine is None:
+        return {"status": "off", "engine": "off", "message": "TTS 已关闭"}
+    return await engine.health()
+
+
+@router.post("/tts", response_model=TTSResponse)
+async def generate_tts(request: TTSRequest):
+    """生成语音。"""
+
+    engine = _get_engine()
+    if engine is None:
+        return TTSResponse(success=False, error="TTS 未启用，请在设置中选择 TTS 引擎")
+
+    async with _lock:
+        kwargs = {}
+
+        # 自动模式：根据好感度/信任度选择音色
+        if request.mode == "auto" or (not request.voice and request.mode != "clone"):
+            from core.relationship import get_relationship
+            aff, tr = get_relationship() if (request.affection == 0 and request.trust == 50) else (request.affection, request.trust)
+            preset = get_voice_preset(aff, tr)
+            # 好感度映射到 EdgeTTS 不同音色
+            VOICE_MAP = {
+                "verylow": "zh-CN-YunxiNeural",     # 冷淡 → 男声/冷静
+                "low":     "zh-CN-XiaoxiaoNeural",   # 普通 → 默认
+                "high":    "zh-CN-XiaoyiNeural",     # 温柔 → 暖声
+            }
+            if engine.name == "edge":
+                kwargs["voice"] = VOICE_MAP.get(preset, request.voice or "zh-CN-XiaoxiaoNeural")
+            elif engine.name == "xiaomi":
+                kwargs["voice"] = request.voice or "default"
+
+        # Edge TTS 专用参数
+        if engine.name == "edge":
+            if request.voice:
+                kwargs["voice"] = request.voice
+        # 小米 TTS 专用参数
+        elif engine.name == "xiaomi":
+            if request.voice:
+                kwargs["voice"] = request.voice
+            kwargs["speed"] = request.speed
+            kwargs["mode"] = request.mode
+
+        result: TTSResult = await engine.synthesize(request.text, **kwargs)
+
+        # 清理旧文件
+        _cleanup_old_audio()
+
+        return TTSResponse(
+            success=result.success,
+            audio_url=result.audio_url,
+            audio_path=result.audio_path,
+            duration=result.duration,
+            inference_time=result.inference_time,
+            engine=engine.name,
+            error=result.error,
+        )
+
+
+@router.get("/audio/{filename}")
+async def get_audio(filename: str):
+    """返回音频文件。"""
+    safe = Path(filename).name
+    if not safe or safe != filename or safe.startswith("."):
+        raise HTTPException(400, "Invalid filename")
+
+    # 在多个目录搜索
+    for d in [tempfile.gettempdir()]:
+        audio_path = Path(d) / safe
+        if audio_path.exists():
+            # 根据扩展名设置 MIME
+            ext = audio_path.suffix.lower()
+            mime_map = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg"}
+            mime = mime_map.get(ext, "audio/wav")
+            return FileResponse(str(audio_path), media_type=mime)
+
+    raise HTTPException(404, "Audio file not found")
+
+
+@router.post("/upload-voice")
+async def upload_voice_clone(file: UploadFile = File(...)):
+    """上传声音克隆参考音频（小米 TTS voiceclone 专用）。"""
+    if not file.filename:
+        raise HTTPException(400, "No file")
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in (".wav", ".mp3"):
+        raise HTTPException(400, "仅支持 wav 和 mp3 格式")
+
+    # 保存到固定位置
+    save_dir = Path(__file__).parent.parent / "data" / "voice_clone"
+    save_dir.mkdir(parents=True, exist_ok=True)
+    save_path = save_dir / f"clone_ref{ext}"
+
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(400, "文件过大（最大 10MB）")
+
+    with open(save_path, "wb") as f:
+        f.write(content)
+
+    # 单独存储克隆音频路径（不嵌套在 voice 下，避免被 saveVoice 覆盖）
+    set_config("tts_clone_audio", str(save_path))
+
+    # 清除引擎缓存，使其重新加载
+    global _engine, _engine_name
+    _engine = None
+    _engine_name = ""
+
+    return {"status": "ok", "path": str(save_path), "size": len(content)}
 
 
 def _cleanup_old_audio():
     tmpdir = Path(tempfile.gettempdir())
     now = time.time()
     try:
-        for f in tmpdir.glob("sakura_tts_*.wav"):
-            if now - f.stat().st_mtime > AUDIO_TTL:
-                f.unlink(missing_ok=True)
+        for prefix in ["edge_tts_", "xiaomi_tts_"]:
+            for f in tmpdir.glob(f"{prefix}*"):
+                if f.suffix in (".wav", ".mp3", ".ogg"):
+                    if now - f.stat().st_mtime > AUDIO_TTL:
+                        f.unlink(missing_ok=True)
     except Exception:
         pass
-
-
-@router.get("/health")
-async def health():
-    _cleanup_old_audio()
-    try:
-        genie = _get_genie()
-        return {"status": "ok", "genie_tts": True,
-                "genie_data": GENIE_DATA_DIR.exists()}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-@router.post("/warmup")
-async def warmup():
-    global _loaded
-    if _loaded:
-        return {"success": True, "character": "YUKI", "status": "already loaded"}
-    try:
-        genie = _get_genie()
-        model_dir = GENIE_TTS_DIR / "models" / "yuki"
-        ref_audio = GENIE_TTS_DIR / "reference" / "yuki_high.wav"
-
-        if not model_dir.exists():
-            raise HTTPException(500, f"Model dir not found: {model_dir}")
-
-        genie.load_character(
-            character_name="YUKI",
-            onnx_model_dir=str(model_dir),
-            language="Chinese",
-        )
-        if ref_audio.exists():
-            genie.set_reference_audio(
-                character_name="YUKI",
-                audio_path=str(ref_audio),
-                audio_text="娜塔莎姐姐说，克拉拉也是医生呢",
-            )
-        _loaded = True
-        return {"success": True, "character": "YUKI"}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def _tts_chunk(genie, character: str, text: str, path: str):
-    genie.tts(character_name=character, text=text, play=False, save_path=path)
-
-
-def _concat_wavs(wav_paths: list, output_path: str):
-    if len(wav_paths) == 1:
-        shutil.copy(wav_paths[0], output_path)
-        return
-    with wave.open(wav_paths[0], 'rb') as ref:
-        params = ref.getparams()
-    with wave.open(str(output_path), 'wb') as out:
-        out.setparams(params)
-        for wp in wav_paths:
-            with wave.open(wp, 'rb') as w:
-                out.writeframes(w.readframes(w.getnframes()))
-
-
-MAX_CHUNK_CHARS = 50
-
-
-@router.post("/tts", response_model=TTSResponse)
-async def generate_tts(request: TTSRequest):
-    global _lock
-    if _lock is None:
-        _lock = asyncio.Lock()
-    async with _lock:
-        try:
-            genie = _get_genie()
-            if not _loaded:
-                result = await warmup()
-                if not result.get("success"):
-                    return TTSResponse(success=False, error=result.get("error", "TTS warmup failed"))
-
-            clean_text = _strip_markdown(request.text)
-            if not clean_text:
-                return TTSResponse(success=False, error="Empty text after markdown stripping")
-
-            preset = get_voice_preset(request.affection, request.trust)
-            _apply_preset(genie, preset)
-
-            character = request.character.upper()
-            chunks = [s.strip() for s in re.split(r'(?<=[。！？!?，,])', clean_text) if s.strip()]
-            if not chunks:
-                chunks = [clean_text]
-
-            def _gen():
-                tmpdir = Path(tempfile.gettempdir())
-                chunk_paths = []
-                for i, chunk in enumerate(chunks):
-                    cp = tmpdir / f"sakura_tts_{uuid.uuid4().hex}.wav"
-                    _tts_chunk(genie, character, chunk, str(cp))
-                    chunk_paths.append(str(cp))
-                output_path = tmpdir / f"sakura_tts_{uuid.uuid4().hex}.wav"
-                _concat_wavs(chunk_paths, str(output_path))
-                return chunk_paths, output_path
-
-            chunk_paths, output_path = await asyncio.to_thread(_gen)
-
-            # Cleanup chunks
-            for cp in chunk_paths:
-                Path(cp).unlink(missing_ok=True)
-
-            return TTSResponse(success=True, audio_url=f"/tts/audio/{output_path.name}")
-        except Exception as e:
-            logger.error(f"TTS error: {e}")
-            return TTSResponse(success=False, error=str(e))
-
-
-@router.get("/audio/{filename}")
-async def get_audio(filename: str):
-    # Prevent path traversal: only allow safe filename chars
-    safe = Path(filename).name
-    if not safe or safe != filename or safe.startswith("."):
-        raise HTTPException(400, "Invalid filename")
-    audio_path = Path(tempfile.gettempdir()) / safe
-    if not audio_path.exists():
-        raise HTTPException(404, "Audio file not found")
-    return FileResponse(str(audio_path), media_type="audio/wav")
-
-
-def _apply_preset(genie, preset: str):
-    global _current_preset
-    if _current_preset.get("YUKI") == preset:
-        return
-    ref_dir = GENIE_TTS_DIR / "reference"
-    ref_map = {
-        "verylow": ("yuki_high.wav", "娜塔莎姐姐说，克拉拉也是医生呢"),
-        "low": ("yuki_high.wav", "娜塔莎姐姐说，克拉拉也是医生呢"),
-        "high": ("yuki_high.wav", "娜塔莎姐姐说，克拉拉也是医生呢"),
-    }
-    info = ref_map.get(preset)
-    if not info:
-        return
-    audio_path = ref_dir / info[0]
-    if audio_path.exists():
-        genie.set_reference_audio("YUKI", audio_path=str(audio_path), audio_text=info[1])
-        _current_preset["YUKI"] = preset

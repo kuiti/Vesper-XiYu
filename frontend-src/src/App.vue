@@ -42,6 +42,8 @@
 
         <MemoryView v-if="activeView==='memory'" :aiName="aiNameLocal" />
 
+        <CharactersView v-if="activeView==='characters'" />
+
         <SettingsView v-if="activeView==='settings'"
           :settings="allSettings" :themeLocal="themeLocal" :ipCity="ipCity"
           :relationship="relationship" :emotionTrend="emotionTrend"
@@ -81,22 +83,23 @@ import OnboardingWizard from './components/OnboardingWizard.vue'
 import AchievementToast from './components/AchievementToast.vue'
 import HistoryView from './components/HistoryView.vue'
 import DiaryView from './components/DiaryView.vue'
+import CharactersView from './components/CharactersView.vue'
 import FloatingCalendar from './components/FloatingCalendar.vue'
 
 export default {
-  components: { NavBar, ChatView, ToolsView, StatsView, GamesView, MemoryView, SettingsView, LockScreen, OnboardingWizard, AchievementToast, HistoryView, DiaryView, FloatingCalendar, LoginView },
+  components: { NavBar, ChatView, ToolsView, StatsView, GamesView, MemoryView, SettingsView, LockScreen, OnboardingWizard, AchievementToast, HistoryView, DiaryView, CharactersView, FloatingCalendar, LoginView },
   provide() { return { showConfirm: this.showConfirm } },
   data() {
     return {
-      activeView: 'chat', currentTheme: 'dark', themeLocal: 'dark',
+      activeView: 'chat', currentTheme: 'vesper', themeLocal: 'vesper',
       ws: null, wsReady: false, wsReconnectAttempts: 0, _reconnectTimer: null, _reconnectMsg: null,
       messages: [], totalMessages: 0, conversationDays: 0, reminderCount: 0,
       isStreaming: false, pendingReply: '', schedId: null, _currentReplyLen: 0, _sendingCooldown: false,
       nextAfterId: null, loadingMore: false,
       showEmojiPicker: false,
       allSettings: {},
-      aiNameLocal: '佐仓', userNameLocal: '', toneLocal: '冷静',
-      assistantAvatarUrl: '', userAvatarUrl: '',
+      aiNameLocal: '夕语', userNameLocal: '', toneLocal: '冷静',
+      assistantAvatarUrl: '/icons/ai-avatar.jpg', userAvatarUrl: '/icons/user-avatar.jpg',
       relationship: {}, emotionTrend: [], ipCity: '', ipCityShort: '',
       showContextMenu: false, ctxMenuX: 0, ctxMenuY: 0, ctxTargetMsg: null,
       showOnboarding: false, showLockScreen: false, needLogin: false,
@@ -122,10 +125,10 @@ export default {
   },
   async mounted() {
     // 云端模式：检查是否需要登录
-    const cfg = window.__SAKURA_CONFIG__ || {}
+    const cfg = window.__VESPER_CONFIG__ || {}
     const isCloudMode = !!cfg.backendHost
     if (isCloudMode) {
-      const savedToken = localStorage.getItem('sakura_api_token')
+      const savedToken = localStorage.getItem('vesper_api_token')
       if (!savedToken) {
         this.needLogin = true
         return
@@ -152,8 +155,9 @@ export default {
     this.connectWebSocket()
     this.loadRelationship()
     this.loadEmotionTrend()
-    // 定位：先读后端记录，3分钟后首次自动检测，之后每5分钟
-    this._locationTimer = setTimeout(() => { if (this._unmounted) return; this.loadIpLocation(); this._locationTimer = setInterval(() => { if (!this._unmounted && document.visibilityState === 'visible') this.loadIpLocation() }, 300000) }, 180000)
+    // 定位：立即获取IP定位，之后每5分钟更新
+    this.loadIpLocation()
+    this._locationTimer = setInterval(() => { if (!this._unmounted && document.visibilityState === 'visible') this.loadIpLocation() }, 300000)
     if (Notification.permission === 'default') Notification.requestPermission()
     this._mediaDark = window.matchMedia('(prefers-color-scheme: dark)')
     this._mediaDark.addEventListener('change', this._onSystemThemeChange)
@@ -212,7 +216,7 @@ export default {
         this.allSettings = s
         this.themeLocal = s.theme || 'dark'; this.currentTheme = this._resolveTheme(this.themeLocal)
         document.documentElement.setAttribute('data-theme', this.currentTheme)
-        this.aiNameLocal = s.ai_name || '佐仓'; this.userNameLocal = s.user_name || ''
+        this.aiNameLocal = s.ai_name || '夕语'; this.userNameLocal = s.user_name || ''
         if (s.precise_city) { this.ipCity = s.precise_city; const parts = s.precise_city.split('·'); this.ipCityShort = parts[parts.length - 1] || s.precise_city }
         if (s.chat_bg_image) this.chatBgImage = s.chat_bg_image
         if (s.bg_opacity !== undefined) this.bgOpacity = Number(s.bg_opacity)
@@ -306,12 +310,12 @@ export default {
     async checkOnboarding() { try { const res = await api.get('/settings/onboarding-status'); if (res.data?.needs_onboarding) this.showOnboarding = true } catch (e) {} },
     onOnboardingCompleted() { this.showOnboarding = false; this.loadAllSettings(); this.connectWebSocket() },
     async loadAvatars() { try { const res = await api.get('/avatar/assistant'); if (res.data?.url) this.assistantAvatarUrl = res.data.url } catch (e) {}; try { const res = await api.get('/avatar/user'); if (res.data?.url) this.userAvatarUrl = res.data.url } catch (e) {} },
-    async loadIpLocation() { try { const res = await api.get('/location/ip'); if (res.data?.city && !this.allSettings.precise_city) { this.ipCity = res.data.city; this.ipCityShort = res.data.city } } catch (e) {} },
+    async loadIpLocation() { try { const res = await api.get('/location/ip'); if (res.data?.city) { if (!this.allSettings.precise_city) { this.ipCity = res.data.city; this.ipCityShort = res.data.city } api.post('/settings/', { key: 'manual_city', value: res.data.city }).catch(() => {}) } } catch (e) {} },
     sendSystemMessage(msg) {
       if (!this.wsReady || this.isStreaming) return
       this._systemStreaming = true; this.isStreaming = true; this.pendingReply = ''; this._currentReplyLen = 0
       this.ws.send(JSON.stringify({ message: msg, history: this.messages.filter(m => !m._sentenceFrag && !m._gameEvent && !m._isGreeting && !m.isProactive).slice(-3).map(m => ({ role: m.role, content: m.content })), _system: true }))
-      this._streamTimeout = setTimeout(() => { if (this.isStreaming) { this.isStreaming = false; this.stopTypewriter() } }, 15000)
+      this._streamTimeout = setTimeout(() => { if (this.isStreaming) { this.isStreaming = false; this._systemStreaming = false; this.stopTypewriter() } }, 15000)
     },
     onAiHelp(evt) {
       if (!evt) return

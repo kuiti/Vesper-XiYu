@@ -18,7 +18,7 @@
 import api from '../api.js'
 export default {
   emits: ['ai-event', 'help'],
-  props: { aiName: { type: String, default: '佐仓' } },
+  props: { aiName: { type: String, default: '夕语' } },
   data() {
     return { grid: [], score: 0, best: 0, over: false, _reached2048: false, _helped: false }
   },

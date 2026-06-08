@@ -4,22 +4,22 @@ import axios from 'axios'
 const CONFIG_VERSION = 'v2';
 
 function _getConfig() {
-  const cfg = window.__SAKURA_CONFIG__ || {}
+  const cfg = window.__VESPER_CONFIG__ || {}
   // 版本变化或地址不匹配时，清除旧 localStorage
-  const savedVer = localStorage.getItem('sakura_config_ver')
-  const savedHost = localStorage.getItem('sakura_server_host')
+  const savedVer = localStorage.getItem('vesper_config_ver')
+  const savedHost = localStorage.getItem('vesper_server_host')
   if (savedVer !== CONFIG_VERSION || (savedHost && cfg.backendHost && savedHost !== cfg.backendHost)) {
-    localStorage.removeItem('sakura_server_host')
-    localStorage.removeItem('sakura_server_port')
-    localStorage.removeItem('sakura_server_protocol')
-    localStorage.removeItem('sakura_api_token')
-    localStorage.setItem('sakura_config_ver', CONFIG_VERSION)
+    localStorage.removeItem('vesper_server_host')
+    localStorage.removeItem('vesper_server_port')
+    localStorage.removeItem('vesper_server_protocol')
+    localStorage.removeItem('vesper_api_token')
+    localStorage.setItem('vesper_config_ver', CONFIG_VERSION)
   }
   return {
-    host: localStorage.getItem('sakura_server_host') || cfg.backendHost || '127.0.0.1',
-    port: localStorage.getItem('sakura_server_port') || cfg.backendPort || 8001,
-    protocol: localStorage.getItem('sakura_server_protocol') || cfg.backendProtocol || 'http',
-    token: localStorage.getItem('sakura_api_token') || cfg.apiToken || '',
+    host: localStorage.getItem('vesper_server_host') || cfg.backendHost || '127.0.0.1',
+    port: localStorage.getItem('vesper_server_port') || cfg.backendPort || 8001,
+    protocol: localStorage.getItem('vesper_server_protocol') || cfg.backendProtocol || 'http',
+    token: localStorage.getItem('vesper_api_token') || cfg.apiToken || '',
   }
 }
 

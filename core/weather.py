@@ -55,7 +55,7 @@ def get_openmeteo_weather(lat: float, lng: float) -> dict:
         data = resp.json()
         if data.get("error"):
             print(f"[天气] API 错误: {data.get('reason', '未知')}")
-            return {}
+            return {"error": data.get("reason", "未知API错误")}
         current = data.get("current", {})
         daily_data = data.get("daily", {})
         return {
@@ -91,17 +91,110 @@ def get_openmeteo_weather(lat: float, lng: float) -> dict:
         return {"error": str(e)}
 
 
-def wind_direction_name(deg: float) -> str:
+def get_wttr_weather(city: str) -> dict:
+    """通过 wttr.in 获取天气（免费，无需 API Key）"""
+    try:
+        url = f"https://wttr.in/{requests.utils.quote(city)}?format=j1"
+        resp = requests.get(url, timeout=10, headers={"User-Agent": "curl/7.0"})
+        resp.raise_for_status()
+        data = resp.json()
+        curr = (data.get("current_condition") or [{}])[0]
+        daily_list = data.get("weather", [])
+        return {
+            "temp": safe_float(curr.get("temp_C")),
+            "humidity": safe_float(curr.get("humidity")),
+            "feels_like": safe_float(curr.get("FeelsLikeC")),
+            "wind_speed": safe_float(curr.get("windspeedKmph")),
+            "wind_direction": curr.get("winddir16Point", ""),
+            "weather": (curr.get("weatherDesc") or [{}])[0].get("value", "未知"),
+            "pressure": safe_float(curr.get("pressure")),
+            "cloud_cover": safe_float(curr.get("cloudcover")),
+            "precipitation": safe_float(curr.get("precipMM")),
+            "visibility": safe_float(curr.get("visibility")),
+            "daily": [
+                {
+                    "date": d.get("date", ""),
+                    "weather": d["hourly"][4].get("weatherDesc", [{}])[0].get("value", "未知") if d.get("hourly") and len(d["hourly"]) > 4 else "未知",
+                    "temp_max": safe_float(d.get("maxtempC")),
+                    "temp_min": safe_float(d.get("mintempC")),
+                    "precipitation_sum": sum(
+                        safe_float(h.get("precipMM", 0))
+                        for h in (d.get("hourly") or [])
+                    ),
+                }
+                for d in daily_list[:3]
+            ] if daily_list else []
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def wind_direction_name(deg) -> str:
     if deg is None:
         return ""
-    dirs = ["北", "东北", "东", "东南", "南", "西南", "西", "西北"]
-    return dirs[int(deg / 45 + 0.5) % 8]
+    if isinstance(deg, str):
+        return deg  # 高德直接返回中文风向
+    try:
+        dirs = ["北", "东北", "东", "东南", "南", "西南", "西", "西北"]
+        return dirs[int(float(deg) / 45 + 0.5) % 8]
+    except (ValueError, TypeError):
+        return str(deg)
 
 
 def get_weather_for_city(city: str = None) -> dict:
-    """统一天气获取入口：城市 -> 坐标 -> 天气数据"""
+    """统一天气获取入口：高德 → wttr.in → Open-Meteo"""
     if not city:
-        city = get_config("precise_city") or "北京"
+        city = get_config("precise_city") or get_config("manual_city") or "北京"
+
+    # 1. 高德优先（数据最准，需要 Key）
+    try:
+        from api.intent import get_weather_forecast, get_current_weather
+        amap_key = get_config("amap_key", "")
+        if amap_key:
+            forecast = get_weather_forecast(city)
+            live = get_current_weather(city)
+            if "error" not in forecast:
+                casts = forecast.get("casts", [])
+                today = casts[0] if casts else None
+                result = {
+                    "city": city, "temp": None, "humidity": None,
+                    "feels_like": None, "wind_speed": None, "wind_direction": None,
+                    "weather": today["dayweather"] if today else "未知",
+                    "precipitation": 0, "daily": [],
+                }
+                if live:
+                    result["temp"] = safe_float(live.get("temperature"))
+                    result["humidity"] = safe_float(live.get("humidity"))
+                    result["wind_speed"] = safe_float(live.get("windpower"))
+                    result["wind_direction"] = live.get("winddirection", "")
+                for c in casts:
+                    result["daily"].append({
+                        "date": c.get("date", ""),
+                        "weather": c.get("dayweather", "未知"),
+                        "temp_max": safe_float(c.get("daytemp")),
+                        "temp_min": safe_float(c.get("nighttemp")),
+                        "precipitation_sum": 5.0 if any(kw in (c.get("dayweather", "") + c.get("nightweather", "")) for kw in ["雨", "雪", "阵雨", "雷"]) else 0,
+                    })
+                return result
+            if live:
+                return {
+                    "city": city, "temp": safe_float(live.get("temperature")),
+                    "humidity": safe_float(live.get("humidity")),
+                    "feels_like": None, "wind_speed": safe_float(live.get("windpower")),
+                    "wind_direction": live.get("winddirection", ""),
+                    "weather": live.get("weather", "未知"),
+                    "precipitation": 0, "daily": [],
+                }
+    except Exception as e:
+        print(f"[天气] 高德异常: {e}")
+
+    # 2. wttr.in（免费无 Key，比 Open-Meteo 稳定）
+    w = get_wttr_weather(city)
+    if "error" not in w:
+        w["city"] = city
+        return w
+
+    # 3. Open-Meteo 最后兜底
     coords = get_city_coords(city)
     if not coords:
         return {"error": f"无法获取 {city} 的坐标"}
@@ -110,6 +203,16 @@ def get_weather_for_city(city: str = None) -> dict:
         return weather
     weather["city"] = coords.get("name", city)
     return weather
+
+
+def safe_float(v):
+    """安全转 float，None 或异常返回 None"""
+    if v is None:
+        return None
+    try:
+        return float(v)
+    except (ValueError, TypeError):
+        return None
 
 
 def get_weather_suggestion(weather: dict, hour: int) -> str:
@@ -138,7 +241,8 @@ def get_weather_suggestion(weather: dict, hour: int) -> str:
             tmr = daily[1]
             if (tmr.get("precipitation_sum", 0) or 0) > 0:
                 suggestions.append("明天有雨，出门提前准备")
-            if tmr.get("temp_min") is not None and tmr["temp_min"] < 10:
+            tmin = tmr.get("temp_min")
+            if tmin is not None and tmin < 10:
                 suggestions.append("明天降温，注意添衣")
     return "。".join(suggestions) + "。" if suggestions else ""
 

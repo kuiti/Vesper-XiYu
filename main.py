@@ -1,5 +1,12 @@
-# version: 5.0.0
+# version: 1.0.0
 """夕语后端 —— 延迟加载版本，所有路由在 lifespan startup 中加载"""
+import sys
+import io
+# Windows 控制台 UTF-8 输出，避免 GBK 编码错误
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -46,6 +53,7 @@ _ALL_ROUTERS = [
     ("api.favorites", "router"),
     ("api.stats", "router"),
     ("api.report", "router"),
+    ("api.characters", "router"),
 ]
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
@@ -61,29 +69,47 @@ API_PREFIXES = ("settings", "chat", "todos", "notes", "countdowns", "reminders",
 
 @asynccontextmanager
 async def lifespan(app):
-    # 启动天气定时推送调度器
-    from api.chat import weather_scheduler
-    weather_task = asyncio.create_task(weather_scheduler())
-    print("[启动] 天气调度器已启动")
+    # 启动 APScheduler 调度器
+    from core.scheduler import start_scheduler, setup_default_jobs, shutdown_scheduler
+    start_scheduler()
+    setup_default_jobs()
+    print("[启动] APScheduler 调度器已启动")
 
     yield
 
-    weather_task.cancel()
-    try:
-        await weather_task
-    except asyncio.CancelledError:
-        pass
+    shutdown_scheduler()
+    print("[启动] APScheduler 调度器已关闭")
 
 
 app = FastAPI(title="夕语后端 API", version="1.0.0", lifespan=lifespan)
 
+# ─── 信任代理头（Nginx 反向代理）───
+try:
+    from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+    _trusted = os.environ.get("VESPER_TRUSTED_HOSTS", "127.0.0.1,localhost")
+    app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=_trusted)
+except ImportError:
+    pass
+
+# ─── CORS（云端模式限制 origins）───
+_cors_origins = os.environ.get("VESPER_CORS_ORIGINS", "").split(",")
+if _cors_origins == [""]:
+    _cors_origins = ["http://127.0.0.1:8060", "http://127.0.0.1:8061", "http://127.0.0.1:8062",
+                     "http://127.0.0.1:8063", "http://127.0.0.1:8064", "http://localhost:5173"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ─── 认证中间件（仅云端模式启用）───
+if os.environ.get("VESPER_API_TOKEN"):
+    from core.auth import AuthMiddleware, router as auth_router
+    app.add_middleware(AuthMiddleware)
+    app.include_router(auth_router)
+    print("[启动] 云端模式：已启用 Token 认证")
 
 os.makedirs("data/avatars", exist_ok=True)
 app.mount("/avatars", StaticFiles(directory="data/avatars"), name="avatars")
@@ -114,7 +140,9 @@ def root():
 
 @app.post("/api/window-theme")
 def set_window_theme(data: dict):
-    dark = data.get("dark", True)
+    dark = bool(data.get("dark", True))
+    if not isinstance(data.get("dark", None), (bool, type(None))):
+        return {"status": "error", "message": "dark 参数必须是布尔值"}
     try:
         import ctypes
         from ctypes import wintypes
@@ -164,6 +192,10 @@ if HAS_FRONTEND:
 
 @app.websocket("/ws/chat")
 async def websocket_endpoint(websocket: WebSocket):
+    from core.auth import verify_ws_token
+    if not await verify_ws_token(websocket):
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
     from api.chat import chat_websocket
     await chat_websocket(websocket)
 
@@ -171,15 +203,20 @@ async def websocket_endpoint(websocket: WebSocket):
 # 生产环境由 launcher.py 启动，以下仅用于开发时直接运行 main.py
 if __name__ == "__main__":
     import uvicorn, socket
-    def _dev_find_free_port(start=8001, end=8010):
-        for port in range(start, end + 1):
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                if s.connect_ex(("127.0.0.1", port)) != 0:
-                    return port
-        return start
-    port = _dev_find_free_port()
+    host = os.environ.get("VESPER_HOST", "127.0.0.1")
+    port = int(os.environ.get("VESPER_PORT", "0"))
+
+    if not port:
+        def _dev_find_free_port(start=8001, end=8010):
+            for p in range(start, end + 1):
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    if s.connect_ex(("127.0.0.1", p)) != 0:
+                        return p
+            return start
+        port = _dev_find_free_port()
+
     os.makedirs("data", exist_ok=True)
     with open("data/port.txt", "w") as f:
         f.write(str(port))
-    print(f"[开发] 后端端口: {port}")
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    print(f"[启动] 后端地址: {host}:{port}")
+    uvicorn.run(app, host=host, port=port)

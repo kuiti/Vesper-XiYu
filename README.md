@@ -195,9 +195,6 @@ A: Windows 10/11 自带 WebView2。如缺失可从[微软官网](https://develop
 **Q: API 连接失败？**
 A: 检查 API Key 是否正确，网络是否正常。在设置面板可点击「测试连接」。
 
-**Q: AI 回复很慢？**
-A: DeepSeek 免费版有速率限制。改用付费 API 或切换 API 提供商。
-
 **Q: 聊天记录在哪里？**
 A: `data/chat_history.db`（SQLite 格式），可用任何 SQLite 工具查看。
 

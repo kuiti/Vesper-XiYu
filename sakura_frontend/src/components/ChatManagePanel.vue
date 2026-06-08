@@ -52,7 +52,6 @@
 
 <script>
 import api from '../api.js'
-import { showConfirm, alert as showAlert } from '../utils/dialog.js'
 
 export default {
   data() {
@@ -98,7 +97,7 @@ export default {
     _fmt(y, m, d) { return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}` },
     async quickDelete(type) {
       const labels = { '30min': '半小时', '60min': '一小时', today: '今天', yesterday: '昨天', '3days': '最近3天', '7days': '最近7天', '14days': '最近14天', '30days': '最近30天', '60days': '最近60天', '90days': '最近90天', '180days': '最近半年', '365days': '最近一年' }
-      if (!await showConfirm({ content: `确定删除${labels[type]}的记录吗？此操作同时清除AI记忆。` })) return
+      if (!confirm(`确定删除${labels[type]}的记录吗？此操作同时清除AI记忆。`)) return
       try {
         if (type === '30min') { await api.delete('/chat/manage/recent/30') }
         else if (type === '60min') { await api.delete('/chat/manage/recent/60') }
@@ -106,21 +105,21 @@ export default {
         else if (type === 'yesterday') { const d = new Date(Date.now() - 86400000); const y = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; await api.delete('/chat/manage/range', { data: { start: y + 'T00:00:00', end: y + 'T23:59:59' } }) }
         else { const days = parseInt(type.replace('days','')); await api.delete(`/chat/manage/older-than/${days}`) }
         this.$emit('changed')
-      } catch (err) { console.error(err); showAlert('删除失败') }
+      } catch (err) { console.error(err); alert('删除失败') }
     },
     async deleteAll() {
-      if (!await showConfirm({ content: '确定清除全部聊天记录和AI记忆？此操作不可恢复！' })) return
-      try { await api.delete('/chat/manage/all'); this.$emit('changed') } catch (err) { console.error(err); showAlert('清除失败') }
+      if (!confirm('确定清除全部聊天记录和AI记忆？此操作不可恢复！')) return
+      try { await api.delete('/chat/manage/all'); this.$emit('changed') } catch (err) { console.error(err); alert('清除失败') }
     },
     async deleteRange() {
       if (!this.dateValid) return
       const start = this._fmt(this.startYear, this.startMonth, this.startDay)
       const end = this._fmt(this.endYear, this.endMonth, this.endDay)
-      if (!await showConfirm({ content: `确定删除 ${start} 至 ${end} 的聊天记录和AI记忆吗？` })) return
-      try { await api.delete('/chat/manage/range', { data: { start, end } }); this.$emit('changed'); showAlert('已删除') } catch (err) { console.error(err); showAlert('删除失败') }
+      if (!confirm(`确定删除 ${start} 至 ${end} 的聊天记录和AI记忆吗？`)) return
+      try { await api.delete('/chat/manage/range', { data: { start, end } }); this.$emit('changed'); alert('已删除') } catch (err) { console.error(err); alert('删除失败') }
     },
     async loadCleanupSettings() { try { const res = await api.get('/chat/manage/cleanup-settings'); const d = res.data.auto_cleanup_days; this.cleanupDays = (typeof d === 'number' && d >= 7 && d <= 365) ? d : 30 } catch (err) {} },
-    async saveCleanupSettings() { try { await api.post('/chat/manage/cleanup-settings', { days: this.cleanupDays }); showAlert('自动清理设置已保存') } catch (err) { console.error(err) } }
+    async saveCleanupSettings() { try { await api.post('/chat/manage/cleanup-settings', { days: this.cleanupDays }); alert('自动清理设置已保存') } catch (err) { console.error(err) } }
   }
 }
 </script>

@@ -264,7 +264,6 @@
 import api from '../api.js'
 import ChatManagePanel from './ChatManagePanel.vue'
 import MigratePanel from './MigratePanel.vue'
-import { showConfirm, alert as showAlert } from '../utils/dialog.js'
 
 const PROVIDER_MAP = {
   deepseek: { url: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
@@ -564,7 +563,7 @@ export default {
     togglePin() { this.saveCfg('pin_enabled', this.pinEnabled); if (!this.pinEnabled) { this.pinCode = ''; this.saveCfg('pin_code', '') } },
     savePin() { if (this.pinCode.length === 4) this.saveCfg('pin_code', this.pinCode) },
     async savePreset() { if (!this.presetName.trim()) return; try { await api.post('/settings/presets', { name: this.presetName, data: { tone: this.tone, length: this.length, recall: this.recall, allow_emotion: this.allowEmotion, custom_system_prompt: this.customPrompt } }); await this.loadPresets() } catch (e) {} },
-    async deletePreset(name) { if (!await showConfirm({ content: `删除预设「${name}」？` })) return; try { await api.delete(`/settings/presets/${encodeURIComponent(name)}`); await this.loadPresets() } catch (e) {} },
+    async deletePreset(name) { if (!confirm(`删除预设「${name}」？`)) return; try { await api.delete(`/settings/presets/${encodeURIComponent(name)}`); await this.loadPresets() } catch (e) {} },
     async loadPreset(name, d) { if (!d) return; this.tone = d.tone || '冷静'; this.length = d.length || '短'; this.recall = d.recall || '从不'; this.allowEmotion = d.allow_emotion !== false; this.customPrompt = d.custom_system_prompt || ''; this.saveCfg('personality_tone', this.tone); this.saveCfg('length_level', this.length); this.saveCfg('recall_past', this.recall); this.saveCfg('allow_emotion', this.allowEmotion); this.saveCfg('custom_system_prompt', this.customPrompt) },
     async delFav(id) { try { await api.delete(`/favorites/${id}`); await this.loadFavorites() } catch (e) {} },
     // ── 定位 ──
@@ -581,18 +580,18 @@ export default {
     async checkRagStatus() { try { const r = await api.get('/rag/status'); this.ragStatus = r.data.model_loaded ? 'ready' : (r.data.installed ? 'installed' : 'missing'); this.ragCount = r.data.total_vectors || r.data.vector_count || 0 } catch (e) {} },
     async installRag() { this.installingRag = true; this.ragMsg = '正在安装向量引擎...'; this.ragMsgOk = false; try { const r = await api.post('/rag/install'); if (r.data.ok) { this.ragMsg = r.data.msg; this.ragMsgOk = true; this.checkRagStatus() } else { this.ragMsg = r.data.error; this.ragMsgOk = false } } catch (e) { this.ragMsg = '安装失败'; this.ragMsgOk = false } this.installingRag = false },
     async rebuildRag() { this.rebuildingRag = true; this.ragMsg = '正在重建索引...'; this.ragMsgOk = false; try { await api.post('/rag/rebuild'); this.ragMsg = '重建任务已提交，稍后刷新查看进度'; this.ragMsgOk = true; setTimeout(() => this.checkRagStatus(), 5000) } catch (e) { this.ragMsg = '重建失败'; this.ragMsgOk = false } this.rebuildingRag = false },
-    async resetRelationship() { if (!await showConfirm({ content: '确定要重置好感度、信任度和AI情绪为初始值吗？' })) return; try { await api.post('/relationship/reset'); showAlert('已重置') } catch (e) { showAlert('重置失败') } },
-    async resetMemory() { if (!await showConfirm({ content: '确定要重置摘要记忆吗？此操作不可撤销。' })) return; try { await api.post('/summary/reset'); showAlert('已重置') } catch (e) { showAlert('重置失败') } },
+    async resetRelationship() { if (!confirm('确定要重置好感度、信任度和AI情绪为初始值吗？')) return; try { await api.post('/relationship/reset'); alert('已重置') } catch (e) { alert('重置失败') } },
+    async resetMemory() { if (!confirm('确定要重置摘要记忆吗？此操作不可撤销。')) return; try { await api.post('/summary/reset'); alert('已重置') } catch (e) { alert('重置失败') } },
     async fullReset() {
-      if (!await showConfirm({ content: '确定要完全重置吗？\n\n将清除：\n- 所有聊天记录\n- 所有提醒、日程、待办\n- 所有记忆和摘要\n- 人设和性格设置\n\nAPI 设置会保留。\n\n此操作不可撤销！' })) return
+      if (!confirm('确定要完全重置吗？\n\n将清除：\n- 所有聊天记录\n- 所有提醒、日程、待办\n- 所有记忆和摘要\n- 人设和性格设置\n\nAPI 设置会保留。\n\n此操作不可撤销！')) return
       try {
         await api.post('/settings/full-reset')
         localStorage.removeItem('sakura_api_token')
         location.reload()
-      } catch (e) { showAlert('重置失败: ' + (e.message || '未知错误')) }
+      } catch (e) { alert('重置失败: ' + (e.message || '未知错误')) }
     },
-    async uploadAvatar(role, e) { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('file', f); try { await api.post(`/avatar/upload/${role}`, fd); this.$emit('config-changed', 'avatar_updated'); e.target.value = '' } catch (err) { showAlert('上传失败') } },
-    async uploadAvatarByUrl(role) { const url = role === 'assistant' ? this.aiAvatarUrlLocal : this.userAvatarUrlLocal; if (!url) return; try { await api.post(`/avatar/upload-url/${role}`, { url }); this.$emit('config-changed', 'avatar_updated'); if (role === 'assistant') this.aiAvatarUrlLocal = ''; else this.userAvatarUrlLocal = '' } catch (err) { showAlert('导入失败') } },
+    async uploadAvatar(role, e) { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('file', f); try { await api.post(`/avatar/upload/${role}`, fd); this.$emit('config-changed', 'avatar_updated'); e.target.value = '' } catch (err) { alert('上传失败') } },
+    async uploadAvatarByUrl(role) { const url = role === 'assistant' ? this.aiAvatarUrlLocal : this.userAvatarUrlLocal; if (!url) return; try { await api.post(`/avatar/upload-url/${role}`, { url }); this.$emit('config-changed', 'avatar_updated'); if (role === 'assistant') this.aiAvatarUrlLocal = ''; else this.userAvatarUrlLocal = '' } catch (err) { alert('导入失败') } },
   }
 }
 </script>

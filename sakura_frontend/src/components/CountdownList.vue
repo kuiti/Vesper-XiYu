@@ -22,10 +22,9 @@
 
 <script>
 import api from '../api.js'
-import { showConfirm, alert as showAlert } from '../utils/dialog.js'
 
 export default {
-  inject: { showConfirm: { default: () => async (msg) => await showConfirm({ content: msg }) } },
+  inject: { showConfirm: { default: () => (msg) => window.confirm(msg) } },
   data() {
     const now = new Date()
     return {

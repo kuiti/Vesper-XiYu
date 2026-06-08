@@ -1,32 +1,32 @@
-// layouts/DefaultLayout.vue — 三栏布局骨架
-// 左导航 + 内容区（右面板保留扩展）
 <template>
   <n-layout position="absolute" style="height:100vh">
     <n-layout has-sider style="height:100vh">
-      <!-- 左边栏：导航 -->
+      <!-- 左导航 -->
       <n-layout-sider
-        :width="56"
-        :collapsed-width="56"
-        show-trigger="bar"
-        collapse-mode="width"
-        :collapsed="true"
-        :native-scrollbar="false"
-        bordered
-        style="background:var(--sb,#161927);display:flex;flex-direction:column;align-items:center;padding-top:12px;border-right:1px solid var(--border,#252d3a)"
+        :width="64" :collapsed-width="64" :collapsed="true"
+        :native-scrollbar="false" bordered
+        :style="{ background: 'var(--bg-deepest)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '6px 0', borderRight: '1px solid var(--border)' }"
       >
-        <n-menu
-          :value="activeKey"
-          :collapsed="true"
-          :collapsed-width="56"
-          :indent="0"
-          @update:value="onNav"
-          :options="navItems"
-          style="flex:1"
-        />
+        <div v-for="item in navItems" :key="item.key"
+          :class="['nav-item', { active: route.name === item.key || (route.name === 'history' && item.key === 'history') }]"
+          @click="go(item.key)"
+          :style="{ display:'flex', flexDirection:'column', alignItems:'center', gap:'2px', padding:'9px 4px', width:'100%', cursor:'pointer', color: route.name === item.key || (route.name === 'history' && item.key === 'history') ? '#fff' : 'var(--text-muted)', transition:'all .12s', position:'relative', border:'none', background:'none', fontFamily:'inherit' }"
+        >
+          <span :style="{ fontSize:'24px', lineHeight:'1' }"><n-icon :component="item.icon" /></span>
+          <span :style="{ fontSize:'10px', lineHeight:'1', marginTop:'3px' }">{{ item.label }}</span>
+        </div>
+        <div style="flex:1"></div>
+        <div :class="['nav-item', { active: route.name === 'settings' }]"
+          @click="router.push({name:'settings'})"
+          :style="{ display:'flex', flexDirection:'column', alignItems:'center', gap:'2px', padding:'7px 4px', width:'100%', cursor:'pointer', color: route.name === 'settings' ? '#fff' : 'var(--text-dim)', transition:'all .12s', border:'none', background:'none', fontFamily:'inherit', fontSize:'20px' }"
+        >
+          <n-icon :component="Settings" />
+          <span :style="{ fontSize:'10px', marginTop:'3px' }">设置</span>
+        </div>
       </n-layout-sider>
 
-      <!-- 主内容区 -->
-      <n-layout-content :native-scrollbar="false" style="background:var(--cb,#0f1119)">
+      <!-- 内容区 -->
+      <n-layout-content :native-scrollbar="false" style="background:var(--bg-elevated)">
         <router-view />
       </n-layout-content>
     </n-layout>
@@ -34,32 +34,42 @@
 </template>
 
 <script setup>
-import { computed, h } from 'vue'
+import { h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { NLayout, NLayoutSider, NLayoutContent, NMenu, NIcon } from 'naive-ui'
-import { ChatboxEllipses, Apps, Book, StatsChart, GameController, Settings, TimeOutline } from '@vicons/ionicons5'
+import { NLayout, NLayoutSider, NLayoutContent, NIcon } from 'naive-ui'
+import {
+  Chat20Regular, Book20Regular, Toolbox20Regular,
+  ChartMultiple20Regular, Brain20Regular, Games20Regular,
+  Settings20Regular, ArrowDown20Regular
+} from '@vicons/fluent'
 
 const route = useRoute()
 const router = useRouter()
 
-const activeKey = computed(() => route.name || 'chat')
-
 const navItems = [
-  { key: 'chat', icon: () => h(NIcon, null, { default: () => h(ChatboxEllipses) }), label: '聊天' },
-  { key: 'tools', icon: () => h(NIcon, null, { default: () => h(Apps) }), label: '工具' },
-  { key: 'memory', icon: () => h(NIcon, null, { default: () => h(Book) }), label: '记忆' },
-  { key: 'diary', icon: () => h(NIcon, null, { default: () => h(TimeOutline) }), label: '日记' },
-  { key: 'stats', icon: () => h(NIcon, null, { default: () => h(StatsChart) }), label: '统计' },
-  { key: 'games', icon: () => h(NIcon, null, { default: () => h(GameController) }), label: '游戏' },
-  { key: 'settings', icon: () => h(NIcon, null, { default: () => h(Settings) }), label: '设置' },
+  { key: 'chat', icon: Chat20Regular, label: '聊天' },
+  { key: 'diary', icon: Book20Regular, label: '日记' },
+  { key: 'tools', icon: Toolbox20Regular, label: '工具' },
+  { key: 'stats', icon: ChartMultiple20Regular, label: '统计' },
+  { key: 'memory', icon: Brain20Regular, label: '记忆' },
+  { key: 'games', icon: Games20Regular, label: '游戏' },
 ]
 
-function onNav(key) {
+function go(key) {
+  if (key === 'scroll') {
+    window.dispatchEvent(new CustomEvent('scroll-chat'))
+    return
+  }
   router.push({ name: key })
 }
 </script>
 
 <style scoped>
-:deep(.n-layout-sider) { border-right: 1px solid var(--border, #252d3a); }
-:deep(.n-menu-item) { justify-content: center; }
+.nav-item:hover { color: var(--text) !important; background: var(--bg-elevated); border-radius: 6px; }
+.nav-item.active::before {
+  content: ''; position: absolute; left: 0; top: 50%;
+  transform: translateY(-50%); width: 3px; height: 22px;
+  border-radius: 0 3px 3px 0; background: #fff;
+}
+:deep(.n-layout-sider) { border-right: 1px solid var(--border); }
 </style>

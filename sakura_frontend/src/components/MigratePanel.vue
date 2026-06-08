@@ -78,7 +78,7 @@ export default {
     async doImport(e) {
       const file = e.target.files[0]
       if (!file) return
-      if (!await showConfirm({ content: `确定要导入 "${file.name}" 吗？当前数据将被覆盖！`)) {
+      if (!await showConfirm({ content: `确定要导入 "${file.name}" 吗？当前数据将被覆盖！` })) {
         this.$refs.fileInput.value = ''
         return
       }

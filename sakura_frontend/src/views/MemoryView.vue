@@ -1,8 +1,24 @@
 <template>
-  <div class="view-page"><h2>🧠 记忆</h2><p class="hint">正在迁移中</p></div>
+  <div class="memory-page">
+    <MemoryPanel :aiName="settingsStore.aiName" />
+    <MemoryVault />
+  </div>
 </template>
+
+<script>
+import { onMounted } from 'vue'
+import { useSettingsStore } from '../stores/settings.js'
+import MemoryPanel from '../components/MemoryPanel.vue'
+import MemoryVault from '../components/MemoryVault.vue'
+
+export default {
+  components: { MemoryPanel, MemoryVault },
+  setup() {
+    const settingsStore = useSettingsStore()
+    return { settingsStore }
+  },
+}
+</script>
 <style scoped>
-.view-page { padding: 32px; }
-.view-page h2 { color: var(--tc, #e2e8f0); margin-bottom: 8px; }
-.hint { color: var(--tc2, #7b8ca0); font-size: 14px; }
+.memory-page { padding: 16px; overflow-y: auto; height: 100%; }
 </style>

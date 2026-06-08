@@ -1,8 +1,35 @@
 <template>
-  <div class="view-page"><h2>🔧 实用工具</h2><p class="hint">正在迁移中</p></div>
+  <div class="tools-page">
+    <KnowledgePanel :aiName="settingsStore.aiName" />
+    <RAGPanel />
+    <GoalPanel :aiName="settingsStore.aiName" />
+    <HabitTracker />
+    <NoteList />
+    <CountdownList />
+    <ReminderList />
+    <ChatManagePanel />
+  </div>
 </template>
+
+<script>
+import { useSettingsStore } from '../stores/settings.js'
+import KnowledgePanel from '../components/KnowledgePanel.vue'
+import RAGPanel from '../components/RAGPanel.vue'
+import GoalPanel from '../components/GoalPanel.vue'
+import HabitTracker from '../components/HabitTracker.vue'
+import NoteList from '../components/NoteList.vue'
+import CountdownList from '../components/CountdownList.vue'
+import ReminderList from '../components/ReminderList.vue'
+import ChatManagePanel from '../components/ChatManagePanel.vue'
+
+export default {
+  components: { KnowledgePanel, RAGPanel, GoalPanel, HabitTracker, NoteList, CountdownList, ReminderList, ChatManagePanel },
+  setup() {
+    const settingsStore = useSettingsStore()
+    return { settingsStore }
+  },
+}
+</script>
 <style scoped>
-.view-page { padding: 32px; }
-.view-page h2 { color: var(--tc, #e2e8f0); margin-bottom: 8px; }
-.hint { color: var(--tc2, #7b8ca0); font-size: 14px; }
+.tools-page { padding: 16px; overflow-y: auto; height: 100%; display: flex; flex-direction: column; gap: 16px; }
 </style>

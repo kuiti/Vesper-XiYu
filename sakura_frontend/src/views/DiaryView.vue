@@ -1,8 +1,16 @@
 <template>
-  <div class="view-page"><h2>📔 日记</h2><p class="hint">正在迁移中</p></div>
+  <DiaryPanel :aiName="settingsStore.aiName" />
 </template>
-<style scoped>
-.view-page { padding: 32px; }
-.view-page h2 { color: var(--tc, #e2e8f0); margin-bottom: 8px; }
-.hint { color: var(--tc2, #7b8ca0); font-size: 14px; }
-</style>
+
+<script>
+import { useSettingsStore } from '../stores/settings.js'
+import DiaryPanel from '../components/DiaryPanel.vue'
+
+export default {
+  components: { DiaryPanel },
+  setup() {
+    const settingsStore = useSettingsStore()
+    return { settingsStore }
+  },
+}
+</script>

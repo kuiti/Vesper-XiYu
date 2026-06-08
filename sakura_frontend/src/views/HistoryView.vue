@@ -1,8 +1,28 @@
 <template>
-  <div class="view-page"><h2>🕐 历史记录</h2><p class="hint">正在迁移中</p></div>
+  <HistoryView
+    :favoriteIds="chatStore.favoriteIds"
+    :aiName="settingsStore.aiName"
+    :userName="settingsStore.userName"
+    @close="router.push({name:'chat'})"
+    @toggle-favorite="chatStore.toggleFavorite"
+  />
 </template>
-<style scoped>
-.view-page { padding: 32px; }
-.view-page h2 { color: var(--tc, #e2e8f0); margin-bottom: 8px; }
-.hint { color: var(--tc2, #7b8ca0); font-size: 14px; }
-</style>
+
+<script>
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useChatStore } from '../stores/chat.js'
+import { useSettingsStore } from '../stores/settings.js'
+import HistoryView from '../components/HistoryView.vue'
+
+export default {
+  components: { HistoryView },
+  setup() {
+    const router = useRouter()
+    const chatStore = useChatStore()
+    const settingsStore = useSettingsStore()
+    onMounted(() => { chatStore.loadFavoriteIds() })
+    return { router, chatStore, settingsStore }
+  },
+}
+</script>

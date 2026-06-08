@@ -20,7 +20,7 @@
           @click="router.push({name:'settings'})"
           :style="{ display:'flex', flexDirection:'column', alignItems:'center', gap:'2px', padding:'7px 4px', width:'100%', cursor:'pointer', color: route.name === 'settings' ? '#fff' : 'var(--text-dim)', transition:'all .12s', border:'none', background:'none', fontFamily:'inherit', fontSize:'20px' }"
         >
-          <n-icon :component="Settings" />
+          <n-icon :component="Settings" :size="20" />
           <span :style="{ fontSize:'10px', marginTop:'3px' }">设置</span>
         </div>
       </n-layout-sider>
@@ -38,21 +38,20 @@ import { h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NLayout, NLayoutSider, NLayoutContent, NIcon } from 'naive-ui'
 import {
-  Chat20Regular, Book20Regular, Toolbox20Regular,
-  ChartMultiple20Regular, Brain20Regular, Games20Regular,
-  Settings20Regular, ArrowDown20Regular
-} from '@vicons/fluent'
+  ChatboxEllipses, Apps, Book, StatsChart, GameController,
+  Bulb, Settings
+} from '@vicons/ionicons5'
 
 const route = useRoute()
 const router = useRouter()
 
 const navItems = [
-  { key: 'chat', icon: Chat20Regular, label: '聊天' },
-  { key: 'diary', icon: Book20Regular, label: '日记' },
-  { key: 'tools', icon: Toolbox20Regular, label: '工具' },
-  { key: 'stats', icon: ChartMultiple20Regular, label: '统计' },
-  { key: 'memory', icon: Brain20Regular, label: '记忆' },
-  { key: 'games', icon: Games20Regular, label: '游戏' },
+  { key: 'chat', icon: ChatboxEllipses, label: '聊天' },
+  { key: 'diary', icon: Book, label: '日记' },
+  { key: 'tools', icon: Apps, label: '工具' },
+  { key: 'stats', icon: StatsChart, label: '统计' },
+  { key: 'memory', icon: Bulb, label: '记忆' },
+  { key: 'games', icon: GameController, label: '游戏' },
 ]
 
 function go(key) {

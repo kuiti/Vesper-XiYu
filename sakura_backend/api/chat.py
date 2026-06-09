@@ -31,6 +31,8 @@ from api.chat_tasks import (
     _calc_consecutive_days, _check_achievements,
     _maybe_surprise, _check_goal_completion, _parse_dsml_tool_calls,
 )
+from api.chat_parser import ThinkingParser  # 提取自本文件的解析类
+from api.chat_loops import diary_scheduler as _diary_scheduler_mod  # 提取自本文件的日记调度
 
 from datetime import datetime, timedelta
 

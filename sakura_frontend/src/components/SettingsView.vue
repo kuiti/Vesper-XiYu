@@ -20,80 +20,36 @@
         @provider-change="onProviderChange" @save-api="saveApi" @test-api="testApi" @fetch-models="fetchModels"
         @save-cfg="(k,v)=>saveCfg(k,v)" />
 
-      <!-- 角色人设 -->
-      <div v-if="activeCat==='role'" class="sc-pane">
-        <div class="card"><h3>基本信息</h3>
-          <div class="field"><label>AI 名字</label><input v-model="aiName" @change="saveCfg('ai_name', aiName)"></div>
-          <div class="field"><label>你的名字</label><input v-model="userName" @change="saveCfg('user_name', userName)"></div>
-        </div>
-        <div class="card"><h3>头像</h3>
-          <div class="avatar-section"><div class="avatar-preview"><img :src="assistantAvatarUrl" class="avatar-img"><span class="avatar-label">AI 头像</span></div><div class="avatar-actions"><button class="btn-s" @click="$refs.aiAvatarInput.click()">本地上传</button><input type="file" ref="aiAvatarInput" accept="image/*" style="display:none" @change="uploadAvatar('assistant', $event)"><input v-model="aiAvatarUrlLocal" placeholder="或输入URL" class="url-input"><button class="btn-s" @click="uploadAvatarByUrl('assistant')" :disabled="!aiAvatarUrlLocal">导入</button></div></div>
-          <div class="avatar-section"><div class="avatar-preview"><img :src="userAvatarUrl" class="avatar-img"><span class="avatar-label">用户头像</span></div><div class="avatar-actions"><button class="btn-s" @click="$refs.userAvatarInput.click()">本地上传</button><input type="file" ref="userAvatarInput" accept="image/*" style="display:none" @change="uploadAvatar('user', $event)"><input v-model="userAvatarUrlLocal" placeholder="或输入URL" class="url-input"><button class="btn-s" @click="uploadAvatarByUrl('user')" :disabled="!userAvatarUrlLocal">导入</button></div></div>
-        </div>
-        <div class="card"><h3>关系状态</h3>
-          <div class="rel-item"><span class="rel-label">好感度</span><div class="rel-bar"><div class="rel-fill affection" :style="{width: (relationship.affection || 30) + '%'}"></div></div><span class="rel-value">{{ relationship.affection || 30 }}</span></div>
-          <div class="rel-item"><span class="rel-label">信任度</span><div class="rel-bar"><div class="rel-fill trust" :style="{width: (relationship.trust || 30) + '%'}"></div></div><span class="rel-value">{{ relationship.trust || 30 }}</span></div>
-          <div class="rel-item"><span class="rel-label">AI 状态</span><span class="ai-emotion-tag">{{ relationship.ai_emotion_label || '平静' }}</span><span class="ai-emotion-desc">{{ relationship.ai_emotion_description || '正常状态' }}</span></div>
-        </div>
-        <div class="card"><h3>性格设置</h3>
-          <div class="field"><label>语气</label><select v-model="tone" @change="saveCfg('personality_tone', tone)"><option value="冷静">冷静</option><option value="活泼">活泼</option><option value="温柔">温柔</option><option value="毒舌">毒舌</option><option value="傲娇">傲娇</option><option value="自由">自由</option></select></div>
-          <div class="field"><label>回复长度</label><select v-model="length" @change="saveCfg('length_level', length)"><option value="极短">极短（一句话）</option><option value="短">短（两三句）</option><option value="中等">中等（一段话）</option><option value="长">长（详细展开）</option><option value="详细">非常详细</option><option value="自由发挥">自由发挥</option><option value="不限">不限</option></select></div>
-          <div class="field"><label>记忆回调</label><select v-model="recall" @change="saveCfg('recall_past', recall)"><option value="从不">从不</option><option value="被动">被动</option></select><p class="hint">控制 AI 是否在对话中主动提及过去的记忆。被动模式仅在相关话题出现时引用。</p></div>
-          <label class="switch"><input type="checkbox" v-model="allowEmotion" @change="saveCfg('allow_emotion', allowEmotion)"> 允许使用颜文字</label><p class="hint">开启后 AI 会在自然的时候用颜文字表达情绪，如（笑）（叹气）（歪头），而非 emoji 图标。</p>
-        </div>
-        <div class="card"><h3>自定义提示词</h3>
-          <textarea v-model="customPrompt" @change="saveCfg('custom_system_prompt', customPrompt)" rows="10" placeholder="留空则使用默认人设" style="min-height:200px;resize:vertical"></textarea>
-          <p class="hint">右下角小标按住可拖动调整高度</p>
-        </div>
-        <div class="card"><h3>设定背景板</h3><p class="hint">记录你为 AI 设定的背景信息，如外号、喜好、身份等。AI 会遵循这些设定。重置关系时清空。</p>
-          <textarea v-model="aiBackground" @change="saveCfg('ai_background', aiBackground)" rows="5" placeholder="例如：&#10;外号：小仓&#10;喜欢：咖啡、下雨天&#10;身份：我的大学室友" style="min-height:100px;resize:vertical"></textarea>
-        </div>
-        <div class="card"><h3>关系类型</h3><p class="hint">选择你和 AI 的关系类型，会影响人设和说话风格。</p>
-          <select v-model="foundationType" @change="onFoundationChange">
-            <option value="空白">空白（默认）</option>
-            <option v-for="(info, type) in foundationTypes" :key="type" :value="type">{{ type }} (好感:{{ info.default_affection }} 信任:{{ info.default_trust }})</option>
-          </select>
-          <div v-if="pendingFoundation" class="foundation-confirm">
-            <p>是否将好感度和信任度重置为「{{ pendingFoundation }}」的默认值？</p>
-            <label><input type="checkbox" v-model="resetFoundationValues"> 重置好感/信任</label>
-            <div class="btn-row">
-              <button class="btn" @click="confirmFoundation">确认</button>
-              <button class="btn btn-secondary" @click="cancelFoundation">取消</button>
-            </div>
-          </div>
-        </div>
-        <div class="card"><h3>角色预设</h3>
-          <div class="btn-row"><input v-model="presetName" placeholder="预设名称"><button class="btn" @click="savePreset">保存当前</button></div>
-          <div class="preset-list"><div v-for="(d, name) in presets" :key="name" class="preset-item" @click="loadPreset(name, d)">{{ name }}<span class="preset-del" @click.stop="deletePreset(name)">&times;</span></div></div>
-        </div>
-      </div>
+      <RoleSettings v-if="activeCat==='role'"
+        :aiName="aiName" :userName="userName" :tone="tone" :length="length" :recall="recall"
+        :allowEmotion="allowEmotion" :customPrompt="customPrompt" :aiBackground="aiBackground"
+        :assistantAvatarUrl="assistantAvatarUrl" :userAvatarUrl="userAvatarUrl"
+        :aiAvatarUrlLocal="aiAvatarUrlLocal" :userAvatarUrlLocal="userAvatarUrlLocal"
+        :relationship="relationship" :foundationType="foundationType" :foundationTypes="foundationTypes"
+        :pendingFoundation="pendingFoundation" :resetFoundationValues="resetFoundationValues"
+        :presetName="presetName" :presets="presets"
+        @update:aiName="aiName=$event" @update:userName="userName=$event"
+        @update:tone="tone=$event" @update:length="length=$event" @update:recall="recall=$event"
+        @update:allowEmotion="allowEmotion=$event" @update:customPrompt="customPrompt=$event"
+        @update:aiBackground="aiBackground=$event"
+        @update:aiAvatarUrlLocal="aiAvatarUrlLocal=$event" @update:userAvatarUrlLocal="userAvatarUrlLocal=$event"
+        @update:foundationType="foundationType=$event" @update:resetFoundationValues="resetFoundationValues=$event"
+        @update:presetName="presetName=$event"
+        @save-cfg="(k,v)=>saveCfg(k,v)"
+        @upload-avatar="(r,e)=>uploadAvatar(r,e)" @upload-avatar-url="(r)=>uploadAvatarByUrl(r)"
+        @foundation-change="onFoundationChange" @confirm-foundation="confirmFoundation"
+        @cancel-foundation="cancelFoundation" @save-preset="savePreset"
+        @load-preset="(n,d)=>loadPreset(n,d)" @delete-preset="(n)=>deletePreset(n)" />
 
-      <!-- 外观 -->
-      <div v-if="activeCat==='appearance'" class="sc-pane">
-        <div class="card"><h3>主题</h3>
-          <div class="theme-row">
-            <button :class="['theme-btn', { active: themeLocal==='dark' }]" @click="setTheme('dark')">暗色</button>
-            <button :class="['theme-btn', { active: themeLocal==='light' }]" @click="setTheme('light')">亮色</button>
-            <button :class="['theme-btn', { active: themeLocal==='sakura' }]" @click="setTheme('sakura')">樱花</button>
-            <button :class="['theme-btn', { active: themeLocal==='vesper' }]" @click="setTheme('vesper')">夕语</button>
-          </div>
-        </div>
-        <div class="card"><h3>聊天背景</h3>
-          <div class="field"><label>本地上传</label><div class="bg-row"><button class="btn-s" @click="$refs.bgFileInput.click()">选择图片</button><input type="file" ref="bgFileInput" accept="image/*" style="display:none" @change="uploadBg"><span v-if="bgUploadMsg" class="ok" style="font-size:11px">{{ bgUploadMsg }}</span></div></div>
-          <div class="field"><label>图片 URL</label><div class="bg-row"><input v-model="chatBgImage" @change="saveCfg('chat_bg_image', chatBgImage)" placeholder="留空为纯色"><button class="btn-s" @click="clearBg">清除</button></div></div>
-          <div class="field"><label>透明度</label><input type="range" min="0" max="100" v-model.number="bgOpacity" @change="saveBgStyle"></div>
-          <div class="field"><label>模糊度</label><input type="range" min="0" max="20" v-model.number="bgBlur" @change="saveBgStyle"></div>
-          <div class="field"><label>显示模式</label><select v-model="bgMode" @change="saveBgStyle"><option value="cover">拉伸</option><option value="contain">完整</option><option value="repeat">平铺</option><option value="center">居中</option></select></div>
-        </div>
-        <div class="card"><h3>向量记忆引擎</h3>
-          <p class="hint">将聊天记录和知识库文档转为语义向量索引，AI 能通过含义（而非关键词）找到相关历史对话。首次使用需下载 ~420MB 模型。导入备份后需手动重建索引。</p>
-          <div v-if="ragStatus === 'ready'" class="ok" style="margin-bottom:6px">已就绪 · {{ ragCount }} 条向量</div>
-          <div v-else-if="ragStatus === 'installed'" style="color:var(--tc2);font-size:12px;margin-bottom:6px">已安装，启动时自动加载</div>
-          <div v-else style="color:#f39c12;font-size:12px;margin-bottom:6px">未安装 · <button class="btn-s" @click="installRag" :disabled="installingRag">{{ installingRag ? '安装中...' : '点击安装' }}</button></div>
-          <button class="btn-s" @click="rebuildRag" :disabled="rebuildingRag" style="margin-top:4px">{{ rebuildingRag ? '重建中...' : '重建向量索引' }}</button>
-          <div v-if="ragMsg" :class="ragMsgOk ? 'ok' : 'fail'" style="margin-top:6px;font-size:11px">{{ ragMsg }}</div>
-        </div>
-      </div>
+      <AppearanceSettings v-if="activeCat==='appearance'"
+        :themeLocal="themeLocal" :chatBgImage="chatBgImage" :bgOpacity="bgOpacity" :bgBlur="bgBlur" :bgMode="bgMode"
+        :bgUploadMsg="bgUploadMsg" :ragStatus="ragStatus" :ragCount="ragCount" :ragMsg="ragMsg" :ragMsgOk="ragMsgOk"
+        :installingRag="installingRag" :rebuildingRag="rebuildingRag"
+        @set-theme="(t)=>setTheme(t)" @upload-bg="(e)=>uploadBg(e)" @clear-bg="clearBg"
+        @save-cfg="(k,v)=>saveCfg(k,v)" @save-bg-style="saveBgStyle"
+        @install-rag="installRag" @rebuild-rag="rebuildRag"
+        @update:chatBgImage="chatBgImage=$event" @update:bgOpacity="bgOpacity=$event"
+        @update:bgBlur="bgBlur=$event" @update:bgMode="bgMode=$event" />
 
       <!-- 聊天偏好 -->
       <div v-if="activeCat==='chat'" class="sc-pane">
@@ -161,207 +117,30 @@
         </div>
       </div>
 
-      <!-- 语音合成 -->
-      <div v-if="activeCat==='tts'" class="sc-pane">
-        <div class="card"><h3>语音朗读（TTS）</h3>
-          <label class="switch"><input type="checkbox" v-model="ttsEnabled" @change="saveVoice"> 启用语音合成</label><p class="hint">开启后 AI 回复旁会显示朗读按钮。</p>
-          <label class="field-label" style="margin-top:8px">引擎</label>
-          <select v-model="ttsEngine" @change="onEngineChange" class="input">
-            <option value="off">关闭语音合成</option>
-            <option value="edge">Edge TTS（免费在线）</option>
-            <option value="openai">OpenAI TTS（在线）</option>
-            <option value="xiaomi">小米 MiMo TTS（在线）</option>
-            <option value="volcano">火山引擎 TTS（在线）</option>
-            <option value="baidu">百度 TTS（在线）</option>
-            <option value="aliyun">阿里云 TTS（在线）</option>
-            <option value="fish_audio">Fish Audio（在线，支持克隆）</option>
-            <option value="spark">讯飞 Spark TTS（在线）</option>
-            <option value="cosyvoice">CosyVoice（本地部署）</option>
-            <option value="gpt_sovits">GPT-SoVITS（本地部署）</option>
-          </select>
-          <p class="hint" v-if="ttsEngine!=='off'">选择 TTS 引擎后配置对应参数。</p>
-          <p class="hint" v-if="ttsEngineStatus" :class="ttsEngineStatus==='ok'?'hint-ok':'hint-err'">引擎状态: {{ ttsEngineStatus }}</p>
-        </div>
+      <TtsSettings v-if="activeCat==='tts'"
+        :ttsEnabled="ttsEnabled" :ttsEngine="ttsEngine" :ttsVoice="ttsVoice" :ttsApiKey="ttsApiKey"
+        :ttsApiUrl="ttsApiUrl" :ttsServerUrl="ttsServerUrl" :ttsEngineStatus="ttsEngineStatus"
+        :ttsCloneMode="ttsCloneMode" :ttsCloneStatus="ttsCloneStatus" :ttsCloneStatusMsg="ttsCloneStatusMsg"
+        :sttEnabled="sttEnabled" :autoPlay="autoPlay"
+        :testingXiaomi="testingXiaomi" :xiaomiTestMsg="xiaomiTestMsg" :xiaomiTestOk="xiaomiTestOk"
+        @update:ttsEnabled="ttsEnabled=$event" @update:ttsEngine="ttsEngine=$event"
+        @update:ttsVoice="ttsVoice=$event" @update:ttsApiKey="ttsApiKey=$event"
+        @update:ttsApiUrl="ttsApiUrl=$event" @update:ttsServerUrl="ttsServerUrl=$event"
+        @update:ttsCloneMode="ttsCloneMode=$event" @update:sttEnabled="sttEnabled=$event"
+        @update:autoPlay="autoPlay=$event"
+        @save-voice="saveVoice" @engine-change="onEngineChange" @clone-mode-change="onCloneModeChange"
+        @test-xiaomi="testXiaomiTts" @upload-clone-audio="(e)=>uploadCloneAudio(e)" />
 
-        <!-- Edge TTS -->
-        <div v-if="ttsEngine==='edge'" class="card"><h3>Edge TTS 音色</h3>
-          <label class="field-label">音色</label>
-          <select v-model="ttsVoice" @change="saveVoice" class="input">
-            <option value="xiaoyi">小艺（女声温柔）</option>
-            <option value="xiaoxiao">小晓（女声活泼）</option>
-            <option value="yunxi">云希（男声阳光）</option>
-            <option value="yunjian">云健（男声沉稳）</option>
-          </select>
-          <p class="hint">免费，无需 API Key，需要网络。</p>
-        </div>
+      <DataSettings v-if="activeCat==='data'"
+        :aiName="aiName" :userName="userName" :favorites="favorites"
+        :cloudBackend="cloudBackend" :cloudUrl="cloudUrl" :cloudUser="cloudUser" :cloudPass="cloudPass" :cloudPhrase="cloudPhrase"
+        :cloudMsg="cloudMsg" :cloudMsgOk="cloudMsgOk" :cloudUploading="cloudUploading" :cloudLastSync="cloudLastSync"
+        @update:cloudBackend="cloudBackend=$event" @update:cloudUrl="cloudUrl=$event"
+        @update:cloudUser="cloudUser=$event" @update:cloudPass="cloudPass=$event"
+        @del-fav="(id)=>delFav(id)" @export-chat="(f)=>$emit('export-chat',f)" @load-favorites="loadFavorites"
+        @save-cloud-cfg="saveCloudCfg" @test-cloud="testCloudConn" @cloud-upload="cloudUpload"
+        @reset-relationship="resetRelationship" @reset-memory="resetMemory" @full-reset="fullReset" />
 
-        <!-- OpenAI TTS -->
-        <div v-if="ttsEngine==='openai'" class="card"><h3>OpenAI TTS</h3>
-          <label class="field-label">API Key</label>
-          <input v-model="ttsApiKey" class="input" placeholder="sk-..." type="password">
-          <label class="field-label" style="margin-top:8px">音色</label>
-          <select v-model="ttsVoice" @change="saveVoice" class="input">
-            <option value="alloy">Alloy（中性）</option>
-            <option value="echo">Echo（男声沉稳）</option>
-            <option value="fable">Fable（英式男声）</option>
-            <option value="onyx">Onyx（男声深沉）</option>
-            <option value="nova">Nova（女声温柔）</option>
-            <option value="shimmer">Shimmer（女声清亮）</option>
-          </select>
-          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
-        </div>
-
-        <!-- 火山引擎 TTS -->
-        <div v-if="ttsEngine==='volcano'" class="card"><h3>火山引擎 TTS</h3>
-          <label class="field-label">API Key</label>
-          <input v-model="ttsApiKey" class="input" placeholder="在火山引擎控制台获取" type="password">
-          <label class="field-label" style="margin-top:8px">音色</label>
-          <select v-model="ttsVoice" @change="saveVoice" class="input">
-            <option value="BV001">温柔女声</option>
-            <option value="BV002">活泼女声</option>
-            <option value="BV003">沉稳男声</option>
-            <option value="BV004">阳光男声</option>
-            <option value="BV005">可爱童声</option>
-            <option value="BV006">知性女声</option>
-            <option value="BV007">磁性男声</option>
-            <option value="BV008">新闻女声</option>
-          </select>
-          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
-        </div>
-
-        <!-- 百度 TTS -->
-        <div v-if="ttsEngine==='baidu'" class="card"><h3>百度 TTS</h3>
-          <label class="field-label">API Key</label>
-          <input v-model="ttsApiKey" class="input" placeholder="appid|secret（在百度AI控制台获取）" type="password">
-          <label class="field-label" style="margin-top:8px">音色</label>
-          <select v-model="ttsVoice" @change="saveVoice" class="input">
-            <option value="0">女声（普通）</option>
-            <option value="1">男声（普通）</option>
-            <option value="3">女声（情感）</option>
-            <option value="4">男声（情感）</option>
-            <option value="5003">女声（精品）</option>
-            <option value="111">男声（情感加深）</option>
-          </select>
-          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
-        </div>
-
-        <!-- 阿里云 TTS -->
-        <div v-if="ttsEngine==='aliyun'" class="card"><h3>阿里云 TTS（CosyVoice）</h3>
-          <label class="field-label">API Key</label>
-          <input v-model="ttsApiKey" class="input" placeholder="AccessKeyId|AccessKeySecret|AppKey" type="password">
-          <label class="field-label" style="margin-top:8px">API 地址</label>
-          <input v-model="ttsApiUrl" class="input" placeholder="https://nls-gateway.cn-shanghai.aliyuncs.com">
-          <label class="field-label" style="margin-top:8px">音色（可选）</label>
-          <input v-model="ttsVoice" class="input" placeholder="longxiaochun（留空用默认）">
-          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
-        </div>
-
-        <!-- Fish Audio -->
-        <div v-if="ttsEngine==='fish_audio'" class="card"><h3>Fish Audio</h3>
-          <label class="field-label">API Key</label>
-          <input v-model="ttsApiKey" class="input" placeholder="fish.audio 获取" type="password">
-          <label class="field-label" style="margin-top:8px">音色 ID</label>
-          <input v-model="ttsVoice" class="input" placeholder="留空用默认音色">
-          <p class="hint">支持声音克隆，在 Fish Audio 平台创建音色后填入 ID。</p>
-          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
-        </div>
-
-        <!-- 讯飞 Spark TTS -->
-        <div v-if="ttsEngine==='spark'" class="card"><h3>讯飞 Spark TTS</h3>
-          <label class="field-label">API Key</label>
-          <input v-model="ttsApiKey" class="input" placeholder="appid|api_secret|api_key" type="password">
-          <label class="field-label" style="margin-top:8px">音色</label>
-          <input v-model="ttsVoice" class="input" placeholder="x4_zh（默认）">
-          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
-        </div>
-
-        <!-- CosyVoice 本地 -->
-        <div v-if="ttsEngine==='cosyvoice'" class="card"><h3>CosyVoice 本地部署</h3>
-          <label class="field-label">服务地址</label>
-          <input v-model="ttsServerUrl" class="input" placeholder="http://127.0.0.1:50000">
-          <label class="field-label" style="margin-top:8px">音色</label>
-          <input v-model="ttsVoice" class="input" placeholder="default（留空用默认）">
-          <p class="hint">需要本地运行 CosyVoice 服务。支持声音克隆和情感控制。</p>
-          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
-        </div>
-
-        <!-- GPT-SoVITS 本地 -->
-        <div v-if="ttsEngine==='gpt_sovits'" class="card"><h3>GPT-SoVITS 本地部署</h3>
-          <label class="field-label">服务地址</label>
-          <input v-model="ttsServerUrl" class="input" placeholder="http://127.0.0.1:9880">
-          <label class="field-label" style="margin-top:8px">参考音频路径/ID</label>
-          <input v-model="ttsVoice" class="input" placeholder="default（留空用默认）">
-          <p class="hint">需要本地运行 GPT-SoVITS API。少样本声音克隆，中文效果极佳。</p>
-          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
-        </div>
-
-        <!-- 小米 TTS -->
-        <div v-if="ttsEngine==='xiaomi'" class="card"><h3>小米 MiMo TTS</h3>
-          <label class="field-label">API Key</label>
-          <div style="display:flex;gap:8px">
-            <input v-model="ttsApiKey" class="input" placeholder="在 platform.xiaomimimo.com 获取" type="password" style="flex:1">
-            <button class="btn" @click="saveVoice">确认</button>
-            <button class="btn-s" @click="testXiaomiTts" :disabled="testingXiaomi">{{ testingXiaomi ? '...' : '测试' }}</button>
-          </div>
-          <p class="hint" v-if="xiaomiTestMsg" :class="xiaomiTestOk?'hint-ok':'hint-err'" style="margin-top:4px">{{ xiaomiTestMsg }}</p>
-          <label class="field-label" style="margin-top:8px">模式</label>
-          <select v-model="ttsCloneMode" @change="onCloneModeChange" class="input">
-            <option value="preset">预置音色</option>
-            <option value="clone">声音克隆（用自己的声音）</option>
-          </select>
-          <div v-if="ttsCloneMode==='preset'" style="margin-top:8px">
-            <label class="field-label">音色</label>
-            <select v-model="ttsVoice" @change="saveVoice" class="input">
-              <option value="冰糖">冰糖（中文女声）</option>
-              <option value="茉莉">茉莉（中文女声）</option>
-              <option value="苏打">苏打（中文男声）</option>
-              <option value="白桦">白桦（中文男声）</option>
-              <option value="Mia">Mia（英文女声）</option>
-              <option value="Chloe">Chloe（英文女声）</option>
-              <option value="Milo">Milo（英文男声）</option>
-              <option value="Dean">Dean（英文男声）</option>
-            </select>
-          </div>
-          <div v-if="ttsCloneMode==='clone'" style="margin-top:8px">
-            <label class="field-label">参考音频</label>
-            <p class="hint">上传你的录音（10秒以上清晰语音，wav/mp3，≤10MB）</p>
-            <input type="file" accept=".wav,.mp3" @change="uploadCloneAudio" class="input" style="padding:4px">
-            <p class="hint" v-if="ttsCloneStatus" :class="ttsCloneStatus==='ok'?'hint-ok':'hint-err'">{{ ttsCloneStatusMsg }}</p>
-          </div>
-        </div>
-
-        <div class="card"><h3>语音输入与播放</h3>
-          <label class="switch"><input type="checkbox" v-model="sttEnabled" @change="saveVoice"> 语音输入（语音转文字）</label><p class="hint">长按发送按钮录音，自动转为文字。</p>
-          <label class="switch" style="margin-top:6px"><input type="checkbox" v-model="autoPlay" @change="saveVoice"> 自动播放语音</label><p class="hint">AI 回复后自动朗读。</p>
-        </div>
-      </div>
-
-      <!-- 数据管理 -->
-      <div v-if="activeCat==='data'" class="sc-pane">
-        <div class="card"><h3>收藏列表</h3><div v-for="f in favorites" :key="f.id" class="fav-item"><span class="fav-role">{{ f.role === 'user' ? userName : aiName }}</span><span class="fav-content">{{ f.content?.slice(0, 80) }}</span><button class="btn-s" @click="delFav(f.msg_id)">取消收藏</button></div><div v-if="!favorites.length" class="empty">暂无收藏</div></div>
-        <div class="card"><h3>导出</h3><p class="hint">导出聊天记录。JSON 适合备份恢复，Markdown 适合阅读，TXT 通用纯文本。</p>
-          <div class="btn-row"><button class="btn" @click="$emit('export-chat', 'json')">JSON</button><button class="btn" @click="$emit('export-chat', 'txt')">TXT</button><button class="btn" @click="$emit('export-chat', 'md')">Markdown</button></div>
-        </div>
-        <div class="card"><h3>聊天管理</h3><ChatManagePanel @changed="loadFavorites" /></div>
-        <div class="card"><h3>数据迁移</h3><p class="hint">导出完整备份（含配置和记忆），或从备份恢复。恢复后建议重建向量索引。</p><MigratePanel /></div>
-        <div class="card"><h3>云端同步</h3><p class="hint">加密备份到 WebDAV 服务器，防止数据丢失。</p>
-          <div class="cloud-panel">
-            <div class="cloud-row"><label>后端类型</label><select v-model="cloudBackend" @change="saveCloudCfg"><option value="webdav">WebDAV</option></select></div>
-            <div class="cloud-row"><label>服务器地址</label><input v-model="cloudUrl" placeholder="https://example.com/dav/" /></div>
-            <div class="cloud-row"><label>用户名</label><input v-model="cloudUser" placeholder="WebDAV 用户名" /></div>
-            <div class="cloud-row"><label>密码</label><input v-model="cloudPass" type="password" placeholder="WebDAV 密码" /></div>
-            <div class="cloud-row"><label>加密密码</label><input v-model="cloudPhrase" type="password" placeholder="可选：备份加密密码" /></div>
-            <div class="cloud-actions">
-              <button class="btn" @click="saveCloudCfg">保存配置</button>
-              <button class="btn-s" @click="testCloudConn">测试连接</button>
-              <button class="btn" @click="cloudUpload" :disabled="cloudUploading">{{ cloudUploading ? '上传中...' : '上传备份' }}</button>
-            </div>
-            <div v-if="cloudMsg" :class="['cloud-msg', cloudMsgOk ? 'ok' : 'err']">{{ cloudMsg }}</div>
-            <div v-if="cloudLastSync" class="cloud-last">上次同步：{{ cloudLastSync }}</div>
-          </div>
-        </div>
-        <div class="card"><h3>重置</h3><div class="btn-row"><button class="btn-s" @click="resetRelationship">重置关系(好感/信任)</button><button class="btn-s" @click="resetMemory">重置摘要记忆</button><button class="btn-s danger" @click="fullReset">完全重置</button></div><p class="hint">完全重置：清除所有数据（聊天、提醒、日程、待办、记忆、人设），重新触发引导。API 设置保留。</p></div>
-      </div>
     </div>
   </div>
 </template>

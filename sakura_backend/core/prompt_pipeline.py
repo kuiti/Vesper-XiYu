@@ -228,6 +228,21 @@ class PersonaPipe(PromptPipe):
         return build_persona()
 
 
+class CharacterCardPipe(PromptPipe):
+    """当前角色卡额外设定注入（description / personality / scenario / taboos 等）"""
+    _cache_key = None
+
+    def process(self, ctx: PipelineContext) -> str | None:
+        if not ctx.is_module_enabled("character_card"):
+            return None
+        try:
+            from core.character_card import get_active_card_prompt_block
+            block = get_active_card_prompt_block()
+            return block if block else None
+        except Exception:
+            return None
+
+
 class UserSummaryPipe(PromptPipe):
     """用户摘要（Zep 方案）"""
     def process(self, ctx: PipelineContext) -> str | None:
@@ -546,6 +561,7 @@ def get_default_pipeline() -> PromptPipeline:
     # 动态管道（按优先级排序）
     p.register(ThinkingPipe())
     p.register(PersonaPipe())
+    p.register(CharacterCardPipe())
     p.register(CustomContextPipe())
     p.register(ContinuityPipe())
     p.register(UserSummaryPipe())

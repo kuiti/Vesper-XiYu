@@ -263,13 +263,8 @@ def build_persona():
                     if allow_emotion else "不要用感叹号，不要用表情符号")
 
     # 解析 ai_background JSON
-    import json as _json_bg
-    bg_obj = {}
-    if ai_bg:
-        try:
-            bg_obj = _json_bg.loads(ai_bg)
-        except _json_bg.JSONDecodeError:
-            bg_obj = {"legacy": ai_bg}
+    from core.persona_data import parse_ai_background
+    bg_obj = parse_ai_background(ai_bg)
 
     # 基石安全（支持模板选择和自定义）
     foundation = bg_obj.get("foundation", "")

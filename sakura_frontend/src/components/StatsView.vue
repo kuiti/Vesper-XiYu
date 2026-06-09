@@ -3,6 +3,7 @@
     <h2>统计</h2>
     <StatsPanel />
     <div class="card" style="margin-top:14px"><h3>情感空间</h3><EmotionPanel /></div>
+    <div class="card" style="margin-top:14px"><h3>洞察分析</h3><InsightPanel /></div>
     <div class="card" style="margin-top:14px"><h3>月度报告</h3><button class="btn" @click="genReport" :disabled="generating">{{ generating ? '生成中...' : '生成本月报告' }}</button><pre v-if="report" class="report">{{ report }}</pre></div>
   </div>
 </template>
@@ -10,10 +11,11 @@
 <script>
 import StatsPanel from './StatsPanel.vue'
 import EmotionPanel from './EmotionPanel.vue'
+import InsightPanel from './InsightPanel.vue'
 import api from '../api.js'
 
 export default {
-  components: { StatsPanel, EmotionPanel },
+  components: { StatsPanel, EmotionPanel, InsightPanel },
   data() { return { generating: false, report: '' } },
   methods: {
     async genReport() { this.generating = true; try { const r = await api.get('/report/monthly'); if (r.data.ok) this.report = r.data.content } catch (e) {} this.generating = false },

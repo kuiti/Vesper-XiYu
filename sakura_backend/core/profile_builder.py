@@ -459,15 +459,169 @@ def get_profile_context():
     profile = get_profile()
     if not profile:
         return ""
-    items = []
+
+    sections = {"_plan_": "【待办计划】", "_progress_": "【进行中】", "_event_": "【已完成】"}
+    category_items = {key: [] for key in sections}
+    other_items = []
+
     for k, v in profile.items():
         conf = v.get("confidence", 0)
         if conf < 0.55:
-            continue  # 低置信不注入
+            continue
         val = v["value"]
         if 0.55 <= conf < 0.7:
-            val = f"{val}（仅供参考）"  # 中置信标注
-        items.append(f"{k}: {val}")
-    if not items:
+            val = f"{val}（仅供参考）"
+
+        matched = False
+        for prefix in sections:
+            if k.startswith(prefix):
+                category_items[prefix].append(f"{k[len(prefix):]}: {val}")
+                matched = True
+                break
+        if not matched and not k.startswith("_"):
+            other_items.append(f"{k}: {val}")
+
+    parts = []
+    for prefix, label in sections.items():
+        if category_items[prefix]:
+            parts.append(label)
+            parts.extend(category_items[prefix])
+    if other_items:
+        parts.append("【用户画像】")
+        parts.extend(other_items)
+
+    if not parts:
         return ""
-    return "【用户画像】\n" + "\n".join(items)
+    return "\n".join(parts)
+
+
+def clear_completed_plans():
+    """已完成的事件清除对应的计划和进行中状态"""
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT key FROM user_profile WHERE key LIKE '_event_%'")
+        done_events = [r["key"].replace("_event_", "") for r in cursor.fetchall()]
+        for cat in done_events:
+            cursor.execute("DELETE FROM user_profile WHERE key IN (?, ?)",
+                          (f"_plan_{cat}", f"_progress_{cat}"))
+        conn.commit()
+    clear_profile_cache()
+
+
+# ─── 事件完成追踪 ───
+
+# 事件完成检测正则（按优先级排列，匹配即返回）
+_COMPLETION_REGEX = [
+    # 1. 特定结构：去了XXX、去了趟XXX
+    r"(?:去了|去了趟|去.*?了)\S{0,8}?(?:店|院|馆|局|厅|理发|剪发|取|寄|买|吃|看|办|拿)",
+
+    # 2. 回来了/到家了/搞定了（短匹配优先）
+    r"\S{0,6}(?:回来|过来了|到家|搞定|弄好)(?:了|的)",
+
+    # 3. XX完了/好了/到了/过了
+    r"\S{1,6}(?:完了|好了|到了|过了|掉了|妥了)",
+
+    # 4. 才/刚 XXX（刚剪完/才回来/刚考完试）
+    r"(?:才|刚)\S{1,12}",
+
+    # 5. 我去/我刚刚/我刚 XX了
+    r"(?:我去|我刚刚|我刚)\S{1,15}了",
+
+    # 6. 单字动+了+结束/标点/名词（吃了烧烤/剪了头发）排除疑问/否定
+    r"(?:买|吃|喝|剪|理|洗|修|做|写|看|读|发|寄|送|取|拿|弄|办|考)了(?!(?:吗|么|没|什么|啥|就|不))\S{0,4}(?:$|[。！？]|\s|的|个|一|点|碗|顿|次|下|趟)",
+]
+
+# 事件类型关键词映射（用于生成可读的 key）
+_EVENT_TYPES = {
+    "头发": "理发",
+    "饭|吃|喝|烧烤|麻辣烫|火锅": "吃饭",
+    "快递|取": "快递",
+    "考": "考试",
+    "买|购物": "购物",
+    "修|搞|弄|办": "办理",
+    "写|做|看|读": "作业",
+    "洗|打扫|整理": "家务",
+    "发|寄|送": "寄送",
+}
+
+
+def _categorize_event(user_message: str) -> str:
+    """对事件分类"""
+    for pattern, category in _EVENT_TYPES.items():
+        import re
+        if re.search(pattern, user_message):
+            return category
+    return "事项"
+
+
+# ─── 计划检测正则 ───
+_PLAN_REGEX = [
+    # 我要/想去/打算/准备 去做某事（排除疑问句）
+    r"(?:(?:我|我们))?(?:要|想去|打算|准备|计划|得去|该去|该)\S{0,3}(?:去|来|把|给)\S{3,15}(?![吗么？？])",
+    # 还没做某事
+    r"还没(?!(?:确定|知道|说完|说完|说完|完事|结束))\S{2,12}",
+]
+
+_IN_PROGRESS_REGEX = [
+    r"(?:正在|正)\S{3,12}(?:。|！|$|\.)",
+    r"在\S{2,8}(?:中|着|呢)(?:。|！|$|\.)",
+]
+
+
+def _save_profile_event(key: str, value: str, confidence: float = 0.9):
+    """写入 user_profile"""
+    with _profile_write_lock:
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            now = datetime.now().isoformat()
+            cursor.execute(
+                "INSERT OR REPLACE INTO user_profile (key, value, confidence, extracted_at) VALUES (?, ?, ?, ?)",
+                (key, value, confidence, now)
+            )
+            conn.commit()
+        clear_profile_cache()
+
+
+def track_event_completion(user_message: str):
+    """检测用户是否完成某事件，写入 user_profile"""
+    """检测用户是否完成某事件，写入 user_profile"""
+    import re
+    for pattern in _COMPLETION_REGEX:
+        if re.search(pattern, user_message):
+            category = _categorize_event(user_message)
+            key = f"_event_{category}"
+
+            with _profile_write_lock:
+                with get_conn() as conn:
+                    cursor = conn.cursor()
+                    now = datetime.now().isoformat()
+                    cursor.execute(
+                        "INSERT OR REPLACE INTO user_profile (key, value, confidence, extracted_at) VALUES (?, ?, ?, ?)",
+                        (key, f"已完成（{datetime.now().strftime('%m-%d')}）", 0.9, now)
+                    )
+                    conn.commit()
+                clear_profile_cache()
+            return True
+    return False
+
+
+def track_plan_intent(user_message: str):
+    """检测用户是否表达计划/意图，写入 user_profile"""
+    import re
+    for pattern in _PLAN_REGEX:
+        if re.search(pattern, user_message):
+            category = _categorize_event(user_message)
+            _save_profile_event(f"_plan_{category}", f"计划中（{datetime.now().strftime('%m-%d')}）", 0.85)
+            return True
+    return False
+
+
+def track_in_progress(user_message: str):
+    """检测用户是否正在做某事"""
+    import re
+    for pattern in _IN_PROGRESS_REGEX:
+        if re.search(pattern, user_message):
+            category = _categorize_event(user_message)
+            _save_profile_event(f"_progress_{category}", f"进行中（{datetime.now().strftime('%m-%d')}）", 0.85)
+            return True
+    return False

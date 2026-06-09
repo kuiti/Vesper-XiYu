@@ -64,15 +64,17 @@ async def delete_recent(minutes: int, bg: BackgroundTasks):
     return {"deleted": count}
 
 @router.delete("/message/{msg_id}")
-async def delete_message(msg_id: int, bg: BackgroundTasks):
+async def delete_message(msg_id: int):
     """删除单条消息"""
     from core.db import get_conn
+    from core.vector_store import delete_message_vectors
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM chat_history WHERE id = ?", (msg_id,))
         cursor.execute("DELETE FROM chat_fts WHERE rowid = ?", (msg_id,))
+        cursor.execute("DELETE FROM sentence_index WHERE msg_id = ?", (msg_id,))
     reset_active_memory()
-    bg.add_task(_clear_vectors)
+    delete_message_vectors(msg_id)
     return {"status": "ok"}
 
 @router.delete("/older-than/{days}")
@@ -86,7 +88,6 @@ async def delete_older_than(days: int, bg: BackgroundTasks):
 async def delete_all(bg: BackgroundTasks):
     from core.db import clear_chat_history
     clear_chat_history()
-    reset_active_memory()
     bg.add_task(_clear_vectors)
     return {"status": "ok"}
 

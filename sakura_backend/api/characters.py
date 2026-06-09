@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response, JSONResponse
 from core.character_card import CharacterCard
 
-router = APIRouter(prefix="/api/characters", tags=["characters"])
+router = APIRouter(prefix="/characters", tags=["characters"])
 
 
 @router.get("/")
@@ -54,7 +54,7 @@ async def apply_character(data: dict):
     card = CharacterCard.load_from_db(name)
     if not card:
         raise HTTPException(404, f"角色卡 '{name}' 不存在")
-    card.apply_to_current()
+    card.apply_to_current(card_name=name)
     # 清除 provider 缓存 + prompt 缓存
     try:
         from core.llm_provider import clear_provider_cache

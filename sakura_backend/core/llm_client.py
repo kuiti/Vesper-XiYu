@@ -2,7 +2,11 @@
 """消除 8 个文件中重复的 HTTP 样板代码。所有非流式 LLM 调用统一走此模块。"""
 import json
 import re
+import time
+import logging
 from core.llm_provider import get_provider
+
+logger = logging.getLogger(__name__)
 
 
 def _extract_json(text: str) -> str | None:
@@ -73,12 +77,27 @@ def call_llm(
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
-    content = provider.chat(
-        messages,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        timeout=timeout,
-    )
+    # 带重试的 LLM 调用（3次，指数退避 1s/2s/4s）
+    content = None
+    max_retries = 2
+    for attempt in range(max_retries + 1):
+        try:
+            content = provider.chat(
+                messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=timeout,
+            )
+            if content:
+                break
+            logger.warning("[LLM] 第%d次返回空响应", attempt + 1)
+        except Exception as e:
+            if attempt < max_retries:
+                delay = min(1.0 * (2 ** attempt), 4.0)
+                logger.warning("[LLM] 第%d次调用失败: %s, %.1fs后重试", attempt + 1, e, delay)
+                time.sleep(delay)
+            else:
+                logger.error("[LLM] 全部%d次调用失败: %s", max_retries + 1, e)
 
     if not content:
         return None if not json_mode else None

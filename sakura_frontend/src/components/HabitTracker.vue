@@ -18,41 +18,46 @@
 </template>
 
 <script>
-const STORAGE_KEY = 'mellow_habits'
+import api from '../api.js'
 
 export default {
   inject: { showConfirm: { default: () => (msg) => window.confirm(msg) } },
   data() {
-    return { habits: [], newHabit: '', _lastDate: '' }
+    return { habits: [], newHabit: '', loading: false }
   },
   mounted() { this.load() },
   methods: {
-    load() {
+    async load() {
+      this.loading = true
       try {
-        const raw = localStorage.getItem(STORAGE_KEY)
-        this.habits = raw ? JSON.parse(raw) : []
-        const today = new Date().toDateString()
-        const savedDate = localStorage.getItem(STORAGE_KEY + '_date') || ''
-        if (savedDate && savedDate !== today) {
-          this.habits.forEach(h => { if (!h.checked) h.streak = 0; h.checked = false })
-          this.save()
-        }
-        localStorage.setItem(STORAGE_KEY + '_date', today)
-      } catch (e) { this.habits = [] }
+        const r = await api.get('/habits/')
+        this.habits = (r.data || []).map(h => ({ ...h, _id: h.id }))
+      } catch (e) { console.error('加载习惯失败', e) }
+      this.loading = false
     },
-    save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.habits)) },
-    addHabit() {
+    async addHabit() {
       if (!this.newHabit.trim()) return
-      this.habits.push({ id: Date.now(), name: this.newHabit.trim(), checked: false, streak: 0 })
-      this.newHabit = ''; this.save()
+      try {
+        await api.post('/habits/', { name: this.newHabit.trim() })
+        this.newHabit = ''
+        await this.load()
+      } catch (e) { console.error('添加习惯失败', e) }
     },
-    toggleDay(h) {
-      h.checked = !h.checked
-      h.streak = h.checked ? (h.streak || 0) + 1 : Math.max(0, (h.streak || 0) - 1)
-      this.save()
+    async toggleDay(h) {
+      const checked = !h.checked
+      const streak = checked ? (h.streak || 0) + 1 : Math.max(0, (h.streak || 0) - 1)
+      try {
+        await api.patch('/habits/' + h.id, { checked, streak })
+        h.checked = checked ? 1 : 0
+        h.streak = streak
+      } catch (e) { console.error('更新习惯失败', e) }
     },
-    deleteHabit(id) {
-      this.habits = this.habits.filter(h => h.id !== id); this.save()
+    async deleteHabit(id) {
+      if (!this.showConfirm) return
+      try {
+        await api.delete('/habits/' + id)
+        await this.load()
+      } catch (e) { console.error('删除习惯失败', e) }
     }
   }
 }

@@ -133,39 +133,32 @@ async def _weather_push_job(hour: int):
 
 
 async def _diary_generate_job():
-    """AI 日记自动生成任务（由调度器调用）"""
+    """AI 日记自动生成任务（23:00 执行）"""
     try:
-        import asyncio
         from datetime import datetime
+        from core.diary_utils import get_today_messages, detect_mood, build_diary_prompt, generate_diary_content
+        from core.db import save_diary_entry, get_config
 
-        def _do_diary():
-            from core.db import get_conn, get_config, save_diary_entry
-            from core.llm_client import call_llm
+        today = datetime.now().strftime("%Y-%m-%d")
+        ai_name = get_config("ai_name", "佐仓")
+        user_name = get_config("user_name", "用户")
 
-            today = datetime.now().strftime("%Y-%m-%d")
-            ai_name = get_config("ai_name", "佐仓")
+        msg_count, today_msgs, yest_row = get_today_messages()
+        if msg_count < 3:
+            print(f"[AI日记] 今日消息不足3条({msg_count})，跳过")
+            return
 
-            with get_conn() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) as cnt FROM chat_history WHERE timestamp >= ?", (today,))
-                msg_count = cursor.fetchone()["cnt"]
-                cursor.execute("SELECT content, role FROM chat_history WHERE timestamp >= ? ORDER BY id DESC LIMIT 15", (today,))
-                recent = cursor.fetchall()
+        all_text = " ".join(r["content"] for r in today_msgs)
+        detected_mood = detect_mood(all_text)
+        yesterday_mood = yest_row["mood"] if yest_row else None
+        prompt = build_diary_prompt(today, msg_count, today_msgs, ai_name, user_name, yesterday_mood)
+        result = generate_diary_content(prompt)
 
-            if msg_count < 5:
-                print(f"[AI日记] 今日消息不足5条，跳过")
-                return
-
-            recent_text = "\n".join([f"{'用户' if r['role']=='user' else '「' + ai_name + '」'}: {r['content'][:80]}" for r in reversed(recent)])
-            prompt = f"今天是{today}。「{ai_name}」和用户今天聊了{msg_count}条消息。以下是今天的一些对话片段：\n{recent_text}\n\n请以「{ai_name}」的第一人称视角写一篇简短的日记（80字以内），内容包括：今天和用户聊了什么、自己的感受、用户今天的心情。语气温暖自然。"
-
-            result = call_llm(prompt=prompt, temperature=0.8, max_tokens=200, timeout=15)
-            if result:
-                mood = "温暖"
-                save_diary_entry(today, result, mood)
-                print(f"[AI日记] 已自动生成 {today}")
-
-        await asyncio.to_thread(_do_diary)
+        if result:
+            save_diary_entry(today, result, detected_mood)
+            print(f"[AI日记] 已生成 {today} 心情:{detected_mood} ({len(result)}字)")
+        else:
+            print(f"[AI日记] 生成结果为空，跳过")
     except Exception as e:
         print(f"[AI日记] 自动生成失败: {e}")
 

@@ -35,6 +35,7 @@ _SETTINGS_WHITELIST = {
     "user_name", "ai_name", "api_key", "api_provider", "llm_provider", "api_base_url", "api_model",
     "tts_enabled", "tts_engine", "tts_voice", "tts_api_key", "tts_server_url",
     "tts_api_url", "stt_enabled", "auto_play_voice", "tts_clone_audio",
+    "fallback_models",
 } | set(PERSONALITY_KEY_MAP.keys())
 
 @router.get("/")
@@ -52,6 +53,7 @@ async def get_all_settings() -> Dict[str, Any]:
         "model_mode": get_config("model_mode", "auto"),
         "api_base_url": get_config("api_base_url", "https://api.deepseek.com/v1"),
         "api_model": get_config("api_model", "deepseek-chat"),
+        "fallback_models": get_config("fallback_models", ""),
         "length_level": personality.get("length") if personality.get("length") is not None else get_config("length_level", "短"),
         "recall_past": personality.get("recall") if personality.get("recall") is not None else get_config("recall_past", "从不"),
         "allow_emotion": personality.get("allow_emotion") if personality.get("allow_emotion") is not None else get_config("allow_emotion", True),
@@ -184,6 +186,8 @@ async def list_providers():
     """获取可用的 LLM Provider 列表"""
     from core.llm_provider import get_available_providers
     return {"providers": get_available_providers()}
+
+@router.get("/foundation-types")
 async def list_foundation_types():
     """获取所有可用的基石类型"""
     from core.prompt_builder import FOUNDATION_TEMPLATES
@@ -208,11 +212,9 @@ async def set_foundation(data: FoundationUpdate):
         return {"status": "error", "message": f"未知的基石类型: {foundation_type}"}
 
     # 更新 ai_background 中的 foundation_type
+    from core.persona_data import parse_ai_background
     current_bg = get_config("ai_background", "")
-    try:
-        bg_obj = json.loads(current_bg) if current_bg else {}
-    except json.JSONDecodeError:
-        bg_obj = {}
+    bg_obj = parse_ai_background(current_bg)
 
     bg_obj["foundation_type"] = foundation_type
     # 清除自定义 foundation（如果有），使用模板
@@ -255,7 +257,9 @@ async def complete_onboarding():
 @router.post("/full-reset")
 async def full_reset():
     """完全重置：清除所有数据，重新触发引导"""
-    from core.db import get_conn, clear_chat_history
+    from core.db import get_conn, clear_chat_history, clear_config_cache
+    from core.relationship import invalidate_relationship_cache
+    from core.llm_provider import clear_provider_cache
     # 1. 清除聊天记录
     clear_chat_history()
     # 2. 清除所有提醒、日程、待办、笔记、倒计时、目标
@@ -263,7 +267,7 @@ async def full_reset():
     with get_conn() as conn:
         cursor = conn.cursor()
         for table in ["reminders", "schedule", "todos", "notes", "countdowns", "goal_tracking",
-                       "emotion_daily", "relationship", "empathy_feedback", "favorites"]:
+                       "emotion_daily", "relationship", "empathy_feedback", "favorites", "documents"]:
             try:
                 cursor.execute(f"DELETE FROM {table}")
             except Exception as e:
@@ -273,10 +277,11 @@ async def full_reset():
     api_provider = get_config("api_provider", "")
     api_base_url = get_config("api_base_url", "")
     api_model = get_config("api_model", "")
+    llm_provider = get_config("llm_provider", "")
     # 删除所有配置（除了 API 相关的）
     with get_conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM config WHERE key NOT IN ('api_key', 'api_provider', 'api_base_url', 'api_model', '_tiered_migration_done', '_default_presets_seeded')")
+        cursor.execute("DELETE FROM config WHERE key NOT IN ('api_key', 'api_provider', 'api_base_url', 'api_model', 'llm_provider', '_tiered_migration_done', '_default_presets_seeded')")
     # 恢复 API 设置
     if api_key:
         set_config("api_key", api_key)
@@ -286,6 +291,12 @@ async def full_reset():
         set_config("api_base_url", api_base_url)
     if api_model:
         set_config("api_model", api_model)
+    if llm_provider:
+        set_config("llm_provider", llm_provider)
+    # 清除配置缓存（SQL DELETE 不经过 set_config，缓存不会自动失效）
+    clear_config_cache()
+    invalidate_relationship_cache()
+    clear_provider_cache()
     # 4. 清除向量存储
     try:
         import shutil
@@ -295,6 +306,7 @@ async def full_reset():
             shutil.rmtree(chroma_path)
             os.makedirs(chroma_path, exist_ok=True)
     except Exception as e:
+        errors.append(f"chroma_db: {e}")
         print(f"[重置] 清除向量库失败: {e}")
     # 5. 清除心路历程和其他数据
     with get_conn() as conn:
@@ -302,7 +314,9 @@ async def full_reset():
         for table in ["emotion_log", "ai_personality_traits", "user_activity_stats",
                        "proactive_response_log", "proactive_flags", "conversation_summary",
                        "ai_diary", "achievements", "demand_patterns", "pending_goals",
-                       "sentence_index", "memory", "user_profile", "summary"]:
+                       "sentence_index", "memory", "user_profile", "summary",
+                       "entities", "memory_history", "death_archive", "knowledge_graph",
+                       "memory_importance"]:
             try:
                 cursor.execute(f"DELETE FROM {table}")
             except Exception as e:

@@ -453,7 +453,8 @@ def generate_proactive(trigger_type: str, context: dict = None):
         if context.get("empathy_avoid"):
             empathy_hint += f"\n注意：{context['empathy_avoid']}"
     elif trigger_type == "upcoming_reminder":
-        idle_desc = f"「{user_name}」有一个提醒即将到期：{context.get('content', '')}"
+        notify_msg = context.get('notify_message') or context.get('content', '')
+        idle_desc = f"「{user_name}」有一个提醒即将到期：{notify_msg}"
     elif trigger_type == "goal_followup":
         idle_desc = f"「{user_name}」之前提过一个目标「{context.get('goal_text', '')}」，很久没更新了。"
     elif trigger_type == "active_hours":

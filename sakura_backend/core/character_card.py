@@ -243,11 +243,27 @@ class CharacterCard:
             pass
         sakura["created_at"] = datetime.now().isoformat()
 
-    def apply_to_current(self):
-        """将角色卡数据应用到 DB config"""
+    def apply_to_current(self, card_name: str = None):
+        """将角色卡数据应用到 DB config（保留完整角色卡名以备 prompt 注入）"""
         sakura = self.sakura
         set_config("ai_name", self.data.get("name", "佐仓"))
         set_config("custom_system_prompt", self.data.get("system_prompt", ""))
+        # 记录当前激活的角色卡名（None 表示自定义/无卡片）
+        if card_name:
+            set_config("_active_character_card", card_name)
+        # V3 额外字段存为 JSON，供 prompt 注入用
+        extra_fields = json.dumps({
+            "description": self.data.get("description", ""),
+            "personality": self.data.get("personality", ""),
+            "scenario": self.data.get("scenario", ""),
+            "mes_example": self.data.get("mes_example", ""),
+            "post_history_instructions": self.data.get("post_history_instructions", ""),
+            "creator_notes": self.data.get("creator_notes", ""),
+            "tags": self.data.get("tags", []),
+            "taboos": sakura.get("taboos", []),
+            "foundation": sakura.get("foundation", ""),
+        }, ensure_ascii=False)
+        set_config("_character_card_extra", extra_fields)
         # personality（只设 tone）
         personality = get_config("personality", {}) or {}
         if sakura.get("tone"):
@@ -277,11 +293,9 @@ class CharacterCard:
 
     def _get_bg_field(self, key: str, default=None):
         """从 ai_background JSON 中读取字段"""
+        from core.persona_data import parse_ai_background
         bg = get_config("ai_background", "")
-        try:
-            obj = json.loads(bg) if bg else {}
-        except json.JSONDecodeError:
-            return default
+        obj = parse_ai_background(bg)
         return obj.get(key, default)
 
     # ─── 持久化 ───
@@ -322,3 +336,47 @@ class CharacterCard:
         with get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM characters WHERE name = ?", (card_name,))
+
+
+# ─── Prompt 注入 ───
+
+def get_active_card_prompt_block() -> str:
+    """构建当前激活的角色卡的 prompt 注入块。
+    返回空字符串表示无角色卡或字段为空。
+    """
+    card_name = get_config("_active_character_card", "")
+    if not card_name:
+        return ""
+    extra_raw = get_config("_character_card_extra", "{}")
+    try:
+        extra = json.loads(extra_raw) if isinstance(extra_raw, str) else extra_raw
+    except Exception:
+        return ""
+
+    parts = []
+    if extra.get("description"):
+        parts.append(f"【角色描述】{extra['description']}")
+    if extra.get("personality"):
+        parts.append(f"【性格】{extra['personality']}")
+    if extra.get("scenario"):
+        parts.append(f"【场景设定】{extra['scenario']}")
+    taboos = extra.get("taboos", [])
+    if taboos:
+        parts.append(f"【禁忌话题】{'、'.join(taboos if isinstance(taboos, list) else [taboos])}")
+    if extra.get("foundation"):
+        parts.append(f"【关系基础】{extra['foundation']}")
+    if extra.get("post_history_instructions"):
+        parts.append(f"【回复指引】{extra['post_history_instructions']}")
+
+    # mes_example 太长时只取头尾
+    mes = extra.get("mes_example", "")
+    if mes:
+        lines = mes.strip().split("\n")
+        if len(lines) > 12:
+            mes = "\n".join(lines[:6]) + "\n……（中间省略）……\n" + "\n".join(lines[-4:])
+        parts.append(f"【对话示例】\n{mes}")
+
+    if not parts:
+        return ""
+
+    return f"\n——角色卡「{card_name}」设定——\n" + "\n".join(parts)

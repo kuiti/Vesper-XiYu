@@ -1014,6 +1014,9 @@ async def chat_websocket(websocket: WebSocket):
                             tool_calls_buffer = chunk["data"]
                             continue
 
+                        if chunk["type"] == "done":
+                            continue
+
                         # token
                         token = chunk["data"]
                         if not token:
@@ -1211,6 +1214,12 @@ async def chat_websocket(websocket: WebSocket):
                     if not _is_system:
                         threading.Thread(target=run_background_tasks, args=(msg_count, original_user_message), daemon=True).start()
                     if not _is_system:
+                        # 事件状态检测（每次用户消息都跑）
+                        from core.profile_builder import track_event_completion, track_plan_intent, track_in_progress, clear_completed_plans
+                        threading.Thread(target=track_event_completion, args=(original_user_message,), daemon=True).start()
+                        threading.Thread(target=track_plan_intent, args=(original_user_message,), daemon=True).start()
+                        threading.Thread(target=track_in_progress, args=(original_user_message,), daemon=True).start()
+                        threading.Thread(target=clear_completed_plans, daemon=True).start()
                         if msg_count % 50 == 0:
                             threading.Thread(target=extract_profile_from_messages, daemon=True).start()
                         if msg_count % 30 == 0:
@@ -1245,6 +1254,50 @@ async def chat_websocket(websocket: WebSocket):
                     # 流式中途失败：保存已发内容，避免用户看到的回复丢失
                     if full_reply and assistant_content and not _is_system:
                         add_chat_message("assistant", assistant_content)
+
+                    # ─── 三阶段降级 ───
+                    if not full_reply:
+                        # 阶段1：非流式重试（不用 tool，纯文本生成）
+                        print("[降级] 流式失败，尝试非流式降级...")
+                        try:
+                            from core.llm_provider import get_provider as _get_provider
+                            _fallback_provider = _get_provider()
+                            _fallback_msgs = [m for m in messages if m["role"] != "system"]
+                            _fallback_reply = _fallback_provider.chat(
+                                _fallback_msgs,
+                                temperature=0.5,
+                                max_tokens=500,
+                            )
+                            if _fallback_reply:
+                                assistant_content = _clean_dsml(_fallback_reply)
+                                full_reply = [assistant_content]
+                                sentences = fallback_split(assistant_content)
+                                if sentences:
+                                    for i, sentence in enumerate(sentences):
+                                        add_chat_message("assistant", _clean_dsml(sentence))
+                                else:
+                                    add_chat_message("assistant", _clean_dsml(assistant_content))
+                                for char in assistant_content:
+                                    await websocket.send_text(json.dumps({"type": "token", "content": char}))
+                                    await asyncio.sleep(0.02)
+                                await websocket.send_text(json.dumps({"type": "done"}))
+                                print("[降级] 非流式降级成功")
+                                continue
+                        except Exception as e2:
+                            print(f"[降级] 非流式也失败: {e2}")
+
+                        # 阶段2：缓存兜底
+                        try:
+                            _cached = _fallback_provider.get_last_successful_reply() if "_fallback_provider" in dir() else ""
+                        except Exception:
+                            _cached = ""
+                        if _cached:
+                            print(f"[降级] 使用缓存回复 ({len(_cached)} chars)")
+                            _brief = _cached[:200] + "……（刚才的回复有点问题，这是上次的内容）"
+                            await websocket.send_text(json.dumps({"type": "token", "content": _brief}))
+                            await websocket.send_text(json.dumps({"type": "done"}))
+                            continue
+
                     err_msg = "生成回复失败，请稍后重试" if full_reply else "AI 服务请求失败，请稍后重试"
                     await websocket.send_text(json.dumps({"type": "error", "content": err_msg}))
             except Exception as e:

@@ -24,9 +24,8 @@ def get_embedding_model():
         if _embedding_model is not None:
             return _embedding_model
         import os
-        # 强制离线——国内服务器连不上 HuggingFace
-        os.environ['HF_HUB_OFFLINE'] = '1'
-        os.environ['TRANSFORMERS_OFFLINE'] = '1'
+        # 设置 HuggingFace 镜像（国内用户可加速下载）
+        os.environ.setdefault('HF_ENDPOINT', 'https://hf-mirror.com')
         from sentence_transformers import SentenceTransformer
         try:
             _embedding_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
@@ -572,6 +571,26 @@ def delete_document_vectors(doc_id):
             collection.delete(ids=results['ids'])
     except Exception as e:
         print(f"[知识库删除] 异常: {e}")
+
+def delete_message_vectors(msg_id):
+    """删除单条消息的向量（避免全量重建）"""
+    if not is_model_ready():
+        return
+    try:
+        # 主集合：chat_memory 以 msg_id 为 id
+        main = get_collection()
+        main.delete(ids=[str(msg_id)])
+    except Exception as e:
+        print(f"[向量删除] chat_memory: {e}")
+    try:
+        # 句子索引集合：按 msg_id 过滤删除
+        sent = get_collection("sentence_index")
+        results = sent.get(where={"msg_id": msg_id})
+        if results and results['ids']:
+            sent.delete(ids=results['ids'])
+    except Exception as e:
+        print(f"[向量删除] sentence_index: {e}")
+
 
 # 启动异步加载模型
 ensure_model_loaded_async()

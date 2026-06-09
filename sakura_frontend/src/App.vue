@@ -42,6 +42,8 @@
 
         <MemoryView v-if="activeView==='memory'" :aiName="aiNameLocal" />
 
+        <CharactersView v-if="activeView==='characters'" />
+
         <SettingsView v-if="activeView==='settings'"
           :settings="allSettings" :themeLocal="themeLocal" :ipCity="ipCity"
           :relationship="relationship" :emotionTrend="emotionTrend"
@@ -81,10 +83,11 @@ import OnboardingWizard from './components/OnboardingWizard.vue'
 import AchievementToast from './components/AchievementToast.vue'
 import HistoryView from './components/HistoryView.vue'
 import DiaryView from './components/DiaryView.vue'
+import CharactersView from './components/CharactersView.vue'
 import FloatingCalendar from './components/FloatingCalendar.vue'
 
 export default {
-  components: { NavBar, ChatView, ToolsView, StatsView, GamesView, MemoryView, SettingsView, LockScreen, OnboardingWizard, AchievementToast, HistoryView, DiaryView, FloatingCalendar, LoginView },
+  components: { NavBar, ChatView, ToolsView, StatsView, GamesView, MemoryView, SettingsView, LockScreen, OnboardingWizard, AchievementToast, HistoryView, DiaryView, CharactersView, FloatingCalendar, LoginView },
   provide() { return { showConfirm: this.showConfirm } },
   data() {
     return {

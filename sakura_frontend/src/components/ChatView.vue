@@ -30,7 +30,9 @@
           <div class="msg-body">
             <div class="msg-name">{{ msg.role === 'user' ? (userNameLocal || '我') : (aiNameLocal || '佐仓') }}</div>
             <div v-if="(msg.isWeather || isWeatherContent(msg.content)) && (msg.weatherData || parseWeatherContent(msg.content))" class="weather-msg"><WeatherCard :data="msg.weatherData || parseWeatherContent(msg.content)" /></div>
-            <div v-else class="msg-bubble" v-html="safeLinkify(msg.content)" @contextmenu.prevent="openCtx($event, msg)" @dblclick="copyText(msg.content)"></div>
+            <div v-else class="msg-bubbles">
+              <div v-for="(para, pi) in splitParagraphs(msg.content)" :key="pi" class="msg-bubble" v-html="safeLinkify(para)" @contextmenu.prevent="openCtx($event, msg)" @dblclick="copyText(msg.content)"></div>
+            </div>
             <div class="msg-footer">
               <span class="msg-time">{{ fmtTime(msg.timestamp) }}</span>
               <button v-if="msg.role === 'assistant' && msg.content && voiceSettings?.tts_enabled" class="tts-btn" @click="speakText(msg)" :title="ttsPlaying && ttsMsgId === msg.id ? '停止' : '朗读'">
@@ -190,6 +192,10 @@ export default {
     isWeatherContent(c) { return typeof c === 'string' && c.startsWith('__WEATHER_CARD__') },
     parseWeatherContent(c) { try { return JSON.parse(c.replace('__WEATHER_CARD__', '')) } catch (e) { return null } },
     copyText(t) { navigator.clipboard.writeText(t).catch(() => {}) },
+    splitParagraphs(text) {
+      if (!text) return ['']
+      return text.split(/\n{2,}/).filter(Boolean)
+    },
     findNextSentence(text) {
       if (this.sentenceMode === 'raw') return null
       if (this.sentenceMode === 'delimiter') { const idx = text.indexOf('<<>>'); if (idx !== -1) return [text.slice(0, idx), text.slice(idx + 4)] }
@@ -262,6 +268,11 @@ export default {
 .msg.user .msg-name { text-align: right; }
 .msg-bubble { padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; word-break: break-word; background: var(--ab); color: var(--tc); }
 .msg.user .msg-bubble { background: var(--ub); }
+.msg-bubbles { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.msg-bubbles .msg-bubble { max-width: 100%; }
+.msg.user .msg-bubbles { align-items: flex-end; }
+.msg-bubbles .msg-bubble:not(:first-child) { border-top-left-radius: 4px; border-top-right-radius: 4px; }
+.msg-bubbles .msg-bubble:not(:last-child) { border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }
 .msg-bubble a { color: var(--p); }
 .msg-bubble.streaming { opacity: .8; }
 .msg-bubble.typing-dots { padding: 10px 18px; display: flex; gap: 5px; align-items: center; }
@@ -290,11 +301,11 @@ export default {
 .empty-chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
 .empty-chip { padding: 6px 14px; background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 16px; font-size: 12px; color: var(--tc2); cursor: pointer; transition: all .15s; }
 .empty-chip:hover { background: var(--p); color: #fff; border-color: var(--p); }
-/* bubble tails */
-.msg.user .msg-bubble { position: relative; }
-.msg.user .msg-bubble::after { content: ''; position: absolute; bottom: 0; right: -6px; width: 0; height: 0; border-left: 6px solid var(--ub); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
-.msg.assistant .msg-bubble { position: relative; }
-.msg.assistant .msg-bubble::after { content: ''; position: absolute; bottom: 0; left: -6px; width: 0; height: 0; border-right: 6px solid var(--ab); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+/* bubble tails - only on last paragraph */
+.msg.user .msg-bubbles .msg-bubble:last-child { position: relative; }
+.msg.user .msg-bubbles .msg-bubble:last-child::after { content: ''; position: absolute; bottom: 0; right: -6px; width: 0; height: 0; border-left: 6px solid var(--ub); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+.msg.assistant .msg-bubbles .msg-bubble:last-child { position: relative; }
+.msg.assistant .msg-bubbles .msg-bubble:last-child::after { content: ''; position: absolute; bottom: 0; left: -6px; width: 0; height: 0; border-right: 6px solid var(--ab); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
 .date-sep { text-align: center; font-size: 11px; color: var(--tc2); padding: 8px 0; }
 .loading-indicator { text-align: center; color: var(--tc2); font-size: 12px; padding: 8px; }
 .quick-replies { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }

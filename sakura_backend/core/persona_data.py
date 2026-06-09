@@ -5,6 +5,21 @@ persona_data.py —— 从 prompt_builder.py 提取的静态数据常量
 构建逻辑仍在 prompt_builder.py 中。
 """
 
+import json as _json_bg
+
+
+def parse_ai_background(raw: str = None) -> dict:
+    """安全解析 ai_background JSON，失败时返回空 dict"""
+    if not raw:
+        raw = ""
+    raw = raw.strip()
+    if not raw:
+        return {}
+    try:
+        return _json_bg.loads(raw)
+    except _json_bg.JSONDecodeError:
+        return {"legacy": raw}
+
 # ─── 回复长度映射 ───
 LENGTH_MAP = {
     "极短": "每句话不超过5个字",

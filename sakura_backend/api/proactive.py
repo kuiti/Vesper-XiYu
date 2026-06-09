@@ -194,8 +194,12 @@ def should_proactive_trigger(
                 minutes_left = (target - now).total_seconds() / 60
                 trigger_key = f"upcoming_reminder_{r['id']}"
                 if 0 < minutes_left < 120 and trigger_key not in session_triggered:
+                    # 使用 reminder_ai 生成温和通知文案
+                    from core.reminder_ai import generate_reminder_message
+                    notify_content = generate_reminder_message(r["content"], r.get("level", 4))
                     return True, trigger_key, {
                         "content": r["content"],
+                        "notify_message": notify_content,
                         "minutes_left": round(minutes_left, 1),
                         "style": "温和提醒，不催促"
                     }

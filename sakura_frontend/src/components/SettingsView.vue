@@ -25,6 +25,7 @@
           <div class="field"><label>提供商</label><select v-model="provider" @change="onProviderChange"><option value="deepseek">DeepSeek</option><option value="qwen">通义千问</option><option value="moonshot">Moonshot</option><option value="zhipu">智谱</option><option value="openai">OpenAI</option><option value="ollama">Ollama (本地)</option><option value="custom">自定义</option></select></div>
           <div class="field"><label>API 地址</label><input v-model="apiBaseUrl" placeholder="https://api.deepseek.com/v1"></div>
           <div class="field"><label>模型</label><div class="btn-row"><input v-model="apiModel" placeholder="deepseek-chat" style="flex:1"><button class="btn-s" @click="fetchModels" :disabled="fetchingModels">{{ fetchingModels ? '...' : '获取' }}</button></div></div>
+          <div class="field"><label>备选模型</label><input v-model="fallbackModels" @change="saveCfg('fallback_models', fallbackModels)" placeholder="gpt-4o,claude-sonnet-4-6（主模型失败时自动切换）"></div>
           <div class="field"><label>API Key</label><input type="password" v-model="apiKey" placeholder="sk-..."></div>
           <div class="btn-row"><button class="btn" @click="saveApi">保存</button><button class="btn-s" @click="testApi" :disabled="testingApi">{{ testingApi ? '...' : '测试连接' }}</button><span v-if="testMsg" :class="testOk ? 'ok' : 'fail'">{{ testMsg }}</span></div>
           <div v-if="availableModels.length" class="field" style="margin-top:8px"><label>可用模型</label><select v-model="apiModel"><option v-for="m in availableModels" :key="m" :value="m">{{ m }}</option></select></div>
@@ -183,13 +184,21 @@
           <select v-model="ttsEngine" @change="onEngineChange" class="input">
             <option value="off">关闭语音合成</option>
             <option value="edge">Edge TTS（免费在线）</option>
+            <option value="openai">OpenAI TTS（在线）</option>
             <option value="xiaomi">小米 MiMo TTS（在线）</option>
+            <option value="volcano">火山引擎 TTS（在线）</option>
+            <option value="baidu">百度 TTS（在线）</option>
+            <option value="aliyun">阿里云 TTS（在线）</option>
+            <option value="fish_audio">Fish Audio（在线，支持克隆）</option>
+            <option value="spark">讯飞 Spark TTS（在线）</option>
+            <option value="cosyvoice">CosyVoice（本地部署）</option>
+            <option value="gpt_sovits">GPT-SoVITS（本地部署）</option>
           </select>
-          <p class="hint" v-if="ttsEngine==='xiaomi'">小米 MiMo 平台 API，支持预置音色和声音克隆。</p>
+          <p class="hint" v-if="ttsEngine!=='off'">选择 TTS 引擎后配置对应参数。</p>
           <p class="hint" v-if="ttsEngineStatus" :class="ttsEngineStatus==='ok'?'hint-ok':'hint-err'">引擎状态: {{ ttsEngineStatus }}</p>
         </div>
 
-        <!-- Edge TTS 配置 -->
+        <!-- Edge TTS -->
         <div v-if="ttsEngine==='edge'" class="card"><h3>Edge TTS 音色</h3>
           <label class="field-label">音色</label>
           <select v-model="ttsVoice" @change="saveVoice" class="input">
@@ -198,10 +207,110 @@
             <option value="yunxi">云希（男声阳光）</option>
             <option value="yunjian">云健（男声沉稳）</option>
           </select>
+          <p class="hint">免费，无需 API Key，需要网络。</p>
         </div>
 
-        <!-- IndexTTS2 配置 -->
-        <!-- 小米 TTS 配置 -->
+        <!-- OpenAI TTS -->
+        <div v-if="ttsEngine==='openai'" class="card"><h3>OpenAI TTS</h3>
+          <label class="field-label">API Key</label>
+          <input v-model="ttsApiKey" class="input" placeholder="sk-..." type="password">
+          <label class="field-label" style="margin-top:8px">音色</label>
+          <select v-model="ttsVoice" @change="saveVoice" class="input">
+            <option value="alloy">Alloy（中性）</option>
+            <option value="echo">Echo（男声沉稳）</option>
+            <option value="fable">Fable（英式男声）</option>
+            <option value="onyx">Onyx（男声深沉）</option>
+            <option value="nova">Nova（女声温柔）</option>
+            <option value="shimmer">Shimmer（女声清亮）</option>
+          </select>
+          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
+        </div>
+
+        <!-- 火山引擎 TTS -->
+        <div v-if="ttsEngine==='volcano'" class="card"><h3>火山引擎 TTS</h3>
+          <label class="field-label">API Key</label>
+          <input v-model="ttsApiKey" class="input" placeholder="在火山引擎控制台获取" type="password">
+          <label class="field-label" style="margin-top:8px">音色</label>
+          <select v-model="ttsVoice" @change="saveVoice" class="input">
+            <option value="BV001">温柔女声</option>
+            <option value="BV002">活泼女声</option>
+            <option value="BV003">沉稳男声</option>
+            <option value="BV004">阳光男声</option>
+            <option value="BV005">可爱童声</option>
+            <option value="BV006">知性女声</option>
+            <option value="BV007">磁性男声</option>
+            <option value="BV008">新闻女声</option>
+          </select>
+          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
+        </div>
+
+        <!-- 百度 TTS -->
+        <div v-if="ttsEngine==='baidu'" class="card"><h3>百度 TTS</h3>
+          <label class="field-label">API Key</label>
+          <input v-model="ttsApiKey" class="input" placeholder="appid|secret（在百度AI控制台获取）" type="password">
+          <label class="field-label" style="margin-top:8px">音色</label>
+          <select v-model="ttsVoice" @change="saveVoice" class="input">
+            <option value="0">女声（普通）</option>
+            <option value="1">男声（普通）</option>
+            <option value="3">女声（情感）</option>
+            <option value="4">男声（情感）</option>
+            <option value="5003">女声（精品）</option>
+            <option value="111">男声（情感加深）</option>
+          </select>
+          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
+        </div>
+
+        <!-- 阿里云 TTS -->
+        <div v-if="ttsEngine==='aliyun'" class="card"><h3>阿里云 TTS（CosyVoice）</h3>
+          <label class="field-label">API Key</label>
+          <input v-model="ttsApiKey" class="input" placeholder="AccessKeyId|AccessKeySecret|AppKey" type="password">
+          <label class="field-label" style="margin-top:8px">API 地址</label>
+          <input v-model="ttsApiUrl" class="input" placeholder="https://nls-gateway.cn-shanghai.aliyuncs.com">
+          <label class="field-label" style="margin-top:8px">音色（可选）</label>
+          <input v-model="ttsVoice" class="input" placeholder="longxiaochun（留空用默认）">
+          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
+        </div>
+
+        <!-- Fish Audio -->
+        <div v-if="ttsEngine==='fish_audio'" class="card"><h3>Fish Audio</h3>
+          <label class="field-label">API Key</label>
+          <input v-model="ttsApiKey" class="input" placeholder="fish.audio 获取" type="password">
+          <label class="field-label" style="margin-top:8px">音色 ID</label>
+          <input v-model="ttsVoice" class="input" placeholder="留空用默认音色">
+          <p class="hint">支持声音克隆，在 Fish Audio 平台创建音色后填入 ID。</p>
+          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
+        </div>
+
+        <!-- 讯飞 Spark TTS -->
+        <div v-if="ttsEngine==='spark'" class="card"><h3>讯飞 Spark TTS</h3>
+          <label class="field-label">API Key</label>
+          <input v-model="ttsApiKey" class="input" placeholder="appid|api_secret|api_key" type="password">
+          <label class="field-label" style="margin-top:8px">音色</label>
+          <input v-model="ttsVoice" class="input" placeholder="x4_zh（默认）">
+          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
+        </div>
+
+        <!-- CosyVoice 本地 -->
+        <div v-if="ttsEngine==='cosyvoice'" class="card"><h3>CosyVoice 本地部署</h3>
+          <label class="field-label">服务地址</label>
+          <input v-model="ttsServerUrl" class="input" placeholder="http://127.0.0.1:50000">
+          <label class="field-label" style="margin-top:8px">音色</label>
+          <input v-model="ttsVoice" class="input" placeholder="default（留空用默认）">
+          <p class="hint">需要本地运行 CosyVoice 服务。支持声音克隆和情感控制。</p>
+          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
+        </div>
+
+        <!-- GPT-SoVITS 本地 -->
+        <div v-if="ttsEngine==='gpt_sovits'" class="card"><h3>GPT-SoVITS 本地部署</h3>
+          <label class="field-label">服务地址</label>
+          <input v-model="ttsServerUrl" class="input" placeholder="http://127.0.0.1:9880">
+          <label class="field-label" style="margin-top:8px">参考音频路径/ID</label>
+          <input v-model="ttsVoice" class="input" placeholder="default（留空用默认）">
+          <p class="hint">需要本地运行 GPT-SoVITS API。少样本声音克隆，中文效果极佳。</p>
+          <div style="margin-top:8px"><button class="btn" @click="saveVoice">保存</button></div>
+        </div>
+
+        <!-- 小米 TTS -->
         <div v-if="ttsEngine==='xiaomi'" class="card"><h3>小米 MiMo TTS</h3>
           <label class="field-label">API Key</label>
           <div style="display:flex;gap:8px">
@@ -215,8 +324,6 @@
             <option value="preset">预置音色</option>
             <option value="clone">声音克隆（用自己的声音）</option>
           </select>
-
-          <!-- 预置音色 -->
           <div v-if="ttsCloneMode==='preset'" style="margin-top:8px">
             <label class="field-label">音色</label>
             <select v-model="ttsVoice" @change="saveVoice" class="input">
@@ -230,8 +337,6 @@
               <option value="Dean">Dean（英文男声）</option>
             </select>
           </div>
-
-          <!-- 声音克隆 -->
           <div v-if="ttsCloneMode==='clone'" style="margin-top:8px">
             <label class="field-label">参考音频</label>
             <p class="hint">上传你的录音（10秒以上清晰语音，wav/mp3，≤10MB）</p>
@@ -254,6 +359,22 @@
         </div>
         <div class="card"><h3>聊天管理</h3><ChatManagePanel @changed="loadFavorites" /></div>
         <div class="card"><h3>数据迁移</h3><p class="hint">导出完整备份（含配置和记忆），或从备份恢复。恢复后建议重建向量索引。</p><MigratePanel /></div>
+        <div class="card"><h3>云端同步</h3><p class="hint">加密备份到 WebDAV 服务器，防止数据丢失。</p>
+          <div class="cloud-panel">
+            <div class="cloud-row"><label>后端类型</label><select v-model="cloudBackend" @change="saveCloudCfg"><option value="webdav">WebDAV</option></select></div>
+            <div class="cloud-row"><label>服务器地址</label><input v-model="cloudUrl" placeholder="https://example.com/dav/" /></div>
+            <div class="cloud-row"><label>用户名</label><input v-model="cloudUser" placeholder="WebDAV 用户名" /></div>
+            <div class="cloud-row"><label>密码</label><input v-model="cloudPass" type="password" placeholder="WebDAV 密码" /></div>
+            <div class="cloud-row"><label>加密密码</label><input v-model="cloudPhrase" type="password" placeholder="可选：备份加密密码" /></div>
+            <div class="cloud-actions">
+              <button class="btn" @click="saveCloudCfg">保存配置</button>
+              <button class="btn-s" @click="testCloudConn">测试连接</button>
+              <button class="btn" @click="cloudUpload" :disabled="cloudUploading">{{ cloudUploading ? '上传中...' : '上传备份' }}</button>
+            </div>
+            <div v-if="cloudMsg" :class="['cloud-msg', cloudMsgOk ? 'ok' : 'err']">{{ cloudMsg }}</div>
+            <div v-if="cloudLastSync" class="cloud-last">上次同步：{{ cloudLastSync }}</div>
+          </div>
+        </div>
         <div class="card"><h3>重置</h3><div class="btn-row"><button class="btn-s" @click="resetRelationship">重置关系(好感/信任)</button><button class="btn-s" @click="resetMemory">重置摘要记忆</button><button class="btn-s danger" @click="fullReset">完全重置</button></div><p class="hint">完全重置：清除所有数据（聊天、提醒、日程、待办、记忆、人设），重新触发引导。API 设置保留。</p></div>
       </div>
     </div>
@@ -317,6 +438,8 @@ export default {
       ragStatus: '', ragCount: 0, ragMsg: '', ragMsgOk: false, installingRag: false, rebuildingRag: false,
       provinces: [], cities: [], selProvince: '', selCity: '',
       savedColorPresets: [],
+      cloudBackend: 'webdav', cloudUrl: '', cloudUser: '', cloudPass: '', cloudPhrase: '',
+      cloudMsg: '', cloudMsgOk: false, cloudUploading: false, cloudLastSync: '',
     }
   },
   computed: {
@@ -332,7 +455,7 @@ export default {
       return (this.settings || {}).manual_city || ''
     }
   },
-  async mounted() { this._loadServerSettings(); await this.loadFromSettings(); this.loadPresets(); this.loadFavorites(); this.loadProvinces(); this.checkRagStatus(); this.loadFoundationTypes() },
+  async mounted() { this._loadServerSettings(); await this.loadFromSettings(); this.loadPresets(); this.loadFavorites(); this.loadProvinces(); this.checkRagStatus(); this.loadFoundationTypes(); this.loadCloudCfg() },
   methods: {
     // ── 服务器连接 ──
     saveServer() {
@@ -592,6 +715,40 @@ export default {
     },
     async uploadAvatar(role, e) { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('file', f); try { await api.post(`/avatar/upload/${role}`, fd); this.$emit('config-changed', 'avatar_updated'); e.target.value = '' } catch (err) { alert('上传失败') } },
     async uploadAvatarByUrl(role) { const url = role === 'assistant' ? this.aiAvatarUrlLocal : this.userAvatarUrlLocal; if (!url) return; try { await api.post(`/avatar/upload-url/${role}`, { url }); this.$emit('config-changed', 'avatar_updated'); if (role === 'assistant') this.aiAvatarUrlLocal = ''; else this.userAvatarUrlLocal = '' } catch (err) { alert('导入失败') } },
+    // 云端同步
+    async saveCloudCfg() {
+      try {
+        await api.post('/cloud/config', { backend_type: this.cloudBackend, url: this.cloudUrl, username: this.cloudUser, password: this.cloudPass, passphrase: this.cloudPhrase })
+        this.cloudMsg = '配置已保存'; this.cloudMsgOk = true
+        setTimeout(() => this.cloudMsg = '', 3000)
+      } catch (e) { this.cloudMsg = '保存失败'; this.cloudMsgOk = false }
+    },
+    async testCloudConn() {
+      try {
+        const r = await api.post('/cloud/test')
+        this.cloudMsg = r.data.message || '连接成功'; this.cloudMsgOk = r.data.status === 'ok'
+      } catch (e) { this.cloudMsg = '连接失败'; this.cloudMsgOk = false }
+    },
+    async cloudUpload() {
+      this.cloudUploading = true; this.cloudMsg = ''
+      try {
+        const r = await api.post('/cloud/upload', { passphrase: this.cloudPhrase })
+        this.cloudMsg = r.data.status === 'ok' ? '上传成功' : (r.data.message || '上传失败')
+        this.cloudMsgOk = r.data.status === 'ok'
+        if (r.data.status === 'ok') { const sr = await api.get('/cloud/status'); this.cloudLastSync = sr.data.last_sync || '' }
+      } catch (e) { this.cloudMsg = '上传失败'; this.cloudMsgOk = false }
+      finally { this.cloudUploading = false }
+    },
+    async loadCloudCfg() {
+      try {
+        const r = await api.get('/cloud/config')
+        const cfg = r.data.config || {}
+        this.cloudUrl = cfg.url || ''; this.cloudUser = cfg.username || ''; this.cloudPass = cfg.password || ''
+        this.cloudBackend = cfg.backend_type || 'webdav'
+        const sr = await api.get('/cloud/status')
+        this.cloudLastSync = sr.data.last_sync || ''
+      } catch (e) {}
+    },
   }
 }
 </script>
@@ -706,4 +863,13 @@ textarea { resize: vertical; }
 .foundation-confirm .btn { padding: 6px 16px; font-size: 13px; }
 .btn-secondary { background: var(--border, #30363d); color: var(--tc, #e6edf3); }
 .btn-secondary:hover { background: var(--tc2, #8b949e); }
+.cloud-panel { display: flex; flex-direction: column; gap: 8px; }
+.cloud-row { display: flex; align-items: center; gap: 8px; }
+.cloud-row label { font-size: 12px; color: var(--tc2); min-width: 80px; flex-shrink: 0; }
+.cloud-row input, .cloud-row select { flex: 1; padding: 6px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--tc); font-size: 12px; }
+.cloud-actions { display: flex; gap: 8px; margin-top: 4px; }
+.cloud-msg { font-size: 12px; padding: 4px 0; }
+.cloud-msg.ok { color: #4caf50; }
+.cloud-msg.err { color: #e74c3c; }
+.cloud-last { font-size: 11px; color: var(--tc2); }
 </style>

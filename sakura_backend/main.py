@@ -21,6 +21,7 @@ _startup_stage = "importing"
 
 # ─── 所有路由延迟加载列表 ───
 _ALL_ROUTERS = [
+    ("api.habits", "router"),
     ("api.settings", "router"),
     ("api.test", "router"),
     ("api.location", "router"),

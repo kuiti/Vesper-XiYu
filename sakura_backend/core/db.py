@@ -58,13 +58,6 @@ def _init_db_locked():
         cursor.execute("""CREATE TABLE IF NOT EXISTS user_profile (
             key TEXT PRIMARY KEY, value TEXT, confidence REAL, extracted_at TEXT
         )""")
-        # summary 表
-        cursor.execute("""CREATE TABLE IF NOT EXISTS summary (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            summary TEXT, key_points TEXT,
-            start_time TEXT, end_time TEXT, created_at TEXT,
-            is_active INTEGER DEFAULT 1
-        )""")
         # tiered_summary 表
         cursor.execute("""CREATE TABLE IF NOT EXISTS tiered_summary (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,6 +89,15 @@ def _init_db_locked():
         cursor.execute("""CREATE TABLE IF NOT EXISTS countdowns (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT, target_date TEXT
+        )""")
+        # habits 表
+        cursor.execute("""CREATE TABLE IF NOT EXISTS habits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            checked INTEGER DEFAULT 0,
+            streak INTEGER DEFAULT 0,
+            date TEXT,
+            created TEXT
         )""")
         # reminders 表
         cursor.execute("""CREATE TABLE IF NOT EXISTS reminders (
@@ -334,40 +336,6 @@ def _init_db_locked():
             except sqlite3.OperationalError:
                 pass
 
-        # 一次性迁移：旧摘要系统 → 三级摘要系统
-        if not _get_config_direct(cursor, "_tiered_migration_done"):
-            try:
-                # migrate_old_summaries 用 get_conn()，这里直接内联关键逻辑
-                cursor.execute("SELECT summary, key_points, start_time, end_time FROM summary WHERE is_active=1")
-                old_rows = cursor.fetchall()
-                for r in old_rows:
-                    kp = r["key_points"]
-                    if isinstance(kp, str):
-                        try:
-                            kp = json.loads(kp)
-                        except (json.JSONDecodeError, ValueError):
-                            kp = []
-                    cursor.execute(
-                        """INSERT INTO tiered_summary
-                           (level, summary, key_points, importance, remaining_days, start_time, end_time)
-                           VALUES (1, ?, ?, 0.5, 5, ?, ?)""",
-                        (r["summary"], json.dumps(kp, ensure_ascii=False), r["start_time"], r["end_time"])
-                    )
-                cursor.execute("SELECT COUNT(*) FROM chat_history")
-                msg_count = cursor.fetchone()[0]
-                cursor.execute(
-                    "UPDATE summary_msg_counter SET count=?, last_level1_at=?, last_level2_at=?, last_level3_at=? WHERE id=1",
-                    (msg_count, (msg_count // 10) * 10, (msg_count // 50) * 50, (msg_count // 100) * 100)
-                )
-                # 标记迁移完成
-                now = datetime.now().isoformat()
-                cursor.execute("REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
-                               ("_tiered_migration_done", "true", now))
-                conn.commit()
-                print("[迁移] 旧摘要数据已迁移至三级摘要系统")
-            except Exception as e:
-                print(f"[迁移] 摘要迁移失败: {e}")
-
         # ─── schema 升级：为旧数据库补加缺失列 ───
         migrations = [
             ("config", "updated_at", "TEXT"),
@@ -453,6 +421,10 @@ import time as _time
 
 _config_cache = {}  # {key: (value, expire_ts)}
 _CONFIG_TTL = 30.0  # 30 秒缓存，平衡响应速度与 DB 压力
+
+def clear_config_cache():
+    """清除整个配置缓存（重置等批量操作后调用）"""
+    _config_cache.clear()
 _CONFIG_CACHE_MAX = 500
 
 def get_config(key, default=None):
@@ -615,6 +587,8 @@ def clear_chat_history():
         cursor.execute("DELETE FROM knowledge_graph")
         cursor.execute("DELETE FROM sentence_index")
         cursor.execute("DELETE FROM memory_importance")
+        cursor.execute("DELETE FROM favorites")
+        cursor.execute("DELETE FROM empathy_feedback")
         cursor.execute("DELETE FROM user_profile WHERE key LIKE '_fact_%'")
         # 重建 FTS 表并恢复触发器
         cursor.execute("INSERT INTO chat_fts(chat_fts) VALUES('rebuild')")
@@ -640,6 +614,9 @@ def delete_chat_history_older_than(days: int):
         if ids:
             placeholders = ','.join('?' for _ in ids)
             cursor.execute(f"DELETE FROM chat_fts WHERE rowid IN ({placeholders})", ids)
+            cursor.execute(f"DELETE FROM sentence_index WHERE msg_id IN ({placeholders})", ids)
+            cursor.execute(f"DELETE FROM favorites WHERE msg_id IN ({placeholders})", ids)
+            cursor.execute(f"DELETE FROM empathy_feedback WHERE msg_id IN ({placeholders})", ids)
             cursor.execute("DELETE FROM chat_history WHERE timestamp < ?", (cutoff,))
             cursor.execute("UPDATE summary_msg_counter SET count = MAX(0, count - ?), last_level1_at = MIN(last_level1_at, MAX(0, count - ?)), last_level2_at = MIN(last_level2_at, MAX(0, count - ?)), last_level3_at = MIN(last_level3_at, MAX(0, count - ?)) WHERE id = 1", (len(ids), len(ids), len(ids), len(ids)))
 
@@ -651,6 +628,9 @@ def delete_chat_history_between(start_iso: str, end_iso: str):
         if ids:
             placeholders = ','.join('?' for _ in ids)
             cursor.execute(f"DELETE FROM chat_fts WHERE rowid IN ({placeholders})", ids)
+            cursor.execute(f"DELETE FROM sentence_index WHERE msg_id IN ({placeholders})", ids)
+            cursor.execute(f"DELETE FROM favorites WHERE msg_id IN ({placeholders})", ids)
+            cursor.execute(f"DELETE FROM empathy_feedback WHERE msg_id IN ({placeholders})", ids)
             cursor.execute("DELETE FROM chat_history WHERE timestamp BETWEEN ? AND ?", (start_iso, end_iso))
             cursor.execute("UPDATE summary_msg_counter SET count = MAX(0, count - ?), last_level1_at = MIN(last_level1_at, MAX(0, count - ?)), last_level2_at = MIN(last_level2_at, MAX(0, count - ?)), last_level3_at = MIN(last_level3_at, MAX(0, count - ?)) WHERE id = 1", (len(ids), len(ids), len(ids), len(ids)))
             return len(ids)
@@ -685,6 +665,42 @@ def rebuild_fts_index():
         """)
 
 # ========== todos ==========
+
+def get_habits():
+    """获取所有习惯"""
+    with get_conn() as conn:
+        rows = conn.cursor().execute("SELECT * FROM habits ORDER BY id").fetchall()
+        return [dict(r) for r in rows]
+
+def add_habit(name: str):
+    """添加习惯"""
+    now = datetime.now().isoformat()
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        conn.cursor().execute("INSERT INTO habits (name, date, created) VALUES (?, ?, ?)", (name, today, now))
+
+def update_habit(habit_id: int, checked: bool, streak: int):
+    """更新习惯状态"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        conn.cursor().execute("UPDATE habits SET checked=?, streak=?, date=? WHERE id=?", (1 if checked else 0, streak, today, habit_id))
+
+def delete_habit(habit_id: int) -> bool:
+    """删除习惯"""
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("DELETE FROM habits WHERE id=?", (habit_id,))
+        return c.rowcount > 0
+
+def reset_habits_daily():
+    """每日重置：未打卡的连续天数归零"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    with get_conn() as conn:
+        conn.cursor().execute(
+            "UPDATE habits SET checked=0, streak=CASE WHEN date != ? THEN 0 ELSE streak END WHERE date != ?",
+            (today, today)
+        )
+
 def get_todos():
     with get_conn() as conn:
         cursor = conn.cursor()

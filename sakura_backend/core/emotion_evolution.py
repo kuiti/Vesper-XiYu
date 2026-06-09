@@ -157,19 +157,12 @@ def _set_last_evolution_date(date_str: str):
 
 
 def _try_claim_evolution_date(today: str) -> bool:
-    """原子化抢占当日演化权限。在单事务中 SELECT + 写入，防止 TOCTOU 并发。"""
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM config WHERE key='last_evolution_date'")
-        row = cursor.fetchone()
-        if row and row["value"] == today:
-            return False
-        # 原子写入：使用同一连接内的事务
-        cursor.execute(
-            "INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)",
-            ("last_evolution_date", today)
-        )
-        return True
+    """检查当日是否已演化的缓存安全版本。"""
+    current = get_config("last_evolution_date", "")
+    if current == today:
+        return False
+    set_config("last_evolution_date", today)
+    return True
 
 
 # ─── 每日演化主入口 ───

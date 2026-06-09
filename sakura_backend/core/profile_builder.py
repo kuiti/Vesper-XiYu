@@ -5,6 +5,8 @@ import hashlib
 import threading
 from datetime import datetime
 from core.db import get_config, get_conn, get_recent_chat_messages
+import logging
+logger = logging.getLogger(__name__)
 
 _profile_cache = None
 _profile_cache_lock = threading.Lock()
@@ -307,8 +309,8 @@ def get_facts_context(max_facts=15):
                         days_ago = (_dt.now() - created).days
                         if days_ago > 0:
                             text = f"【{days_ago}天前】{text}"
-                    except Exception:
-                        pass
+                    except Exception as e:  # silent
+                        logger.debug(f"[get_facts_context] {e}")
                 facts.append((importance, text))
         except (json.JSONDecodeError, TypeError):
             pass

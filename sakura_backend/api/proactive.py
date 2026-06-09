@@ -12,6 +12,8 @@
 import json
 from datetime import datetime, timedelta
 from core.db import get_config, set_config, get_active_hours, get_proactive_flag, get_proactive_response_rate, get_reminders
+import logging
+logger = logging.getLogger(__name__)
 
 
 # ─── AI 情绪 → 主动意愿系数 ───
@@ -203,10 +205,10 @@ def should_proactive_trigger(
                         "minutes_left": round(minutes_left, 1),
                         "style": "温和提醒，不催促"
                     }
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as e:  # silent
+                logger.debug(f"[?] {e}")
+    except Exception as e:  # silent
+        logger.debug(f"[?] {e}")
 
     # ─── 触发 E: 长期目标跟进 ───
     try:
@@ -219,8 +221,8 @@ def should_proactive_trigger(
                 "category": goal.get("category", "other"),
                 "style": "自然提起，不像任务清单，像朋友关心进展"
             }
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[?] {e}")
 
     # ─── 兜底: 空闲 >= 30 分钟 ───
     if idle_minutes >= 30 and "idle" not in session_triggered:
@@ -260,15 +262,15 @@ def _load_care_counts():
             data = json.loads(raw)
             _care_daily_counts = data.get("counts", {})
             _care_daily_date = data.get("date", "")
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[_load_care_counts] {e}")
 
 
 def _save_care_counts():
     try:
         set_config("_care_daily_counts", json.dumps({"counts": _care_daily_counts, "date": _care_daily_date}, ensure_ascii=False))
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[_save_care_counts] {e}")
 
 
 def _reset_care_counts_if_new_day():

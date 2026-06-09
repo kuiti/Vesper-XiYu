@@ -6,6 +6,8 @@
 
 from datetime import datetime, timedelta
 from core.db import get_conn, get_config, set_config
+import logging
+logger = logging.getLogger(__name__)
 
 
 # 性格特征上下限
@@ -202,8 +204,8 @@ def process_daily_evolution():
         if today_trend and today_trend[0]["total_messages"] > 0:
             update_trait("agreeableness", 0.01)
             print(f"[情绪演化] 今日互动 → expressiveness+0.01")
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[?] {e}")
 
     # ─── 规则6: 周日反思 ───
     if datetime.now().weekday() == 6:
@@ -216,8 +218,8 @@ def process_daily_evolution():
         from core.db import get_conn
         with get_conn() as conn:
             conn.cursor().execute("DELETE FROM emotion_log WHERE timestamp < date('now', '-90 days')")
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[?] {e}")
     print(f"[情绪演化] 每日演化完成")
 
 

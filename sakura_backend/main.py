@@ -15,6 +15,8 @@ from contextlib import asynccontextmanager
 import importlib
 import os
 import asyncio
+import logging
+logger = logging.getLogger(__name__)
 
 # ─── 启动阶段追踪 ───
 _startup_stage = "importing"
@@ -153,8 +155,8 @@ def set_window_theme(data: dict):
             try:
                 with open(hwnd_file) as f:
                     hwnd = int(f.read().strip())
-            except Exception:
-                pass
+            except Exception as e:  # silent
+                logger.debug(f"[set_window_theme] {e}")
         if not hwnd:
             hwnd = ctypes.windll.user32.FindWindowW(None, "佐仓")
         if hwnd:
@@ -164,8 +166,8 @@ def set_window_theme(data: dict):
                 wintypes.HWND(hwnd), DWMWA_USE_IMMERSIVE_DARK_MODE,
                 ctypes.byref(val), ctypes.sizeof(val))
             return {"status": "ok"}
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[set_window_theme] {e}")
     return {"status": "ignored"}
 
 

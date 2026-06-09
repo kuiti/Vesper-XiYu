@@ -15,6 +15,8 @@ from datetime import datetime, timedelta
 from core.db import (
     get_config, set_config, get_reminders, update_reminder_last_reminded, get_conn,
 )
+import logging
+logger = logging.getLogger(__name__)
 
 
 # ─── 深度提示 ───
@@ -205,8 +207,8 @@ def _check_achievements(msg_count, consecutive_days, ws, loop):
                     asyncio.run_coroutine_threadsafe(
                         ws.send_text(json.dumps({"type": "achievement", "data": a})), loop
                     )
-                except Exception:
-                    pass
+                except Exception as e:  # silent
+                    logger.debug(f"[_check_achievements] {e}")
     except Exception as e:
         print(f"[成就] 检查失败: {e}")
 

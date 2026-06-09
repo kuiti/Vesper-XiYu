@@ -35,6 +35,8 @@ from api.chat_parser import ThinkingParser  # 提取自本文件的解析类
 from api.chat_loops import diary_scheduler as _diary_scheduler_mod  # 提取自本文件的日记调度
 
 from datetime import datetime, timedelta
+import logging
+logger = logging.getLogger(__name__)
 
 # 全局 WebSocket 连接追踪
 _active_websockets: dict = {}  # {conn_id: websocket}
@@ -258,8 +260,8 @@ async def chat_websocket(websocket: WebSocket):
                             # 如果最近2条都是AI（说明上一条主动消息用户还没回），别再发
                             if len(_recent) >= 2 and all(r["role"] == "assistant" for r in _recent):
                                 continue
-                        except Exception:
-                            pass
+                        except Exception as e:  # silent
+                            logger.debug(f"[?] {e}")
 
                         # 关怀类别每日上限检查
                         from api.proactive import check_care_category_limit, record_care_trigger, get_care_category
@@ -692,8 +694,8 @@ async def chat_websocket(websocket: WebSocket):
                         if empathy_strategy:
                             sentiment_result["empathy_strategy"] = empathy_strategy
                             _conn_empathy_strategy = empathy_strategy
-                    except Exception:
-                        pass
+                    except Exception as e:  # silent
+                        logger.debug(f"[?] {e}")
 
                 if not _is_system:
                     print(f"[意图检测] type={intent_type}, data={intent_data}")
@@ -711,8 +713,8 @@ async def chat_websocket(websocket: WebSocket):
                             if len(name) >= 2 and name in user_message:
                                 kb_title_hint = f"【知识库关联】用户的话题可能与知识库文档「{title}」相关，你可以自然地引用其中的内容。"
                                 break
-                    except Exception:
-                        pass
+                    except Exception as e:  # silent
+                        logger.debug(f"[?] {e}")
 
                 rag_context = ""
                 if not _is_system and is_model_ready():
@@ -787,8 +789,8 @@ async def chat_websocket(websocket: WebSocket):
                             gid = pending[0]["id"]
                             dynamic_content += f"\n【待确认目标】用户提过「{goal_text}」，自然问一句要不要跟踪。确认回[/goal confirm {gid}]，拒绝回[/goal reject {gid}]。"
                             session_triggered.add("goal_asked")
-                    except Exception:
-                        pass
+                    except Exception as e:  # silent
+                        logger.debug(f"[?] {e}")
                 if _is_system:
                     dynamic_content += "\n【重要】这条消息是系统通知，不是用户直接说的。用活泼、鼓励的语气回复，像朋友在旁边看你玩游戏一样。控制在15字以内，简短有力。不要追问，不要展开话题。"
 
@@ -825,8 +827,8 @@ async def chat_websocket(websocket: WebSocket):
                                 try:
                                     _delta = abs((datetime.fromisoformat(_this_ts) - datetime.fromisoformat(_prev_ts)).total_seconds())
                                     _close_in_time = _delta < 480  # 8 分钟内
-                                except Exception:
-                                    pass
+                                except Exception as e:  # silent
+                                    logger.debug(f"[_trim_history] {e}")
                             if _close_in_time:
                                 merged[-1] = {**merged[-1], "content": merged[-1]["content"] + msg["content"]}
                             else:
@@ -861,8 +863,8 @@ async def chat_websocket(websocket: WebSocket):
                                 if top_words:
                                     dropped_context = f"【更早的对话中提到过】{'、'.join(top_words)}"
                                     set_config("_dropped_context", dropped_context)
-                            except Exception:
-                                pass
+                            except Exception as e:  # silent
+                                logger.debug(f"[_has_emotion] {e}")
 
                     return recent + older
 
@@ -901,8 +903,8 @@ async def chat_websocket(websocket: WebSocket):
                                 _time_gapped.append({"role": "system", "content": f"{_gap_note} 过了{_hrs}小时，不是刚才"})
                             elif _gap > 30:
                                 _time_gapped.append({"role": "system", "content": f"{_gap_note} 隔了{int(_gap)}分钟"})
-                        except Exception:
-                            pass
+                        except Exception as e:  # silent
+                            logger.debug(f"[?] {e}")
                     # 不修改消息内容，保持原样
                     _time_gapped.append(_m)
                     if _ts:
@@ -1320,8 +1322,8 @@ async def chat_websocket(websocket: WebSocket):
         # 清理主动上下文，避免重连后误触发
         try:
             set_config("_proactive_context", "null")
-        except Exception:
-            pass
+        except Exception as e:  # silent
+            logger.debug(f"[?] {e}")
         # diary_task 是全局任务，不在此取消（由 APScheduler 管理生命周期）
 
 

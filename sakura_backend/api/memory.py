@@ -3,6 +3,8 @@ from core.db import get_memory, set_memory, delete_memory
 from pydantic import BaseModel
 from typing import Dict
 import json as _json
+import logging
+logger = logging.getLogger(__name__)
 
 _PROFILE_KEY_LABELS = {
     "user_student": "身份", "user_habit_stay_up": "习惯", "user_habit": "习惯",
@@ -75,8 +77,8 @@ async def memory_vault():
                     "confidence": r["confidence"],
                     "extracted_at": r["extracted_at"],
                 })
-            except Exception:
-                pass
+            except Exception as e:  # silent
+                logger.debug(f"[memory_vault] {e}")
     # 实体
     entities = []
     with get_conn() as conn:
@@ -161,8 +163,8 @@ async def delete_memory_item(vtype: str, key: str = ""):
                                               (json.dumps(list(linked)), row["id"]))
                             else:
                                 cursor.execute("DELETE FROM entities WHERE id = ?", (row["id"]))
-                    except Exception:
-                        pass
+                    except Exception as e:  # silent
+                        logger.debug(f"[delete_memory_item] {e}")
             # 清除画像缓存
             from core.profile_builder import clear_profile_cache
             clear_profile_cache()

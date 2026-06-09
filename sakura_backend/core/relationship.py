@@ -10,6 +10,8 @@ import time
 import threading
 from datetime import datetime, timedelta
 from core.db import get_conn, get_config, set_config
+import logging
+logger = logging.getLogger(__name__)
 
 # 范围（支持负数）
 MIN_VALUE = -100
@@ -79,8 +81,8 @@ def _get_foundation_defaults() -> tuple:
             foundation_type = bg_obj.get("foundation_type", "空白")
             from core.prompt_builder import get_foundation_defaults
             return get_foundation_defaults(foundation_type)
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[_get_foundation_defaults] {e}")
     return 30, 30  # 默认空白
 
 

@@ -12,6 +12,8 @@ from core.db import (
     log_proactive_message, get_conn, save_diary_entry,
 )
 from api.chat_tasks import check_reminders
+import logging
+logger = logging.getLogger(__name__)
 
 
 async def reminder_loop(websocket: WebSocket):
@@ -79,8 +81,8 @@ async def proactive_loop(
                         # 如果最近2条都是AI说的（一条主动消息用户没回，就别再发了）
                         if len(_recent) >= 2 and all(r["role"] == "assistant" for r in _recent):
                             continue
-                    except Exception:
-                        pass
+                    except Exception as e:  # silent
+                        logger.debug(f"[?] {e}")
 
                     # 关怀类每日上限检查
                     from api.proactive import check_care_category_limit, record_care_trigger, get_care_category

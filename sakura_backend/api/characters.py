@@ -7,6 +7,8 @@ import tempfile
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response, JSONResponse
 from core.character_card import CharacterCard
+import logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/characters", tags=["characters"])
 
@@ -59,8 +61,8 @@ async def apply_character(data: dict):
     try:
         from core.llm_provider import clear_provider_cache
         clear_provider_cache()
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[apply_character] {e}")
     from core.prompt_builder import clear_persona_cache
     clear_persona_cache()
     return {"status": "ok", "name": name}

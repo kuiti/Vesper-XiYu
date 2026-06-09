@@ -9,6 +9,8 @@ from core.db import (
     get_conn,
 )
 from core.security import detect_sql_injection, detect_path_traversal, sanitize_display_text
+import logging
+logger = logging.getLogger(__name__)
 
 # ─── OpenAI Function Calling 格式 ───
 OPENAI_TOOLS = [
@@ -468,8 +470,8 @@ def call_tool(name, arguments):
                         label = "📌" if r.get("type") == "profile" else "💭"
                         lines.append(f"{label} {r['key']}: {r['value'][:200]}")
                     return "\n".join(lines)
-        except Exception:
-            pass
+        except Exception as e:  # silent
+            logger.debug(f"[?] {e}")
         # 降级：关键词检索
         mems = get_memory()
         query_lower = query.lower()

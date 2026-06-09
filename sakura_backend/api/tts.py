@@ -174,8 +174,8 @@ async def generate_tts(request: TTSRequest):
                     try:
                         from core.relationship import get_relationship
                         aff, tr = get_relationship()
-                    except Exception:
-                        pass
+                    except Exception as e:  # silent
+                        logger.debug(f"[generate_tts] {e}")
                 preset = get_voice_preset(aff, tr)
                 edge_voice_map = {
                     "verylow": "zh-CN-YunxiNeural",
@@ -292,5 +292,5 @@ def _cleanup_old_audio():
                 if f.suffix in (".wav", ".mp3", ".ogg"):
                     if now - f.stat().st_mtime > AUDIO_TTL:
                         f.unlink(missing_ok=True)
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[_cleanup_old_audio] {e}")

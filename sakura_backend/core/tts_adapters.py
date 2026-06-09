@@ -847,8 +847,8 @@ class XiaomiTTS(BaseTTS):
             try:
                 with open(b64_path, "w", encoding="utf-8") as f:
                     f.write(self._clone_base64)
-            except Exception:
-                pass
+            except Exception as e:  # silent
+                logger.debug(f"[_load_clone_audio] {e}")
             return self._clone_base64
         except Exception as e:
             logger.error(f"加载克隆音频失败: {e}")

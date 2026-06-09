@@ -6,6 +6,8 @@ import math
 import threading
 import warnings
 from datetime import datetime
+import logging
+logger = logging.getLogger(__name__)
 
 CHROMA_PATH = "data/chroma_db"
 os.makedirs(CHROMA_PATH, exist_ok=True)
@@ -126,8 +128,8 @@ def _check_duplicate(collection, embedding, sentence, threshold=0.85):
                 # 找到重复，获取ID
                 existing_id = results['ids'][0][0] if results.get('ids') else None
                 return True, existing_id, doc
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[_check_duplicate] {e}")
     return False, None, None
 
 
@@ -248,8 +250,8 @@ def _update_access_batch(results: list):
             if meta and meta.get("msg_id"):
                 sid = f"s_{meta['msg_id']}_{meta.get('seq', 0)}"
                 update_memory_access(sid)
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[_update_access_batch] {e}")
 
 
 def _mmr_select(query_emb: list, candidates_with_emb: list, top_k: int, lambda_mult: float = 0.7) -> list:
@@ -473,8 +475,8 @@ def rebuild_all_vectors(progress_callback=None):
             if rows:
                 try:
                     client.delete_collection("sentence_index")
-                except Exception:
-                    pass
+                except Exception as e:  # silent
+                    logger.debug(f"[?] {e}")
                 sent_collection = client.get_or_create_collection(
                     name="sentence_index", metadata={"hnsw:space": "cosine"}
                 )
@@ -722,8 +724,8 @@ def _keyword_search_memories(query: str, top_k: int = 5) -> list[dict]:
                 value = r["value"]
                 if query_lower in key.lower() or query_lower in value.lower():
                     results.append({"key": key, "value": value, "score": 0.5, "type": "memory"})
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[_keyword_search_memories] {e}")
 
     # user_profile 表
     try:
@@ -736,8 +738,8 @@ def _keyword_search_memories(query: str, top_k: int = 5) -> list[dict]:
                 value = str(r.get("value", ""))
                 if query_lower in key.lower() or query_lower in value.lower():
                     results.append({"key": key, "value": value, "score": 0.4, "type": "profile"})
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[?] {e}")
 
     return results[:top_k]
 

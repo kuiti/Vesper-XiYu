@@ -85,8 +85,8 @@ def remove_job(job_id: str):
     try:
         scheduler.remove_job(job_id)
         logger.info(f"[调度器] 移除任务: {job_id}")
-    except Exception:
-        pass
+    except Exception as e:  # silent
+        logger.debug(f"[remove_job] {e}")
 
 
 def list_jobs() -> list:

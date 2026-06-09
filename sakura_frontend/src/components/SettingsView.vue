@@ -4,36 +4,21 @@
       <button v-for="cat in categories" :key="cat.id" :class="['sn-item', { active: activeCat === cat.id }]" @click="activeCat = cat.id">{{ cat.label }}</button>
     </div>
     <div class="settings-content">
-      <!-- 服务器连接 -->
-      <div v-if="activeCat==='server'" class="sc-pane">
-        <div class="card"><h3>云端服务器连接</h3><p class="hint">连接到云端部署的佐仓后端。本地使用请留空。</p>
-          <div class="field"><label>服务器地址</label><input v-model="serverHost" placeholder="47.98.120.186（留空=本地模式）"></div>
-          <div class="field"><label>端口</label><input v-model="serverPort" placeholder="18060"></div>
-          <div class="field"><label>访问令牌</label><input type="password" v-model="serverToken" placeholder="输入云端 Token"></div>
-          <div class="btn-row">
-            <button class="btn" @click="saveServer">保存并连接</button>
-            <button class="btn-s" @click="testServer" :disabled="testingServer">{{ testingServer ? '...' : '测试连接' }}</button>
-            <span v-if="serverTestMsg" :class="serverTestOk ? 'ok' : 'fail'">{{ serverTestMsg }}</span>
-          </div>
-          <p class="hint" style="margin-top:8px">当前模式：{{ serverHost ? '☁️ 云端' : '💻 本地' }}</p>
-        </div>
-      </div>
+      <ServerSettings v-if="activeCat==='server'"
+        :serverHost="serverHost" :serverPort="serverPort" :serverToken="serverToken"
+        :testingServer="testingServer" :serverTestMsg="serverTestMsg" :serverTestOk="serverTestOk"
+        @update:serverHost="serverHost=$event" @update:serverPort="serverPort=$event" @update:serverToken="serverToken=$event"
+        @save-server="saveServer" @test-server="testServer" />
 
-      <!-- API -->
-      <div v-if="activeCat==='api'" class="sc-pane">
-        <div class="card"><h3>AI 接口配置</h3>
-          <div class="field"><label>提供商</label><select v-model="provider" @change="onProviderChange"><option value="deepseek">DeepSeek</option><option value="qwen">通义千问</option><option value="moonshot">Moonshot</option><option value="zhipu">智谱</option><option value="openai">OpenAI</option><option value="ollama">Ollama (本地)</option><option value="custom">自定义</option></select></div>
-          <div class="field"><label>API 地址</label><input v-model="apiBaseUrl" placeholder="https://api.deepseek.com/v1"></div>
-          <div class="field"><label>模型</label><div class="btn-row"><input v-model="apiModel" placeholder="deepseek-chat" style="flex:1"><button class="btn-s" @click="fetchModels" :disabled="fetchingModels">{{ fetchingModels ? '...' : '获取' }}</button></div></div>
-          <div class="field"><label>备选模型</label><input v-model="fallbackModels" @change="saveCfg('fallback_models', fallbackModels)" placeholder="gpt-4o,claude-sonnet-4-6（主模型失败时自动切换）"></div>
-          <div class="field"><label>API Key</label><input type="password" v-model="apiKey" placeholder="sk-..."></div>
-          <div class="btn-row"><button class="btn" @click="saveApi">保存</button><button class="btn-s" @click="testApi" :disabled="testingApi">{{ testingApi ? '...' : '测试连接' }}</button><span v-if="testMsg" :class="testOk ? 'ok' : 'fail'">{{ testMsg }}</span></div>
-          <div v-if="availableModels.length" class="field" style="margin-top:8px"><label>可用模型</label><select v-model="apiModel"><option v-for="m in availableModels" :key="m" :value="m">{{ m }}</option></select></div>
-        </div>
-        <div class="card"><h3>联网搜索</h3><p class="hint">选择搜索方式。大模型模式由 AI 自行判断是否需要联网；DuckDuckGo 仅在识别到搜索意图时调用。仅大模型支持联网时生效。</p>
-          <select v-model="searchProvider" @change="saveCfg('search_provider', searchProvider)"><option value="off">关闭</option><option value="llm">大模型</option><option value="ddg">DuckDuckGo</option></select>
-        </div>
-      </div>
+      <ApiSettings v-if="activeCat==='api'"
+        :provider="provider" :apiBaseUrl="apiBaseUrl" :apiModel="apiModel" :apiKey="apiKey"
+        :searchProvider="searchProvider" :fallbackModels="fallbackModels"
+        :testingApi="testingApi" :testMsg="testMsg" :testOk="testOk"
+        :fetchingModels="fetchingModels" :availableModels="availableModels"
+        @update:provider="provider=$event" @update:apiBaseUrl="apiBaseUrl=$event" @update:apiModel="apiModel=$event"
+        @update:apiKey="apiKey=$event" @update:searchProvider="searchProvider=$event" @update:fallbackModels="fallbackModels=$event"
+        @provider-change="onProviderChange" @save-api="saveApi" @test-api="testApi" @fetch-models="fetchModels"
+        @save-cfg="(k,v)=>saveCfg(k,v)" />
 
       <!-- 角色人设 -->
       <div v-if="activeCat==='role'" class="sc-pane">
@@ -383,8 +368,12 @@
 
 <script>
 import api from '../api.js'
-import ChatManagePanel from './ChatManagePanel.vue'
-import MigratePanel from './MigratePanel.vue'
+import ServerSettings from './ServerSettings.vue'
+import ApiSettings from './ApiSettings.vue'
+import RoleSettings from './RoleSettings.vue'
+import TtsSettings from './TtsSettings.vue'
+import DataSettings from './DataSettings.vue'
+import AppearanceSettings from './AppearanceSettings.vue'
 
 const PROVIDER_MAP = {
   deepseek: { url: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
@@ -397,7 +386,7 @@ const PROVIDER_MAP = {
 }
 
 export default {
-  components: { ChatManagePanel, MigratePanel },
+  components: { ServerSettings, ApiSettings, RoleSettings, TtsSettings, DataSettings, AppearanceSettings },
   props: { settings: Object, themeLocal: String, ipCity: String, relationship: Object, emotionTrend: Array, totalMessages: Number, conversationDays: Number, assistantAvatarUrl: String, userAvatarUrl: String },
   emits: ['config-changed', 'export-chat', 'close'],
   data() {

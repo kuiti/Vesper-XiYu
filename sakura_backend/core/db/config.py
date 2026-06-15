@@ -4,6 +4,7 @@ import json
 import copy
 import time as _time
 from . import get_conn
+from core.retry import silent_exc
 
 # ========== 配置缓存 ==========
 _config_cache = {}  # {key: (value, expire_ts)}
@@ -46,8 +47,8 @@ def get_config(key, default=None):
         try:
             from core.config_models import validate_config
             value = validate_config(key, value)
-        except ImportError:
-            pass
+        except ImportError as e:
+            silent_exc("db_config", e)
         # 写入缓存
         if len(_config_cache) >= _CONFIG_CACHE_MAX:
             # 清理过期条目

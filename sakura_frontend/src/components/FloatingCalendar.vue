@@ -81,7 +81,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 // 简化的农历转换函数（仅支持2024-2030年）
 function getLunarInfo(year, month, day) {
@@ -359,68 +359,68 @@ export default {
 .floating-calendar { position: fixed; z-index: 100; }
 
 /* 收起按钮 */
-.cal-toggle { display: flex; align-items: center; gap: 4px; background: var(--sb); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; cursor: pointer; color: var(--tc2); transition: all .15s; position: relative; }
-.cal-toggle:hover { border-color: var(--p); color: var(--p); }
-.cal-badge { font-size: 12px; font-weight: 600; color: var(--tc); }
+.cal-toggle { display: flex; align-items: center; gap: 4px; background: var(--surface-sidebar); border: 1px solid var(--border-default); border-radius: 8px; padding: 6px 10px; cursor: pointer; color: var(--text-secondary); transition: all .15s; position: relative; }
+.cal-toggle:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+.cal-badge { font-size: 12px; font-weight: 600; color: var(--text-primary); }
 
 /* 展开面板 */
-.cal-panel { width: 280px; background: var(--sb); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,.3); overflow: hidden; }
+.cal-panel { width: 280px; background: var(--surface-sidebar); border: 1px solid var(--border-default); border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,.3); overflow: hidden; }
 
 /* 头部 */
-.cal-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
-.cal-nav { background: none; border: none; color: var(--tc2); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; }
-.cal-nav:hover { background: rgba(255,255,255,.06); color: var(--tc); }
-.cal-title { flex: 1; text-align: center; font-size: 13px; font-weight: 600; color: var(--tc); }
-.cal-close { background: none; border: none; color: var(--tc2); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; }
-.cal-close:hover { color: var(--tc); }
+.cal-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border-default); }
+.cal-nav { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; }
+.cal-nav:hover { background: rgba(255,255,255,.06); color: var(--text-primary); }
+.cal-title { flex: 1; text-align: center; font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.cal-close { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; }
+.cal-close:hover { color: var(--text-primary); }
 
 /* 星期标题 */
 .cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); padding: 6px 8px 0; }
-.cal-weekdays span { text-align: center; font-size: 10px; color: var(--tc2); padding: 2px 0; }
+.cal-weekdays span { text-align: center; font-size: 10px; color: var(--text-secondary); padding: 2px 0; }
 
 /* 日期网格 */
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); padding: 4px 8px 8px; }
 .cal-day { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 40px; border-radius: 6px; cursor: pointer; position: relative; transition: all .1s; gap: 1px; }
 .cal-day:hover { background: rgba(255,255,255,.04); }
-.cal-day.other .day-num { color: var(--tc2); opacity: .3; }
+.cal-day.other .day-num { color: var(--text-secondary); opacity: .3; }
 .cal-day.today { background: rgba(255,255,255,.06); }
-.cal-day.today .day-num { color: var(--p); font-weight: 700; }
-.cal-day.selected { background: var(--p); }
+.cal-day.today .day-num { color: var(--accent-primary); font-weight: 700; }
+.cal-day.selected { background: var(--accent-primary); }
 .cal-day.selected .day-num { color: #fff; font-weight: 600; }
-.day-num { font-size: 12px; color: var(--tc); }
-.day-lunar { font-size: 8px; color: var(--tc2); opacity: .6; line-height: 1; }
+.day-num { font-size: 12px; color: var(--text-primary); }
+.day-lunar { font-size: 8px; color: var(--text-secondary); opacity: .6; line-height: 1; }
 .day-festival { font-size: 8px; color: #e74c3c; line-height: 1; font-weight: 500; }
 .cal-day.festival .day-num { color: #e74c3c; }
 .day-dot { width: 4px; height: 4px; border-radius: 50%; margin-top: 1px; }
 
 /* 详情区 */
-.cal-detail { border-top: 1px solid var(--border); padding: 10px 12px; }
+.cal-detail { border-top: 1px solid var(--border-default); padding: 10px 12px; }
 .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.detail-header span { font-size: 13px; color: var(--tc); font-weight: 600; }
-.detail-add { background: var(--p); border: none; color: #fff; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+.detail-header span { font-size: 13px; color: var(--text-primary); font-weight: 600; }
+.detail-add { background: var(--accent-primary); border: none; color: #fff; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
 
 /* 添加表单 */
 .add-form { margin-bottom: 8px; }
-.add-input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--tc); font-size: 12px; outline: none; box-sizing: border-box; margin-bottom: 6px; }
-.add-input:focus { border-color: var(--p); }
+.add-input { width: 100%; padding: 6px 8px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--surface-app); color: var(--text-primary); font-size: 12px; outline: none; box-sizing: border-box; margin-bottom: 6px; }
+.add-input:focus { border-color: var(--accent-primary); }
 .add-row { display: flex; gap: 6px; }
-.add-time { flex: 1; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--tc); font-size: 12px; }
-.add-color { width: 40px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--tc); font-size: 11px; }
-.add-btn { padding: 4px 10px; background: var(--p); border: none; color: #fff; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.add-time { flex: 1; padding: 4px 6px; border: 1px solid var(--border-default); border-radius: 4px; background: var(--surface-app); color: var(--text-primary); font-size: 12px; }
+.add-color { width: 40px; border: 1px solid var(--border-default); border-radius: 4px; background: var(--surface-app); color: var(--text-primary); font-size: 11px; }
+.add-btn { padding: 4px 10px; background: var(--accent-primary); border: none; color: #fff; border-radius: 4px; cursor: pointer; font-size: 12px; }
 .add-btn:disabled { opacity: .4; cursor: not-allowed; }
 
 /* 日程列表 */
 .detail-list { max-height: 150px; overflow-y: auto; }
 .schedule-item { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
 .sch-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.sch-title { flex: 1; font-size: 12px; color: var(--tc); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sch-level { font-size: 10px; color: var(--tc2); background: rgba(255,255,255,.06); padding: 1px 4px; border-radius: 3px; flex-shrink: 0; }
-.sch-time { font-size: 11px; color: var(--tc2); }
-.sch-del { background: none; border: none; color: var(--tc2); cursor: pointer; font-size: 14px; padding: 0 2px; opacity: .4; }
+.sch-title { flex: 1; font-size: 12px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sch-level { font-size: 10px; color: var(--text-secondary); background: rgba(255,255,255,.06); padding: 1px 4px; border-radius: 3px; flex-shrink: 0; }
+.sch-time { font-size: 11px; color: var(--text-secondary); }
+.sch-del { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 14px; padding: 0 2px; opacity: .4; }
 .sch-del:hover { opacity: 1; color: #e74c3c; }
 .sch-special { background: rgba(231, 76, 60, 0.1); border-radius: 4px; padding: 4px 6px; }
 .sch-special .sch-title { color: #e74c3c; font-weight: 500; }
-.detail-empty { font-size: 12px; color: var(--tc2); text-align: center; padding: 8px 0; }
+.detail-empty { font-size: 12px; color: var(--text-secondary); text-align: center; padding: 8px 0; }
 
 /* 移动端适配 */
 @media (max-width: 768px) {

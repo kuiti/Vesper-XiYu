@@ -1,11 +1,11 @@
 import os
-import shutil
 import asyncio
 import requests
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from core.db import set_config, get_config
+from core.retry import silent_exc
 
 router = APIRouter(prefix="/avatar", tags=["avatar"])
 
@@ -79,8 +79,8 @@ async def upload_avatar_by_url(role: str, data: AvatarUrl):
         addr = ipaddress.ip_address(ip)
         if addr.is_private or addr.is_loopback or addr.is_link_local:
             raise HTTPException(400, "不允许使用内网地址")
-    except ValueError:
-        pass
+    except Exception as e:
+        silent_exc("avatar", e)
 
     try:
         resp = await asyncio.to_thread(requests.get, data.url, timeout=10, stream=True)

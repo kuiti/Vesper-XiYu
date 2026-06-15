@@ -25,7 +25,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 const CFG = { easy: { w:9, h:9, m:10 }, medium: { w:16, h:16, m:40 }, hard: { w:30, h:16, m:99 } }
 
 export default {
@@ -161,15 +161,15 @@ export default {
 
 <style scoped>
 .minesweeper { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px; }
-.ms-header { display: flex; align-items: center; gap: 8px; color: var(--tc); font-size: 13px; }
+.ms-header { display: flex; align-items: center; gap: 8px; color: var(--text-primary); font-size: 13px; }
 .ms-counter { min-width: 55px; font-weight: 600; color: #e74c3c; }
-.ms-timer { min-width: 40px; font-weight: 600; color: var(--p); }
-.ms-face { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; border-radius: 4px; border: 1px solid var(--border); background: var(--sb); color: var(--tc); cursor: pointer; user-select: none; }
+.ms-timer { min-width: 40px; font-weight: 600; color: var(--accent-primary); }
+.ms-face { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; border-radius: 4px; border: 1px solid var(--border-default); background: var(--surface-sidebar); color: var(--text-primary); cursor: pointer; user-select: none; }
 .ms-face:hover { background: rgba(255,255,255,.06); }
-.ms-diff { padding: 4px; border-radius: 4px; background: var(--bg); color: var(--tc); border: 1px solid var(--border); font-size: 11px; }
-.ms-grid { display: grid; gap: 1px; background: var(--border); padding: 1px; border-radius: 4px; }
+.ms-diff { padding: 4px; border-radius: 4px; background: var(--surface-app); color: var(--text-primary); border: 1px solid var(--border-default); font-size: 11px; }
+.ms-grid { display: grid; gap: 1px; background: var(--border-default); padding: 1px; border-radius: 4px; }
 .ms-grid > div { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; cursor: pointer; user-select: none; border-radius: 2px; transition: background .1s; }
-.ms-hidden { background: var(--sb); }
+.ms-hidden { background: var(--surface-sidebar); }
 .ms-hidden:hover { background: rgba(255,255,255,.08); }
 .ms-hidden:active { background: rgba(255,255,255,.12); }
 .ms-flag { background: #c0392b; color: #fff; }
@@ -186,5 +186,5 @@ export default {
 .ms-msg { font-weight: 600; font-size: 13px; }
 .ms-msg.win { color: #4caf50; }
 .ms-msg.lose { color: #e74c3c; }
-.help-btn { background: var(--p); border: none; color: #fff; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 12px; }
+.help-btn { background: var(--accent-primary); border: none; color: #fff; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 12px; }
 </style>

@@ -69,41 +69,41 @@ export default {
 
 <style scoped>
 .sc-pane { display: flex; flex-direction: column; gap: 12px; }
-.card { background: rgba(255,255,255,.02); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+.card { background: rgba(255,255,255,.02); border: 1px solid var(--border-default); border-radius: 8px; padding: 14px; }
 .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-.hint { font-size: 11px; color: var(--tc2); margin: 0 0 10px 0; line-height: 1.5; opacity: .75; }
+.hint { font-size: 11px; color: var(--text-secondary); margin: 0 0 10px 0; line-height: 1.5; opacity: .75; }
 .field { margin-bottom: 10px; }
-.field label { display: block; font-size: 12px; color: var(--tc2); margin-bottom: 4px; }
-.field input, .field select, textarea { width: 100%; padding: 7px 10px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); color: var(--tc); font-size: 13px; font-family: inherit; box-sizing: border-box; }
+.field label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.field input, .field select, textarea { width: 100%; padding: 7px 10px; border-radius: 5px; border: 1px solid var(--border-default); background: var(--surface-app); color: var(--text-primary); font-size: 13px; font-family: inherit; box-sizing: border-box; }
 .field select { width: 100%; }
 textarea { resize: vertical; }
-.btn { padding: 7px 16px; background: var(--p); color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; }
+.btn { padding: 7px 16px; background: var(--accent-primary); color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; }
 .btn:disabled { opacity: .4; }
-.btn-s { padding: 5px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 4px; color: var(--tc2); cursor: pointer; font-size: 12px; }
+.btn-s { padding: 5px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-secondary); cursor: pointer; font-size: 12px; }
 .btn-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.switch { display: block; font-size: 13px; color: var(--tc); margin: 4px 0; cursor: pointer; }
+.switch { display: block; font-size: 13px; color: var(--text-primary); margin: 4px 0; cursor: pointer; }
 .switch input { margin-right: 6px; }
 .rel-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
-.rel-label { color: var(--tc2); min-width: 50px; font-size: 12px; }
+.rel-label { color: var(--text-secondary); min-width: 50px; font-size: 12px; }
 .rel-bar { flex: 1; height: 8px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; }
 .rel-fill { height: 100%; border-radius: 4px; transition: width .5s; }
 .rel-fill.affection { background: linear-gradient(90deg, #f0a0b0, #e8929b); }
 .rel-fill.trust { background: linear-gradient(90deg, #5390d4, #4ecdc4); }
-.rel-value { color: var(--tc); min-width: 30px; text-align: right; font-size: 12px; }
-.ai-emotion-tag { color: var(--p); font-size: 12px; }
-.ai-emotion-desc { color: var(--tc2); font-size: 11px; margin-left: 8px; }
+.rel-value { color: var(--text-primary); min-width: 30px; text-align: right; font-size: 12px; }
+.ai-emotion-tag { color: var(--accent-primary); font-size: 12px; }
+.ai-emotion-desc { color: var(--text-secondary); font-size: 11px; margin-left: 8px; }
 .avatar-section { display: flex; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.03); }
 .avatar-preview { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.avatar-img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); }
-.avatar-label { font-size: 10px; color: var(--tc2); }
+.avatar-img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-default); }
+.avatar-label { font-size: 10px; color: var(--text-secondary); }
 .avatar-actions { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-.url-input { padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--tc); font-size: 11px; }
+.url-input { padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-default); background: var(--surface-app); color: var(--text-primary); font-size: 11px; }
 .foundation-confirm { margin-top: 12px; padding: 12px; background: rgba(83,144,212,.08); border-radius: 8px; border: 1px solid var(--border, #30363d); }
 .foundation-confirm p { margin: 0 0 8px; font-size: 13px; }
 .foundation-confirm label { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 10px; cursor: pointer; }
 .btn-secondary { background: var(--border, #30363d); color: var(--tc, #e6edf3); }
 .preset-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.preset-item { padding: 4px 10px; background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 4px; font-size: 12px; cursor: pointer; }
+.preset-item { padding: 4px 10px; background: rgba(255,255,255,.03); border: 1px solid var(--border-default); border-radius: 4px; font-size: 12px; cursor: pointer; }
 .preset-item:hover { background: rgba(255,255,255,.06); }
 .preset-del { color: #e74c3c; font-size: 14px; opacity: .4; margin-left: 4px; }
 .preset-del:hover { opacity: 1; }

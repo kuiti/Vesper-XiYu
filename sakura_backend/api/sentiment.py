@@ -1,6 +1,7 @@
-import json
+# api/sentiment.py — 关键词级情感分析 + 共情策略引擎
+# 替代 LLM 情感分析，零延迟，纯规则匹配
+import re
 from collections import OrderedDict
-from core.db import get_config
 
 _sentiment_cache = OrderedDict()
 import threading as _threading  # noqa
@@ -103,12 +104,12 @@ def get_contextual_strategy(emotion_subtype: str, context_keyword: str, affectio
 
 
 def analyze_sentiment(text, context=None):
-    """用 LLM 分析用户消息，返回结构化情绪+关系影响数据
+    """关键词级情感分析，返回结构化情绪+关系影响数据
     返回 dict: {sentiment, target, intent, relationship_impact}
     sentiment: positive/negative/neutral
-    target: ai/self/situation/other — 情绪指向谁
-    intent: gratitude/clarification/complaint/attack/sharing/joke/playful/statement
-    relationship_impact: -2.0 ~ +2.0，负数伤害关系，正数增进关系
+    target: ai/self/situation/other
+    intent: gratitude/complaint/statement/sharing/joke/playful
+    relationship_impact: -2.0 ~ +2.0
 
     Args:
         text: 用户消息
@@ -127,89 +128,166 @@ def analyze_sentiment(text, context=None):
             _sentiment_cache.move_to_end(key)
             return _sentiment_cache[key].copy()
 
-    api_key = get_config("api_key", "")
-    if not api_key:
-        return dict(FALLBACK_RESULT)
+    # ─── 关键词级情感检测（替代 LLM，0 延迟） ───
+    # 否定前缀：如果这些词出现在正向关键词前，取反
+    _has_negation = any(neg in text for neg in ["不", "没", "别", "不要", "不是", "不会", "没那么"])
 
-    # 构建上下文（过滤天气卡片，减少到3条）
-    context_text = ""
-    if context:
-        recent = [m for m in context[-5:] if not m.get("content", "").startswith("__WEATHER_CARD__")][-3:]
-        lines = []
-        for m in recent:
-            role = "用户" if m.get("role") == "user" else "AI"
-            content = m.get("content", "")[:60]
-            lines.append(f"{role}：{content}")
-        context_text = "最近对话：\n" + "\n".join(lines) + "\n\n"
+    # 负面情绪（强度从高到低）
+    _neg_strong = ["受不了", "恶心", "崩溃", "想死", "绝望", "滚"]
+    _neg_sad = ["难过", "伤心", "哭了", "失落", "委屈", "心痛", "想哭", "孤独", "寂寞"]
+    _neg_angry = ["生气", "火大", "太过分", "有病", "有病吧", "神经", "气死", "气炸"]
+    _neg_tired = ["好累", "累死", "疲惫", "困了", "没劲", "不想动", "乏力"]
+    _neg_anxious = ["焦虑", "紧张", "担心", "害怕", "慌", "不安", "压力大", "怕"]
+    _neg_frustrated = ["烦", "好烦", "真烦", "烦躁", "失败", "好难", "太难了", "烦人",
+                       "你不懂", "跟你说不清", "你根本", "你从来没", "你每次都"]
 
-    prompt = f"""分析用户消息的情感，结合对话上下文判断。输出JSON（只输出JSON）：
-{{"sentiment":"positive/negative/neutral","target":"ai/self/situation/other","intent":"gratitude/clarification/complaint/attack/sharing/joke/playful/statement","emotion_subtype":"子类型","relationship_impact":-2到2的数值,"background_update":null}}
+    # 正面情绪
+    _pos_happy = ["开心", "高兴", "快乐", "哈哈", "嘻嘻", "嘿嘿", "耶", "好开心", "太开心了"]
+    _pos_warm = ["谢谢", "感谢", "感动", "暖心", "温暖", "幸福", "好幸福"]
+    _pos_proud = ["厉害", "棒", "好棒", "太棒了", "完美", "优秀", "成功", "太好了", "Nice", "nice", "牛"]
+    _pos_love = ["喜欢", "爱了", "好喜欢", "超喜欢", "爱你", "最爱"]
 
-{context_text}用户最新消息：{text[:250]}
+    # 撒娇/玩笑（需要排除真实负面）
+    _play_kw = ["哼", "切", "才怪", "才不是", "我不管", "你猜", "略略略", "不行吗",
+                "讨厌", "不要嘛", "坏蛋", "笨蛋"]
+    _joke_kw = ["完蛋了", "打你", "咬你", "揍你", "吃了你", "死定了", "你完了"]
 
-规则：
-- target: 情绪指向谁。ai=冲AI来的，self=说自己，situation=说处境/环境，other=其他
-- intent: 用户的真实意图。
-  * gratitude=感谢认可
-  * clarification=澄清纠正（"不对，应该是周五"）
-  * complaint=抱怨AI（"你真烦""你怎么回事"）——指向AI才扣分
-  * attack=攻击AI（"你瞎说什么""闭嘴"）——明确恶意才扣分
-  * sharing=分享个人信息
-  * joke=开玩笑（"我要吃了你""你完蛋了"）
-  * playful=撒娇/调侃/耍赖（"哼""我不管""才不是""你猜""略略略""也行吧"）——不扣分
-  * statement=中性陈述
-- emotion_subtype: 细粒度情绪子类型（必须选一个）
-  * negative类: tired=疲惫, frustrated=受挫/烦躁, sad=伤心/失落, anxious=焦虑/担心, lonely=孤独/想人, angry=生气/愤怒, wronged=委屈/不被理解, overwhelmed=压力大/撑不住
-  * positive类: happy_share=分享开心, proud=自豪/成就感
-  * playful类: teasing=撒娇/调侃
-  * neutral类: neutral=中性
-- relationship_impact: 对关系的影响。playful/joke/gratitude/sharing 是正向，complaint/attack 才负向
-- background_update: 用户为AI设定背景时输出 {"action":"add/replace/remove","key":"类别","value":"内容"}，否则null
-  key示例: nickname=用户外号, ai_nickname=AI外号, role=角色关系, preference=用户偏好, event=事件, personality=性格特点
+    emotion_subtype = "neutral"
+    sentiment = "neutral"
+    target = "other"
+    intent = "statement"
+    relationship_impact = 0
 
-**情绪子类型区分（中文口语）**：
-- "好累""不想动了" → tired
-- "又失败了""怎么这么烦" → frustrated
-- "气死了""太过分了" → angry
-- "没人懂我""凭什么" → wronged
-- "好紧张""万一怎么办" → anxious
-- "一个人好无聊" → lonely
-- "太多了""要疯了" → overwhelmed
+    # 先判断撒娇/玩笑（优先级高，覆盖可能的负面词）
+    is_playful = any(kw in text for kw in _play_kw)
+    is_joking = any(kw in text for kw in _joke_kw)
 
-**关键区分（中文口语）**：
-- "哼""切""才怪""才不是" → playful（撒娇），不是 complaint
-- "我不管""你自己想""随便" → playful（耍赖），不是 attack
-- "也行吧""嗯""哦" → statement（无所谓），不是 complaint
-- "你完蛋了""我要打你" → joke（玩笑），不是 attack
-- "讨厌""你好烦啊" → 要看上下文，可能是撒娇（playful）也可能是真抱怨（complaint）"""
-
-    from core.llm_client import call_llm
-    result = call_llm(prompt=prompt, temperature=0, max_tokens=250, timeout=10, json_mode=True)
-    if result and isinstance(result, dict):
-        try:
-            impact = float(result.get("relationship_impact", 0))
-        except (ValueError, TypeError):
-            impact = 0.0
-        bg = result.get("background_update")
-        validated = {
-            "sentiment": result.get("sentiment", "neutral"),
-            "target": result.get("target", "other"),
-            "intent": result.get("intent", "statement"),
-            "emotion_subtype": result.get("emotion_subtype", "neutral"),
-            "relationship_impact": max(-2.0, min(2.0, impact)),
-            "background_update": bg if bg else None,
-            "empathy_strategy": None,
-            "context_keyword": detect_context_keyword(text)
-        }
-        # 仅 LLM 成功返回时才缓存
-        with _sentiment_lock:
-            if key in _sentiment_cache:
-                _sentiment_cache.move_to_end(key)
-            _sentiment_cache[key] = validated
-            if len(_sentiment_cache) > 200:
-                _sentiment_cache.popitem(last=False)  # LRU 驱逐
+    if is_playful:
+        emotion_subtype = "teasing"
+        sentiment = "positive"
+        intent = "playful"
+        relationship_impact = 0.3
+    elif is_joking:
+        emotion_subtype = "neutral"
+        sentiment = "positive"
+        intent = "joke"
+        relationship_impact = 0.2
     else:
-        validated = dict(FALLBACK_RESULT)
-        # 回退结果不缓存，下次重试
+        # 判断负面（优先检测高强度）
+        if any(kw in text for kw in _neg_strong):
+            emotion_subtype = "overwhelmed"
+            sentiment = "negative"
+            relationship_impact = -0.3
+        elif any(kw in text for kw in _neg_angry):
+            emotion_subtype = "angry"
+            sentiment = "negative"
+            relationship_impact = -0.2
+        elif any(kw in text for kw in _neg_sad):
+            emotion_subtype = "sad"
+            sentiment = "negative"
+        elif any(kw in text for kw in _neg_anxious):
+            emotion_subtype = "anxious"
+            sentiment = "negative"
+        elif any(kw in text for kw in _neg_frustrated):
+            emotion_subtype = "frustrated"
+            sentiment = "negative"
+        elif any(kw in text for kw in _neg_tired):
+            emotion_subtype = "tired"
+            sentiment = "negative"
+        # 判断正面（排除有否定前缀的情况）
+        elif not _has_negation:
+            if any(kw in text for kw in _pos_love):
+                emotion_subtype = "happy_share"
+                sentiment = "positive"
+                intent = "sharing"
+                relationship_impact = 0.8
+            elif any(kw in text for kw in _pos_warm):
+                emotion_subtype = "gratitude"
+                sentiment = "positive"
+                intent = "gratitude"
+                relationship_impact = 0.5
+            elif any(kw in text for kw in _pos_happy):
+                emotion_subtype = "happy_share"
+                sentiment = "positive"
+                intent = "sharing"
+                relationship_impact = 0.4
+            elif any(kw in text for kw in _pos_proud):
+                emotion_subtype = "proud"
+                sentiment = "positive"
+                intent = "sharing"
+                relationship_impact = 0.3
 
+    # 情绪指向检测
+    _to_ai = [r"你真\w", r"你这个人", r"你给", r"你为", r"你总\w", r"你不懂", r"你.*不", r"你.*什么", r"你怎么回事"]
+    _to_self = [r"我觉得", r"我想", r"我要", r"我\w{0,2}了", r"我的\w"]
+
+    if any(re.search(p, text) for p in _to_ai):
+        target = "ai"
+        if sentiment == "negative":
+            intent = "complaint"
+            relationship_impact = max(relationship_impact, -1.0)
+        elif sentiment == "positive":
+            intent = "gratitude"
+    elif any(re.search(p, text) for p in _to_self):
+        target = "self"
+
+    # ─── 背景信息提取（替代 LLM 的 background_update） ───
+    background_update = None
+    _bg_rules = [
+        # 称呼/外号：叫我XX、叫XX、外号是XX
+        (r"(?:叫我|可以叫我|喊我|叫我名字)\s*(.+)", "nickname"),
+        (r"(?:外号|绰号|别名)(?:是|叫)?\s*(.+)", "nickname"),
+        # 关系：XX是你的XX、我是你的XX
+        (r"(?:我是你的?|我是你|我当你的?|我做你的?)\s*(.+)", "role"),
+        (r"(?:你把[我当]作\s*(.+)|我是你的?\s*(.+))", "role"),
+        # 偏好：喜欢/爱/爱吃/爱听/爱看
+        (r"(?:我爱|我喜欢|我好喜欢|我最爱|最爱)(?:吃|喝|听|看|玩)?\s*(.+)", "preference"),
+        (r"(?:我讨厌|我不喜欢|我反感|最讨厌)\s*(.+)", "dislike"),
+        # 身份：我是XX、我是一名XX、我在XX工作
+        (r"我是[一名位个]?\s*(.+)", "identity"),
+        (r"(?:我在|我从事|我做|我的工作)(?:.*?)(?:工作|行业|职业)", "identity"),
+        # 习惯：我经常、我习惯、我每天都会
+        (r"(?:我经常|我习惯|我每天都会|我平时)\s*(.+)", "habit"),
+        # 居住地/位置：我住在XX、我家在XX、我在XX
+        (r"(?:我住在|我家在)\s*(.{2,6})", "city"),
+        # 年龄：我今年XX岁、我XX岁
+        (r"(?:我今年|我|本人)\s*(\d{1,2})\s*岁", "age"),
+        # 名字：我叫XX
+        (r"我叫\s*(.{1,4})(?:[，。！？]|$)", "name"),
+        # 技能/爱好：我会XX、我学过XX、我在学XX
+        (r"(?:我会|我学过|我在学|我正在学|我擅长)\s*(.{1,20})", "skill"),
+        # 宠物：我养了XX
+        (r"(?:我养了|我有一只|我家里有)\s*(.{1,10})", "pet"),
+        # 家庭：我有XX、我有个XX
+        (r"我(?:有|有个|有一位)\s*(.{1,10})", "family"),
+        # 身体状态：我感冒了、我最近失眠、我腰痛
+        (r"(?:我|我最近|我这两天)(?:感冒|发烧|头痛|失眠|腰痛|胃痛|咳嗽|过敏|受伤|生病|不舒服)", "health"),
+        # 学校：我在XX上学、我读XX
+        (r"(?:我在.*?上(?:学|班)|我读|我就读于)\s*(.{1,20})", "school_or_work"),
+    ]
+    for pat, key in _bg_rules:
+        m = re.search(pat, text)
+        if m:
+            val = None
+            try: val = m.group(1)
+            except IndexError: pass
+            if not val:
+                try: val = m.group(2)
+                except IndexError: pass
+            if not val:
+                val = m.group(0)
+            if val and len(val) < 60:
+                background_update = {"action": "add", "key": key, "value": val}
+                break
+
+    validated = {
+        "sentiment": sentiment, "target": target, "intent": intent,
+        "emotion_subtype": emotion_subtype,
+        "relationship_impact": relationship_impact,
+        "background_update": background_update,
+        "empathy_strategy": None,
+        "context_keyword": detect_context_keyword(text)
+    }
     return validated
+
+

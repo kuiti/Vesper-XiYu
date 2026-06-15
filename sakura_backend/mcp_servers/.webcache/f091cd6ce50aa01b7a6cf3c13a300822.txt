@@ -1,0 +1,80 @@
+Issues · continuedev/continue · GitHub
+
+Skip to content
+
+You signed in with another tab or window. Reload to refresh your session.
+You signed out in another tab or window. Reload to refresh your session.
+You switched accounts on another tab or window. Reload to refresh your session.
+ 
+
+Dismiss alert
+
+        continuedev
+ 
+/
+
+continue
+
+Public
+
+- 
+ 
+
+Notifications
+ You must be signed in to change notification settings
+
+- 
+ 
+
+Fork
+    4.6k
+
+- 
+
+ 
+
+          Star
+ 33.6k
+
+# Issues
+Search Issuesreasoning_contentreasoning_contentSearchLabelsMilestonesNew issue
+## Search results
+OpenClosed
+- 
+### fix(deepseek): replay reasoning content for tool calls
+size:SThis PR changes 10-29 lines, ignoring generated files.This PR changes 10-29 lines, ignoring generated files.Status: Open (in progress).continuedev/continuenumber 12360 #12360 In continuedev/continue;· Jerry2003826  opened on May 10, 2026
+- 
+### [Bug] CLI: 400 reasoning_content error when using @file (Tool Calls) with DeepSeek API, regardless of thinking mode
+area:toolsRelates to tool usageRelates to tool usagekind:bugIndicates an unexpected problem or unintended behaviorIndicates an unexpected problem or unintended behavioros:windowsHappening specifically on WindowsHappening specifically on WindowsStatus: Open.#12246 In continuedev/continue;· qiaozheng9  opened on Apr 28, 2026
+- 
+### fix: map reasoning-delta to reasoning_content instead of content
+lgtmThis PR has been approved by a maintainerThis PR has been approved by a maintainersize:SThis PR changes 10-29 lines, ignoring generated files.This PR changes 10-29 lines, ignoring generated files.Status: Merged (completed).continuedev/continuenumber 11847 #11847 In continuedev/continue;·  by RomneyDa  was closed on Mar 25, 2026
+- 
+### fix(moonshot): add reasoning_content field support for Kimi models
+lgtmThis PR has been approved by a maintainerThis PR has been approved by a maintainersize:XSThis PR changes 0-9 lines, ignoring generated files.This PR changes 0-9 lines, ignoring generated files.Status: Merged (completed).continuedev/continuenumber 11806 #11806 In continuedev/continue;·  by RomneyDa  was closed on Mar 25, 2026
+- 
+### Error: Kimi K2.5 - 400
+kind:bugIndicates an unexpected problem or unintended behaviorIndicates an unexpected problem or unintended behaviorStatus: Closed (completed).#11711 In continuedev/continue;·  by forcewithme  was closed on Mar 25, 2026
+- 
+### Local model code editing: tracking issue for known failures
+area:applyarea:toolsRelates to tool usageRelates to tool usagekind:bugIndicates an unexpected problem or unintended behaviorIndicates an unexpected problem or unintended behaviorStatus: Closed (completed).#11667 In continuedev/continue;·  by shanevcantwell  was closed on Mar 21, 2026
+- 
+### Error: Kimi-K2.5 (moonshot.ai) - 400
+area:integrationIntegrations (context providers, model providers, etc.)Integrations (context providers, model providers, etc.)kind:bugIndicates an unexpected problem or unintended behaviorIndicates an unexpected problem or unintended behaviorStatus: Closed (completed).#11600 In continuedev/continue;·  by jrialland  was closed on Mar 25, 2026
+- 
+### Error: Kimi K2.5 - 400
+Status: Closed (completed).#11527 In continuedev/continue;·  by liyayong000-sketch  was closed on Mar 17, 2026
+- 
+### fix: include reasoning_content field for DeepSeek Reasoner models
+lgtmThis PR has been approved by a maintainerThis PR has been approved by a maintainersize:SThis PR changes 10-29 lines, ignoring generated files.This PR changes 10-29 lines, ignoring generated files.Status: Merged (completed).continuedev/continuenumber 11290 #11290 In continuedev/continue;·  by mvanhorn  was closed on Mar 21, 2026
+- 
+### Error: DeepSeek Reasoner - 400
+area:integrationIntegrations (context providers, model providers, etc.)Integrations (context providers, model providers, etc.)kind:bugIndicates an unexpected problem or unintended behaviorIndicates an unexpected problem or unintended behaviorStatus: Closed (completed).#11285 In continuedev/continue;·  by caoyuee  was closed on Mar 21, 2026
+- 
+### feat: Complete DeepSeek API adapter implementation
+ai-mergesize:XXLThis PR changes 1000+ lines, ignoring generated files.This PR changes 1000+ lines, ignoring generated files.Status: Closed (abandoned).continuedev/continuenumber 11130 #11130 In continuedev/continue;·  by dixoxib  was closed on Mar 24, 2026
+- 
+### Fix system-message tools parser when tool call is non-terminal
+lgtmThis PR has been approved by a maintainerThis PR has been approved by a maintainersize:LThis PR changes 100-499 lines, ignoring generated files.This PR changes 100-499 lines, ignoring generated files.Status: Merged (completed).continuedev/continuenumber 11092 #11092 In continuedev/continue;·  by MumuTW  was closed on Mar 24, 2026
+
+    You can’t perform that action at this time.

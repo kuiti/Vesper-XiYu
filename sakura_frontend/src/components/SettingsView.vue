@@ -4,13 +4,14 @@
       <button v-for="cat in categories" :key="cat.id" :class="['sn-item', { active: activeCat === cat.id }]" @click="activeCat = cat.id">{{ cat.label }}</button>
     </div>
     <div class="settings-content">
-      <ServerSettings v-if="activeCat==='server'"
+      <Transition name="page-fade" mode="out-in">
+        <ServerSettings v-if="activeCat==='server'" :key="'server'"
         :serverHost="serverHost" :serverPort="serverPort" :serverToken="serverToken"
         :testingServer="testingServer" :serverTestMsg="serverTestMsg" :serverTestOk="serverTestOk"
         @update:serverHost="serverHost=$event" @update:serverPort="serverPort=$event" @update:serverToken="serverToken=$event"
         @save-server="saveServer" @test-server="testServer" />
 
-      <ApiSettings v-if="activeCat==='api'"
+      <ApiSettings v-else-if="activeCat==='api'"
         :provider="provider" :apiBaseUrl="apiBaseUrl" :apiModel="apiModel" :apiKey="apiKey"
         :searchProvider="searchProvider" :fallbackModels="fallbackModels"
         :testingApi="testingApi" :testMsg="testMsg" :testOk="testOk"
@@ -20,7 +21,7 @@
         @provider-change="onProviderChange" @save-api="saveApi" @test-api="testApi" @fetch-models="fetchModels"
         @save-cfg="(k,v)=>saveCfg(k,v)" />
 
-      <RoleSettings v-if="activeCat==='role'"
+      <RoleSettings v-else-if="activeCat==='role'"
         :aiName="aiName" :userName="userName" :tone="tone" :length="length" :recall="recall"
         :allowEmotion="allowEmotion" :customPrompt="customPrompt" :aiBackground="aiBackground"
         :assistantAvatarUrl="assistantAvatarUrl" :userAvatarUrl="userAvatarUrl"
@@ -41,7 +42,7 @@
         @cancel-foundation="cancelFoundation" @save-preset="savePreset"
         @load-preset="(n,d)=>loadPreset(n,d)" @delete-preset="(n)=>deletePreset(n)" />
 
-      <AppearanceSettings v-if="activeCat==='appearance'"
+      <AppearanceSettings v-else-if="activeCat==='appearance'"
         :themeLocal="themeLocal" :chatBgImage="chatBgImage" :bgOpacity="bgOpacity" :bgBlur="bgBlur" :bgMode="bgMode"
         :bgUploadMsg="bgUploadMsg" :ragStatus="ragStatus" :ragCount="ragCount" :ragMsg="ragMsg" :ragMsgOk="ragMsgOk"
         :installingRag="installingRag" :rebuildingRag="rebuildingRag"
@@ -52,7 +53,7 @@
         @update:bgBlur="bgBlur=$event" @update:bgMode="bgMode=$event" />
 
       <!-- 聊天偏好 -->
-      <div v-if="activeCat==='chat'" class="sc-pane">
+      <div v-else-if="activeCat==='chat'" class="sc-pane">
         <div class="card"><h3>字体大小</h3>
           <div class="field"><input type="range" min="10" max="20" v-model.number="chatFontSize" @change="saveCfg('chat_font_size', chatFontSize)"><span style="margin-left:8px;font-size:13px;color:var(--tc2)">{{ chatFontSize }}px</span></div>
         </div>
@@ -75,49 +76,32 @@
       </div>
 
       <!-- 定位 -->
-      <div v-if="activeCat==='location'" class="sc-pane">
-        <div class="card"><h3>高德地图 API</h3><p class="hint">用于天气查询和 GPS 精确定位。在高德开放平台免费申请 Web服务 Key 后填入。</p>
-          <div class="field"><label>API Key (Web服务)</label><div class="btn-row"><input v-model="amapKey" placeholder="输入高德 Web服务 Key"><button class="btn" @click="saveAmapKey">保存</button><button class="btn-s" @click="testAmap" :disabled="testingAmap">{{ testingAmap ? '...' : '测试' }}</button></div><div v-if="amapTestMsg" class="field" style="margin-top:4px"><span :class="amapTestOk ? 'ok' : 'fail'">{{ amapTestMsg }}</span></div></div>
-        </div>
-        <div class="card"><h3>定位方式</h3><p class="hint">IP 定位写入手动城市（不会覆盖 GPS 结果）。GPS 精确定位精度更高，首次使用需浏览器授权。已授权过的重启后不再询问。</p>
-          <div class="btn-row"><button class="btn" @click="locateByIP" :disabled="!!locating">{{ locating === 'ip' ? '定位中...' : 'IP 定位' }}</button><button class="btn" @click="preciseLocate" :disabled="!!locating">{{ locating === 'gps' ? '定位中...' : 'GPS 精确定位' }}</button><button class="btn-s" @click="resetLocation">重置权限</button></div>
-          <div v-if="locateResult" class="field" style="margin-top:8px"><span :class="locateOk ? 'ok' : 'fail'">{{ locateResult }}</span></div>
-        </div>
-        <div class="card"><h3>手动选择</h3><p class="hint">当前定位：{{ currentLocation || '未获取' }}（精确城市优先于手动城市，GPS结果覆盖IP结果）</p>
-          <div class="field"><label>省份</label><select v-model="selProvince" @change="loadCities"><option value="">{{ currentProvince || '-- 自动检测 --' }}</option><option v-for="p in provinces" :key="p.adcode" :value="p.adcode">{{ p.name }}</option></select></div>
-          <div class="field"><label>城市</label><select v-model="selCity" @change="saveManualCity"><option value="">{{ currentManualCity || '-- 选择城市 --' }}</option><option v-for="c in cities" :key="c.adcode" :value="c.adcode">{{ c.name }}</option></select></div>
-        </div>
-        <div class="card"><h3>大模型联网天气</h3>
-          <label class="switch"><input type="checkbox" v-model="enableLlmWeather" @change="saveCfg('enable_llm_weather_search', enableLlmWeather)"> 使用大模型联网查询天气</label>
-          <p class="hint">勾选后天气查询跳过 Open-Meteo，由大模型自行搜索天气信息。仅大模型支持联网时生效。</p>
-          <div style="margin-top:12px">
-            <button class="btn" @click="testWeather" :disabled="testingWeather">{{ testingWeather ? '测试中...' : '测试天气源' }}</button>
-          </div>
-          <div v-if="weatherTestResults" style="margin-top:10px">
-            <div v-for="r in weatherTestResults.sources" :key="r.source" :style="{color: r.ok ? '#4caf84' : '#e05570', fontSize:'13px', marginBottom:'4px'}">
-              {{ r.ok ? '✓' : '✗' }} {{ r.source }}：{{ r.reason }}
-              <div v-if="r.preview" style="color:var(--tc2);font-size:12px;margin-left:18px">{{ r.preview }}</div>
-            </div>
-            <div style="font-size:12px;color:var(--tc2);margin-top:4px">{{ weatherTestResults.summary }}</div>
-          </div>
-        </div>
-      </div>
+      <LocationSettings v-else-if="activeCat==='location'"
+        :amapKey="amapKey" :enableLlmWeather="enableLlmWeather" :testingAmap="testingAmap"
+        :amapTestMsg="amapTestMsg" :amapTestOk="amapTestOk" :locating="locating"
+        :locateResult="locateResult" :locateOk="locateOk" :testingWeather="testingWeather"
+        :weatherTestResults="weatherTestResults" :currentLocation="currentLocation"
+        :currentProvince="currentProvince" :currentManualCity="currentManualCity"
+        :provinces="provinces" :cities="cities" :selProvince="selProvince" :selCity="selCity"
+        @update:amapKey="amapKey=$event" @update:enableLlmWeather="enableLlmWeather=$event"
+        @update:selProvince="selProvince=$event" @update:selCity="selCity=$event"
+        @save-amap-key="saveAmapKey" @test-amap="testAmap"
+        @locate-ip="locateByIP" @locate-gps="preciseLocate" @reset-location="resetLocation"
+        @load-cities="loadCities" @save-manual-city="saveManualCity" @test-weather="testWeather"
+        @save-cfg="(k,v)=>saveCfg(k,v)" />
 
       <!-- 隐私与通知 -->
-      <div v-if="activeCat==='privacy'" class="sc-pane">
-        <div class="card"><h3>隐私锁</h3><p class="hint">启动时需要输入密码才能进入聊天界面。忘记密码时输错3次后可重置。</p>
-          <label class="switch"><input type="checkbox" v-model="pinEnabled" @change="togglePin"> 启用 PIN 锁</label>
-          <div v-if="pinEnabled" class="field" style="margin-top:8px"><label>密码</label><input type="password" v-model="pinCode" @change="savePin"></div>
-        </div>
-        <div class="card"><h3>通知</h3>
-          <label class="switch"><input type="checkbox" v-model="useSysNotify" @change="saveCfg('use_system_notification', useSysNotify)"> 系统通知</label><p class="hint">Windows 桌面推送。提醒到期、AI 主动问候时弹窗。</p>
-          <label class="switch"><input type="checkbox" v-model="useWeather" @change="saveCfg('use_weather_care', useWeather)"> 天气关怀</label><p class="hint">每天 7:00 / 12:00 / 19:00 自动推送当地天气，主动问候也会提及天气。定位城市可在「定位」设置中修改。</p>
-          <label class="switch"><input type="checkbox" v-model="showTray" @change="saveCfg('show_tray_notification', showTray)"> 托盘提示</label><p class="hint">最小化到托盘时显示气泡提示。</p>
-          <div class="field" style="margin-top:8px"><label>通知风格</label><select v-model="notifyStyle" @change="saveCfg('notification_style', notifyStyle)"><option value="warm">温暖</option><option value="casual">随意</option><option value="humorous">幽默</option><option value="concise">简洁</option><option value="tsundere">傲娇</option><option value="free">自由</option></select><p class="hint">影响天气推送和主动问候的文案语气。温暖偏向关怀口吻，随意更口语化，幽默带俏皮玩笑，简洁只说重点，傲娇口是心非，自由由AI自行决定。</p></div>
-        </div>
-      </div>
+      <PrivacySettings v-else-if="activeCat==='privacy'"
+        :pinEnabled="pinEnabled" :pinCode="pinCode"
+        :useSysNotify="useSysNotify" :useWeather="useWeather"
+        :showTray="showTray" :notifyStyle="notifyStyle"
+        @update:pinCode="pinCode=$event" @update:useSysNotify="useSysNotify=$event"
+        @update:useWeather="useWeather=$event" @update:showTray="showTray=$event"
+        @update:notifyStyle="notifyStyle=$event"
+        @toggle-pin="togglePin" @save-pin="savePin"
+        @save-cfg="(k,v)=>saveCfg(k,v)" />
 
-      <TtsSettings v-if="activeCat==='tts'"
+      <TtsSettings v-else-if="activeCat==='tts'"
         :ttsEnabled="ttsEnabled" :ttsEngine="ttsEngine" :ttsVoice="ttsVoice" :ttsApiKey="ttsApiKey"
         :ttsApiUrl="ttsApiUrl" :ttsServerUrl="ttsServerUrl" :ttsEngineStatus="ttsEngineStatus"
         :ttsCloneMode="ttsCloneMode" :ttsCloneStatus="ttsCloneStatus" :ttsCloneStatusMsg="ttsCloneStatusMsg"
@@ -131,7 +115,7 @@
         @save-voice="saveVoice" @engine-change="onEngineChange" @clone-mode-change="onCloneModeChange"
         @test-xiaomi="testXiaomiTts" @upload-clone-audio="(e)=>uploadCloneAudio(e)" />
 
-      <DataSettings v-if="activeCat==='data'"
+      <DataSettings v-else-if="activeCat==='data'"
         :aiName="aiName" :userName="userName" :favorites="favorites"
         :cloudBackend="cloudBackend" :cloudUrl="cloudUrl" :cloudUser="cloudUser" :cloudPass="cloudPass" :cloudPhrase="cloudPhrase"
         :cloudMsg="cloudMsg" :cloudMsgOk="cloudMsgOk" :cloudUploading="cloudUploading" :cloudLastSync="cloudLastSync"
@@ -140,19 +124,21 @@
         @del-fav="(id)=>delFav(id)" @export-chat="(f)=>$emit('export-chat',f)" @load-favorites="loadFavorites"
         @save-cloud-cfg="saveCloudCfg" @test-cloud="testCloudConn" @cloud-upload="cloudUpload"
         @reset-relationship="resetRelationship" @reset-memory="resetMemory" @full-reset="fullReset" />
-
+      </Transition>
     </div>
   </div>
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 import ServerSettings from './ServerSettings.vue'
 import ApiSettings from './ApiSettings.vue'
 import RoleSettings from './RoleSettings.vue'
 import TtsSettings from './TtsSettings.vue'
 import DataSettings from './DataSettings.vue'
 import AppearanceSettings from './AppearanceSettings.vue'
+import LocationSettings from './settings/LocationSettings.vue'
+import PrivacySettings from './settings/PrivacySettings.vue'
 
 const PROVIDER_MAP = {
   deepseek: { url: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
@@ -401,7 +387,7 @@ export default {
     onProviderChange() { const p = PROVIDER_MAP[this.provider]; if (p) { this.apiBaseUrl = p.url; this.apiModel = p.model } },
     async saveApi() { await this.saveCfg('api_provider', this.provider); await this.saveCfg('api_base_url', this.apiBaseUrl); await this.saveCfg('api_model', this.apiModel); if (this.apiKey && this.apiKey !== '••••••••' && this.apiKey.length >= 10) await this.saveCfg('api_key', this.apiKey) },
     async testApi() { this.testingApi = true; try { const r = await api.get('/test/deepseek'); this.testOk = r.data.ok; this.testMsg = r.data.message } catch (e) { this.testOk = false; this.testMsg = '连接失败' } this.testingApi = false },
-    setTheme(v) { this.saveCfg('theme', v) },
+    setTheme(v) { this.$emit("config-changed", "theme", v); this.saveCfg("theme", v) },
     clearBg() { this.chatBgImage = ''; this.saveCfg('chat_bg_image', ''); this.bgUploadMsg = '' },
     async uploadBg(e) { const f = e.target.files[0]; if (!f) return; const fd = new FormData(); fd.append('file', f); try { const r = await api.post('/avatar/upload/bg', fd); if (r.data.filename) { const url = `/avatars/${r.data.filename}`; this.chatBgImage = url; this.saveCfg('chat_bg_image', url); this.bgUploadMsg = '已上传' } } catch (err) { this.bgUploadMsg = '上传失败' } e.target.value = '' },
     saveBgStyle() { this.saveCfg('bg_opacity', this.bgOpacity); this.saveCfg('bg_blur', this.bgBlur); this.saveCfg('bg_mode', this.bgMode); this.$emit('config-changed', 'bg_style', { opacity: this.bgOpacity, blur: this.bgBlur, mode: this.bgMode }) },
@@ -523,75 +509,75 @@ export default {
 
 <style scoped>
 .settings-view { display: flex; height: 100%; }
-.settings-nav { width: 180px; border-right: 1px solid var(--border); padding: 16px 0; display: flex; flex-direction: column; gap: 2px; }
-.sn-item { padding: 10px 20px; background: none; border: none; text-align: left; font-size: 13px; color: var(--tc2); cursor: pointer; }
-.sn-item:hover { background: rgba(255,255,255,.03); color: var(--tc); }
-.sn-item.active { background: rgba(255,255,255,.04); color: var(--p); }
+.settings-nav { width: 180px; border-right: 1px solid var(--border-default); padding: 16px 0; display: flex; flex-direction: column; gap: 2px; }
+.sn-item { padding: 10px 20px; background: none; border: none; text-align: left; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
+.sn-item:hover { background: rgba(255,255,255,.03); color: var(--text-primary); }
+.sn-item.active { background: rgba(255,255,255,.04); color: var(--accent-primary); }
 .settings-content { flex: 1; overflow-y: auto; padding: 20px; }
 .sc-pane { display: flex; flex-direction: column; gap: 12px; }
-.card { background: rgba(255,255,255,.02); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+.card { background: rgba(255,255,255,.02); border: 1px solid var(--border-default); border-radius: 8px; padding: 14px; }
 .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-.hint { font-size: 11px; color: var(--tc2); margin: 0 0 10px 0; line-height: 1.5; opacity: .75; }
+.hint { font-size: 11px; color: var(--text-secondary); margin: 0 0 10px 0; line-height: 1.5; opacity: .75; }
 .hint-ok { color: #4caf50 !important; opacity: 1 !important; }
 .hint-err { color: #e74c3c !important; opacity: 1 !important; }
-.field-label { display: block; font-size: 12px; color: var(--tc2); margin-bottom: 4px; }
-.input { width: 100%; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--tc); font-size: 13px; outline: none; box-sizing: border-box; }
-.input:focus { border-color: var(--p); }
+.field-label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.input { width: 100%; padding: 6px 10px; background: var(--surface-app); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary); font-size: 13px; outline: none; box-sizing: border-box; }
+.input:focus { border-color: var(--accent-primary); }
 .field { margin-bottom: 10px; }
-.field label { display: block; font-size: 12px; color: var(--tc2); margin-bottom: 4px; }
-.field input, .field select, textarea { width: 100%; padding: 7px 10px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); color: var(--tc); font-size: 13px; font-family: inherit; box-sizing: border-box; }
+.field label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.field input, .field select, textarea { width: 100%; padding: 7px 10px; border-radius: 5px; border: 1px solid var(--border-default); background: var(--surface-app); color: var(--text-primary); font-size: 13px; font-family: inherit; box-sizing: border-box; }
 .field select { width: 100%; }
 textarea { resize: vertical; }
-.btn { padding: 7px 16px; background: var(--p); color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; }
+.btn { padding: 7px 16px; background: var(--accent-primary); color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; }
 .btn:disabled { opacity: .4; }
-.btn-s { padding: 5px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 4px; color: var(--tc2); cursor: pointer; font-size: 12px; }
+.btn-s { padding: 5px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-secondary); cursor: pointer; font-size: 12px; }
 .btn-s:hover { background: rgba(255,255,255,.06); }
 .btn-s.danger { color: #f85149; border-color: #f85149; }
 .btn-s.danger:hover { background: rgba(248,81,73,.1); }
 .btn-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .ok { color: #2ea043; font-size: 12px; }
 .fail { color: #e74c3c; font-size: 12px; }
-.switch { display: block; font-size: 13px; color: var(--tc); margin: 4px 0; cursor: pointer; }
+.switch { display: block; font-size: 13px; color: var(--text-primary); margin: 4px 0; cursor: pointer; }
 .switch input { margin-right: 6px; }
 .theme-row { display: flex; gap: 6px; flex-wrap: wrap; }
-.theme-btn { flex: 1; padding: 8px; background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 6px; color: var(--tc2); cursor: pointer; font-size: 12px; min-width: 50px; }
-.theme-btn.active { background: var(--p); color: #fff; border-color: var(--p); }
+.theme-btn { flex: 1; padding: 8px; background: rgba(255,255,255,.03); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-secondary); cursor: pointer; font-size: 12px; min-width: 50px; }
+.theme-btn.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
 .preset-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.preset-item { padding: 4px 10px; background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 4px; font-size: 12px; cursor: pointer; }
+.preset-item { padding: 4px 10px; background: rgba(255,255,255,.03); border: 1px solid var(--border-default); border-radius: 4px; font-size: 12px; cursor: pointer; }
 .preset-item:hover { background: rgba(255,255,255,.06); }
 .phrase-row { display: flex; gap: 6px; margin-bottom: 6px; }
-.phrase-row input { flex: 1; padding: 5px 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--tc); font-size: 12px; }
+.phrase-row input { flex: 1; padding: 5px 8px; border-radius: 4px; border: 1px solid var(--border-default); background: var(--surface-app); color: var(--text-primary); font-size: 12px; }
 .fav-item { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.03); font-size: 12px; }
-.fav-role { color: var(--p); white-space: nowrap; min-width: 30px; }
-.fav-content { flex: 1; color: var(--tc); }
-.empty { color: var(--tc2); font-size: 12px; padding: 10px; }
+.fav-role { color: var(--accent-primary); white-space: nowrap; min-width: 30px; }
+.fav-content { flex: 1; color: var(--text-primary); }
+.empty { color: var(--text-secondary); font-size: 12px; padding: 10px; }
 .preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.preset-chip { display: flex; align-items: center; gap: 4px; padding: 4px 10px; background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--tc2); transition: border-color .15s; }
-.preset-chip:hover { border-color: var(--p); color: var(--tc); }
+.preset-chip { display: flex; align-items: center; gap: 4px; padding: 4px 10px; background: rgba(255,255,255,.03); border: 1px solid var(--border-default); border-radius: 6px; cursor: pointer; font-size: 12px; color: var(--text-secondary); transition: border-color .15s; }
+.preset-chip:hover { border-color: var(--accent-primary); color: var(--text-primary); }
 .preset-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
 .preset-del { color: #e74c3c; font-size: 14px; opacity: .4; }
 .preset-del:hover { opacity: 1; }
-.loc-hint { font-size: 11px; color: var(--tc2); margin-top: 4px; }
+.loc-hint { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
 .color-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
-.color-field label { font-size: 11px; color: var(--tc2); }
+.color-field label { font-size: 11px; color: var(--text-secondary); }
 .color-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
-.color-swatch { width: 20px; height: 20px; border-radius: 4px; border: 1px solid var(--border); flex-shrink: 0; }
+.color-swatch { width: 20px; height: 20px; border-radius: 4px; border: 1px solid var(--border-default); flex-shrink: 0; }
 .color-row input[type="color"] { width: 28px; height: 20px; padding: 0; border: none; background: none; cursor: pointer; }
 .rel-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
-.rel-label { color: var(--tc2); min-width: 50px; font-size: 12px; }
+.rel-label { color: var(--text-secondary); min-width: 50px; font-size: 12px; }
 .rel-bar { flex: 1; height: 8px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; }
 .rel-fill { height: 100%; border-radius: 4px; transition: width .5s; }
 .rel-fill.affection { background: linear-gradient(90deg, #f0a0b0, #e8929b); }
 .rel-fill.trust { background: linear-gradient(90deg, #5390d4, #4ecdc4); }
-.rel-value { color: var(--tc); min-width: 30px; text-align: right; font-size: 12px; }
-.ai-emotion-tag { color: var(--p); font-size: 12px; }
-.ai-emotion-desc { color: var(--tc2); font-size: 11px; margin-left: 8px; }
+.rel-value { color: var(--text-primary); min-width: 30px; text-align: right; font-size: 12px; }
+.ai-emotion-tag { color: var(--accent-primary); font-size: 12px; }
+.ai-emotion-desc { color: var(--text-secondary); font-size: 11px; margin-left: 8px; }
 .avatar-section { display: flex; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.03); }
 .avatar-preview { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.avatar-img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border); }
-.avatar-label { font-size: 10px; color: var(--tc2); }
+.avatar-img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-default); }
+.avatar-label { font-size: 10px; color: var(--text-secondary); }
 .avatar-actions { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-.url-input { padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); color: var(--tc); font-size: 11px; }
+.url-input { padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-default); background: var(--surface-app); color: var(--text-primary); font-size: 11px; }
 
 /* 移动端适配 */
 @media (max-width: 768px) {
@@ -600,7 +586,7 @@ textarea { resize: vertical; }
     width: 100%;
     flex-direction: row;
     border-right: none;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-default);
     padding: 0;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -633,11 +619,11 @@ textarea { resize: vertical; }
 .btn-secondary:hover { background: var(--tc2, #8b949e); }
 .cloud-panel { display: flex; flex-direction: column; gap: 8px; }
 .cloud-row { display: flex; align-items: center; gap: 8px; }
-.cloud-row label { font-size: 12px; color: var(--tc2); min-width: 80px; flex-shrink: 0; }
-.cloud-row input, .cloud-row select { flex: 1; padding: 6px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--tc); font-size: 12px; }
+.cloud-row label { font-size: 12px; color: var(--text-secondary); min-width: 80px; flex-shrink: 0; }
+.cloud-row input, .cloud-row select { flex: 1; padding: 6px 8px; background: var(--surface-app); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary); font-size: 12px; }
 .cloud-actions { display: flex; gap: 8px; margin-top: 4px; }
 .cloud-msg { font-size: 12px; padding: 4px 0; }
 .cloud-msg.ok { color: #4caf50; }
 .cloud-msg.err { color: #e74c3c; }
-.cloud-last { font-size: 11px; color: var(--tc2); }
+.cloud-last { font-size: 11px; color: var(--text-secondary); }
 </style>

@@ -112,7 +112,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   props: { aiName: { type: String, default: '佐仓' } },
@@ -192,26 +192,26 @@ export default {
 <style scoped>
 .vault-panel { padding: 4px; font-size: 13px; }
 .vault-section { margin-bottom: 12px; }
-.vault-section h4 { font-size: 12px; color: var(--tc2); margin: 0 0 6px; }
+.vault-section h4 { font-size: 12px; color: var(--text-secondary); margin: 0 0 6px; }
 .vault-item { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.03); }
-.vault-key { color: var(--p); font-size: 11px; white-space: nowrap; min-width: 60px; }
-.vault-val { flex: 1; color: var(--tc); font-size: 12px; }
+.vault-key { color: var(--accent-primary); font-size: 11px; white-space: nowrap; min-width: 60px; }
+.vault-val { flex: 1; color: var(--text-primary); font-size: 12px; }
 .vault-del { background: none; border: none; color: #e74c3c; cursor: pointer; font-size: 11px; padding: 0 4px; opacity: .5; }
 .vault-del:hover { opacity: 1; }
-.vault-more { background: none; border: 1px solid rgba(255,255,255,.1); color: var(--tc2); cursor: pointer; font-size: 11px; padding: 4px 12px; border-radius: 4px; margin-top: 4px; display: block; width: 100%; }
-.vault-more:hover { border-color: var(--p); color: var(--p); }
-.empty-hint { color: var(--tc2); font-size: 12px; text-align: center; padding: 20px; }
-.vault-cat { font-size: 10px; padding: 1px 5px; border-radius: 3px; white-space: nowrap; background: rgba(255,255,255,.06); color: var(--tc2); }
+.vault-more { background: none; border: 1px solid rgba(255,255,255,.1); color: var(--text-secondary); cursor: pointer; font-size: 11px; padding: 4px 12px; border-radius: 4px; margin-top: 4px; display: block; width: 100%; }
+.vault-more:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+.empty-hint { color: var(--text-secondary); font-size: 12px; text-align: center; padding: 20px; }
+.vault-cat { font-size: 10px; padding: 1px 5px; border-radius: 3px; white-space: nowrap; background: rgba(255,255,255,.06); color: var(--text-secondary); }
 .vault-cat.bio { background: rgba(52,152,219,.15); color: #3498db; }
 .vault-cat.pref { background: rgba(155,89,182,.15); color: #9b59b6; }
 .vault-cat.exp { background: rgba(46,204,113,.15); color: #2ecc71; }
 .vault-cat.social { background: rgba(241,196,15,.15); color: #f1c40f; }
 .vault-cat.work { background: rgba(230,126,34,.15); color: #e67e22; }
 .vault-cat.event { background: rgba(231,76,60,.15); color: #e74c3c; }
-.vault-imp { font-size: 10px; color: var(--tc2); min-width: 16px; text-align: center; }
-.vault-cnt { font-size: 10px; color: var(--tc2); white-space: nowrap; }
+.vault-imp { font-size: 10px; color: var(--text-secondary); min-width: 16px; text-align: center; }
+.vault-cnt { font-size: 10px; color: var(--text-secondary); white-space: nowrap; }
 .kg-item { font-size: 12px; }
-.kg-subj { color: var(--p); }
-.kg-pred { color: var(--tc2); font-size: 11px; }
-.kg-obj { color: var(--tc); }
+.kg-subj { color: var(--accent-primary); }
+.kg-pred { color: var(--text-secondary); font-size: 11px; }
+.kg-obj { color: var(--text-primary); }
 </style>

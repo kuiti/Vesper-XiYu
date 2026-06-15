@@ -72,14 +72,14 @@ export default {
 </script>
 <style scoped>
 .sc-pane { display: flex; flex-direction: column; gap: 12px; }
-.card { background: rgba(255,255,255,.02); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+.card { background: rgba(255,255,255,.02); border: 1px solid var(--border-default); border-radius: 8px; padding: 14px; }
 .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
 .hint-ok { color: #4caf50; font-size: 12px; }
 .hint-err { color: #e74c3c; font-size: 12px; }
-.field-label { display: block; font-size: 12px; color: var(--tc2); margin-bottom: 4px; }
-.input { width: 100%; padding: 6px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--tc); font-size: 13px; outline: none; box-sizing: border-box; }
-.btn { padding: 7px 16px; background: var(--p); color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; }
-.btn-s { padding: 5px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 4px; color: var(--tc2); cursor: pointer; font-size: 12px; }
-.switch { display: block; font-size: 13px; color: var(--tc); margin: 4px 0; cursor: pointer; }
+.field-label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.input { width: 100%; padding: 6px 10px; background: var(--surface-app); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary); font-size: 13px; outline: none; box-sizing: border-box; }
+.btn { padding: 7px 16px; background: var(--accent-primary); color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; }
+.btn-s { padding: 5px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-secondary); cursor: pointer; font-size: 12px; }
+.switch { display: block; font-size: 13px; color: var(--text-primary); margin: 4px 0; cursor: pointer; }
 .switch input { margin-right: 6px; }
 </style>

@@ -19,7 +19,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   inject: { showConfirm: { default: () => (msg) => window.confirm(msg) } },
@@ -50,14 +50,14 @@ export default {
 <style scoped>
 .note-list { padding: 10px; }
 .add-note { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-.title-input { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--tc); font-size: 15px; font-weight: 600; }
-.content-input { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--tc); font-size: 14px; line-height: 1.7; resize: vertical; min-height: 160px; font-family: inherit; }
-.add-btn { align-self: flex-end; background: var(--p); border: none; border-radius: 8px; color: #fff; cursor: pointer; padding: 8px 20px; font-size: 14px; }
-.note-item { background: var(--sb); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.title-input { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border-default); background: var(--surface-app); color: var(--text-primary); font-size: 15px; font-weight: 600; }
+.content-input { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-default); background: var(--surface-app); color: var(--text-primary); font-size: 14px; line-height: 1.7; resize: vertical; min-height: 160px; font-family: inherit; }
+.add-btn { align-self: flex-end; background: var(--accent-primary); border: none; border-radius: 8px; color: #fff; cursor: pointer; padding: 8px 20px; font-size: 14px; }
+.note-item { background: var(--surface-sidebar); border-radius: 8px; padding: 12px; margin-bottom: 10px; }
 .note-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.note-title { font-weight: 600; color: var(--p); font-size: 15px; }
-.note-content { font-size: 14px; color: var(--tc); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
-.note-header .del-btn { background: none; border: none; color: var(--tc2); cursor: pointer; font-size: 13px; opacity: .4; transition: opacity .15s; }
+.note-title { font-weight: 600; color: var(--accent-primary); font-size: 15px; }
+.note-content { font-size: 14px; color: var(--text-primary); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.note-header .del-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 13px; opacity: .4; transition: opacity .15s; }
 .note-header .del-btn:hover { opacity: 1; color: #e74c3c; }
-.empty { color: var(--tc2); text-align: center; font-size: 14px; padding: 30px; }
+.empty { color: var(--text-secondary); text-align: center; font-size: 14px; padding: 30px; }
 </style>

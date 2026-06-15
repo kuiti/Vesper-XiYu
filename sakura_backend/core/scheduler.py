@@ -1,6 +1,7 @@
 # core/scheduler.py — APScheduler 定时任务管理
 """替代 asyncio.create_task，支持持久化、错过补执行、错误重试"""
 import logging
+from core.retry import silent_exc
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -85,8 +86,8 @@ def remove_job(job_id: str):
     try:
         scheduler.remove_job(job_id)
         logger.info(f"[调度器] 移除任务: {job_id}")
-    except Exception as e:  # silent
-        logger.debug(f"[remove_job] {e}")
+    except Exception as e:
+        silent_exc("remove_job", e)
 
 
 def list_jobs() -> list:

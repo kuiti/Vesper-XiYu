@@ -1,6 +1,6 @@
 # version: 5.0.0
 from fastapi import APIRouter, BackgroundTasks
-from core.db import delete_chat_history_between, delete_chat_history_older_than, set_config, get_config, reset_active_memory, get_db_connection
+from core.db import delete_chat_history_between, delete_chat_history_older_than, set_config, get_config, reset_active_memory
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 

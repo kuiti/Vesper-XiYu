@@ -10,9 +10,10 @@
   兜底: 空闲 >= 30分钟（保留原逻辑）
 """
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from core.db import get_config, set_config, get_active_hours, get_proactive_flag, get_proactive_response_rate, get_reminders
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 
@@ -205,10 +206,10 @@ def should_proactive_trigger(
                         "minutes_left": round(minutes_left, 1),
                         "style": "温和提醒，不催促"
                     }
-            except Exception as e:  # silent
-                logger.debug(f"[?] {e}")
-    except Exception as e:  # silent
-        logger.debug(f"[?] {e}")
+            except Exception as e:
+                silent_exc("?", e)
+    except Exception as e:
+        silent_exc("?", e)
 
     # ─── 触发 E: 长期目标跟进 ───
     try:
@@ -221,8 +222,8 @@ def should_proactive_trigger(
                 "category": goal.get("category", "other"),
                 "style": "自然提起，不像任务清单，像朋友关心进展"
             }
-    except Exception as e:  # silent
-        logger.debug(f"[?] {e}")
+    except Exception as e:
+        silent_exc("?", e)
 
     # ─── 兜底: 空闲 >= 30 分钟 ───
     if idle_minutes >= 30 and "idle" not in session_triggered:
@@ -262,15 +263,15 @@ def _load_care_counts():
             data = json.loads(raw)
             _care_daily_counts = data.get("counts", {})
             _care_daily_date = data.get("date", "")
-    except Exception as e:  # silent
-        logger.debug(f"[_load_care_counts] {e}")
+    except Exception as e:
+        silent_exc("_load_care_counts", e)
 
 
 def _save_care_counts():
     try:
         set_config("_care_daily_counts", json.dumps({"counts": _care_daily_counts, "date": _care_daily_date}, ensure_ascii=False))
-    except Exception as e:  # silent
-        logger.debug(f"[_save_care_counts] {e}")
+    except Exception as e:
+        silent_exc("_save_care_counts", e)
 
 
 def _reset_care_counts_if_new_day():
@@ -348,16 +349,16 @@ def should_heartbeat_trigger(idle_minutes: float, session_triggered: set = None)
         try:
             if (now - datetime.fromisoformat(last_heartbeat)).total_seconds() / 60 < 120:
                 return False, "", {}
-        except ValueError:
-            pass
+        except ValueError as e:
+            silent_exc("proactive", e)
     # 也要检查最近一次主动消息时间，避免刚发完主动就发心跳
     last_proactive = get_config("_last_proactive_time", "")
     if last_proactive:
         try:
             if (now - datetime.fromisoformat(last_proactive)).total_seconds() / 60 < 120:
                 return False, "", {}
-        except ValueError:
-            pass
+        except ValueError as e:
+            silent_exc("proactive", e)
     time_hint = "自然地问候"
     for (lo, hi), hint in HEARTBEAT_TIME_HINTS.items():
         if lo <= hour < hi:

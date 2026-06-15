@@ -40,7 +40,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   props: {
@@ -109,32 +109,32 @@ export default {
 </script>
 
 <style scoped>
-.history-view { display: flex; flex-direction: column; height: 100%; background: var(--bg); color: var(--tc); }
-.hv-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.history-view { display: flex; flex-direction: column; height: 100%; background: var(--surface-app); color: var(--text-primary); }
+.hv-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border-default); }
 .hv-header h2 { font-size: 16px; font-weight: 600; }
-.btn-close { background: none; border: none; color: var(--tc2); font-size: 20px; cursor: pointer; }
+.btn-close { background: none; border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer; }
 .hv-body { display: flex; flex: 1; overflow: hidden; }
-.hv-dates { width: 140px; overflow-y: auto; border-right: 1px solid var(--border); padding: 8px 0; }
-.hv-month-header { padding: 8px 16px; font-size: 12px; font-weight: 600; color: var(--p); cursor: pointer; user-select: none; }
+.hv-dates { width: 140px; overflow-y: auto; border-right: 1px solid var(--border-default); padding: 8px 0; }
+.hv-month-header { padding: 8px 16px; font-size: 12px; font-weight: 600; color: var(--accent-primary); cursor: pointer; user-select: none; }
 .hv-month-header:hover { background: rgba(255,255,255,.03); }
-.hv-date { padding: 8px 16px; font-size: 13px; cursor: pointer; color: var(--tc2); transition: all .15s; }
-.hv-date:hover { color: var(--tc); background: rgba(255,255,255,.03); }
-.hv-date.active { color: var(--p); background: rgba(255,255,255,.06); font-weight: 600; }
+.hv-date { padding: 8px 16px; font-size: 13px; cursor: pointer; color: var(--text-secondary); transition: all .15s; }
+.hv-date:hover { color: var(--text-primary); background: rgba(255,255,255,.03); }
+.hv-date.active { color: var(--accent-primary); background: rgba(255,255,255,.06); font-weight: 600; }
 .hv-msgs { flex: 1; overflow-y: auto; padding: 12px 16px; }
 .hv-msg { padding: 10px 12px; margin-bottom: 8px; border-radius: 8px; position: relative; }
-.hv-msg.user { background: var(--ub); }
-.hv-msg.assistant { background: var(--ab); }
+.hv-msg.user { background: var(--bubble-user); }
+.hv-msg.assistant { background: var(--bubble-assistant); }
 .hv-msg-meta { display: flex; gap: 8px; margin-bottom: 4px; }
-.hv-msg-role { font-size: 11px; color: var(--p); font-weight: 600; }
-.hv-msg-time { font-size: 11px; color: var(--tc2); }
+.hv-msg-role { font-size: 11px; color: var(--accent-primary); font-weight: 600; }
+.hv-msg-time { font-size: 11px; color: var(--text-secondary); }
 .hv-msg-content { font-size: 13px; line-height: 1.6; word-break: break-word; }
-.hv-fav-btn { position: absolute; top: 8px; right: 10px; background: none; border: none; font-size: 16px; cursor: pointer; color: var(--tc2); transition: color .15s; }
+.hv-fav-btn { position: absolute; top: 8px; right: 10px; background: none; border: none; font-size: 16px; cursor: pointer; color: var(--text-secondary); transition: color .15s; }
 .hv-fav-btn.fav { color: #f0c040; }
-.hv-empty { padding: 24px; text-align: center; color: var(--tc2); font-size: 13px; }
-.hv-loading { padding: 16px; text-align: center; color: var(--tc2); }
-.hv-footer { display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border); }
-.hv-footer button { padding: 6px 16px; border-radius: 16px; border: 1px solid var(--border); background: var(--bg); color: var(--tc2); font-size: 12px; cursor: pointer; transition: all .15s; }
-.hv-footer button.active { background: var(--p); color: #fff; border-color: var(--p); }
+.hv-empty { padding: 24px; text-align: center; color: var(--text-secondary); font-size: 13px; }
+.hv-loading { padding: 16px; text-align: center; color: var(--text-secondary); }
+.hv-footer { display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border-default); }
+.hv-footer button { padding: 6px 16px; border-radius: 16px; border: 1px solid var(--border-default); background: var(--surface-app); color: var(--text-secondary); font-size: 12px; cursor: pointer; transition: all .15s; }
+.hv-footer button.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
 
 /* 移动端适配 */
 @media (max-width: 768px) {
@@ -145,7 +145,7 @@ export default {
   .hv-dates {
     width: 100%;
     border-right: none;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-default);
     max-height: 150px;
     overflow-x: auto;
     display: flex;

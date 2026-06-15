@@ -18,7 +18,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   inject: { showConfirm: { default: () => (msg) => window.confirm(msg) } },
@@ -66,15 +66,15 @@ export default {
 <style scoped>
 .habit-tracker { padding: 10px; }
 .add-item { display: flex; gap: 8px; margin-bottom: 12px; }
-.add-item input { flex: 1; padding: 6px 8px; border-radius: 6px; background: var(--bg); color: var(--tc); border: 1px solid var(--border); }
-.add-item button { background: var(--p); border: none; color: #fff; border-radius: 6px; cursor: pointer; padding: 0 14px; }
-.habit-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--sb); border-radius: 6px; margin-bottom: 6px; }
+.add-item input { flex: 1; padding: 6px 8px; border-radius: 6px; background: var(--surface-app); color: var(--text-primary); border: 1px solid var(--border-default); }
+.add-item button { background: var(--accent-primary); border: none; color: #fff; border-radius: 6px; cursor: pointer; padding: 0 14px; }
+.habit-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--surface-sidebar); border-radius: 6px; margin-bottom: 6px; }
 .habit-check { cursor: pointer; font-size: 16px; user-select: none; }
-.habit-name { flex: 1; color: var(--tc); font-size: 14px; }
+.habit-name { flex: 1; color: var(--text-primary); font-size: 14px; }
 .habit-name.done { text-decoration: line-through; opacity: .5; }
-.habit-streak { color: var(--p); font-size: 12px; font-weight: 600; }
-.del-btn { background: none; border: none; color: var(--tc2); cursor: pointer; opacity: .4; font-size: 16px; }
+.habit-streak { color: var(--accent-primary); font-size: 12px; font-weight: 600; }
+.del-btn { background: none; border: none; color: var(--text-secondary); cursor: pointer; opacity: .4; font-size: 16px; }
 .del-btn:hover { opacity: 1; color: #e74c3c; }
-.empty { text-align: center; color: var(--tc2); font-size: 13px; padding: 20px; }
-.habit-reset { text-align: center; color: var(--tc2); font-size: 10px; margin-top: 8px; opacity: .5; }
+.empty { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 20px; }
+.habit-reset { text-align: center; color: var(--text-secondary); font-size: 10px; margin-top: 8px; opacity: .5; }
 </style>

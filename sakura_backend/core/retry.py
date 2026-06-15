@@ -1,10 +1,15 @@
-# core/retry.py — 通用重试工具
-"""提供带指数退避的重试装饰器，用于外部 HTTP API 调用。"""
+# core/retry.py — 通用重试工具 + silent_exc 辅助
+"""提供带指数退避的重试装饰器和 silent_exc 快捷函数。"""
 import time
 import logging
 from functools import wraps
 
 logger = logging.getLogger(__name__)
+
+
+def silent_exc(ctx: str, e: BaseException) -> None:
+    """静默记录非关键异常，统一格式，取代散落的 # silent + logger.debug 模式。"""
+    logger.debug("[%s] %s", ctx, e)
 
 
 def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 10.0,

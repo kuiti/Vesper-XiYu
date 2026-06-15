@@ -50,13 +50,13 @@ export default {
 <style scoped>
 .tl-side-card {
   position: fixed; right: 16px; top: 60px; width: 240px; max-height: 70vh; overflow-y: auto;
-  padding: 14px; background: var(--sb); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px; background: var(--surface-sidebar); border: 1px solid var(--border-default); border-radius: 10px;
   box-shadow: 0 4px 20px rgba(0,0,0,.3); z-index: 100; animation: tlIn .3s ease;
 }
 @keyframes tlIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-.tl-header { font-size: 12px; color: var(--tc2); margin-bottom: 8px; font-weight: 500; }
+.tl-header { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; font-weight: 500; }
 .tl-items { display: flex; flex-wrap: wrap; gap: 6px; }
-.tl-chip { padding: 3px 10px; background: rgba(255,255,255,.04); border-radius: 10px; font-size: 11px; color: var(--tc); }
-.tl-empty { font-size: 11px; color: var(--tc2); opacity: .6; }
-.tl-close { position: absolute; top: 8px; right: 10px; background: none; border: none; color: var(--tc2); cursor: pointer; font-size: 16px; }
+.tl-chip { padding: 3px 10px; background: rgba(255,255,255,.04); border-radius: 10px; font-size: 11px; color: var(--text-primary); }
+.tl-empty { font-size: 11px; color: var(--text-secondary); opacity: .6; }
+.tl-close { position: absolute; top: 8px; right: 10px; background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 16px; }
 </style>

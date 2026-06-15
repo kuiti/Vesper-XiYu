@@ -16,7 +16,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   data() {
@@ -65,11 +65,11 @@ export default {
 <style scoped>
 .rag-panel { padding: 10px; }
 .status-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; margin-bottom: 6px; background: rgba(255,255,255,.03); border-radius: 6px; font-size: 13px; }
-.label { color: var(--tc2); }
-.badge { padding: 2px 10px; border-radius: 10px; font-size: 11px; background: rgba(255,255,255,.08); color: var(--tc); }
+.label { color: var(--text-secondary); }
+.badge { padding: 2px 10px; border-radius: 10px; font-size: 11px; background: rgba(255,255,255,.08); color: var(--text-primary); }
 .badge.ok { background: #4caf5033; color: #4caf50; }
 .badge.fail { background: #e74c3c33; color: #e74c3c; }
-button { width: 100%; padding: 8px; margin-top: 10px; background: var(--p); border: none; border-radius: 6px; color: #fff; cursor: pointer; }
-button:disabled { background: var(--border); }
-.hint { font-size: 12px; color: var(--tc2); margin-top: 8px; text-align: center; }
+button { width: 100%; padding: 8px; margin-top: 10px; background: var(--accent-primary); border: none; border-radius: 6px; color: #fff; cursor: pointer; }
+button:disabled { background: var(--border-default); }
+.hint { font-size: 12px; color: var(--text-secondary); margin-top: 8px; text-align: center; }
 </style>

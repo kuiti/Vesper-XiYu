@@ -9,4 +9,8 @@ export default defineConfig({
     vue(),
   ],
   base: './',
+  test: {
+    environment: 'jsdom',
+    globals: true,
+  },
 })

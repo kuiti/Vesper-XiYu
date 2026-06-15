@@ -1,6 +1,7 @@
 from fastapi import APIRouter, BackgroundTasks
 from core.vector_store import rebuild_all_vectors, is_model_ready, get_collection
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/rag", tags=["rag"])
@@ -30,13 +31,13 @@ async def rag_status():
         try:
             col = get_collection()
             count = col.count()
-        except Exception as e:  # silent
-            logger.debug(f"[rag_status] {e}")
+        except Exception as e:
+            silent_exc("rag_status", e)
         try:
             col2 = get_collection("sentence_index")
             sentence_count = col2.count()
-        except Exception as e:  # silent
-            logger.debug(f"[rag_status] {e}")
+        except Exception as e:
+            silent_exc("rag_status", e)
     return {"model_loaded": model_ok, "vector_count": count, "sentence_count": sentence_count, "total_vectors": count + sentence_count, "installed": installed}
 
 @router.post("/install")

@@ -3,6 +3,7 @@ import concurrent.futures
 from datetime import datetime
 from core.db import get_config, get_memory, get_last_user_messages, set_config, get_conn
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 # 模块级共享线程池，避免每次调用创建新池导致线程泄漏
@@ -193,10 +194,10 @@ def generate_greeting():
                 w = _future.result(timeout=2)
                 if "error" not in w and w.get("temp") is not None:
                     weather_hint = f"你知道{city}现在{w.get('weather','')}，{w['temp']}度。如果自然的话可以顺口提一句。"
-            except concurrent.futures.TimeoutError:
-                pass
-    except Exception as e:  # silent
-        logger.debug(f"[?] {e}")
+            except concurrent.futures.TimeoutError as e:
+                silent_exc("greeting", e)
+    except Exception as e:
+        silent_exc("?", e)
     # 获取最近几条自己说过的话，避免重复问候
     recent_self = ""
     try:
@@ -207,8 +208,8 @@ def generate_greeting():
         if rows:
             recent_msgs = [r["content"][:60] for r in reversed(rows)]
             recent_self = "你最近对用户说过的话（不要重复这些内容）：" + "；".join(recent_msgs)
-    except Exception as e:  # silent
-        logger.debug(f"[?] {e}")
+    except Exception as e:
+        silent_exc("?", e)
 
     ctx_line = f"\n【上下文提示】{context_hint}。\n" if context_hint else ""
     user_prompt = f"{memory_text}\n用户{time_desc}。\n时间风格：{slot['style']}。{ctx_line}{recent_self}\n请生成一个简短、自然的欢迎语。{weather_hint}直接输出欢迎语，不要加任何前缀。"
@@ -419,8 +420,8 @@ def generate_proactive(trigger_type: str, context: dict = None):
                 w_desc = weather.get("weather", "")
                 w_temp = weather["temp"]
                 weather_context = f"你知道{city}现在{w_desc}，{w_temp}度。但不用硬提天气，只有自然的时候才顺口带一句。"
-    except Exception as e:  # silent
-        logger.debug(f"[?] {e}")
+    except Exception as e:
+        silent_exc("?", e)
 
     # ─── 触发特定的内容指令 ───
     trigger_instruction = context.get("style", "像朋友一样自然闲聊")
@@ -438,8 +439,8 @@ def generate_proactive(trigger_type: str, context: dict = None):
         try:
             from api.proactive import get_comfort_dedup_hint
             comfort_dedup = get_comfort_dedup_hint()
-        except Exception as e:  # silent
-            logger.debug(f"[?] {e}")
+        except Exception as e:
+            silent_exc("?", e)
         empathy_hint = context.get("empathy_style", "")
         if context.get("empathy_avoid"):
             empathy_hint += f"\n注意：{context['empathy_avoid']}"
@@ -449,8 +450,8 @@ def generate_proactive(trigger_type: str, context: dict = None):
         try:
             from api.proactive import get_comfort_dedup_hint
             comfort_dedup = get_comfort_dedup_hint()
-        except Exception as e:  # silent
-            logger.debug(f"[?] {e}")
+        except Exception as e:
+            silent_exc("?", e)
         empathy_hint = context.get("empathy_style", "")
         if context.get("empathy_avoid"):
             empathy_hint += f"\n注意：{context['empathy_avoid']}"
@@ -518,8 +519,8 @@ def generate_proactive(trigger_type: str, context: dict = None):
         if rows:
             recent_msgs = [r["content"][:60] for r in reversed(rows)]
             user_parts.append("你最近对用户说过的话（不要重复）：" + "；".join(recent_msgs))
-    except Exception as e:  # silent
-        logger.debug(f"[?] {e}")
+    except Exception as e:
+        silent_exc("?", e)
 
     user_parts.append(time_context)
     user_parts.append(idle_desc)
@@ -542,8 +543,8 @@ def generate_proactive(trigger_type: str, context: dict = None):
             try:
                 from api.proactive import record_comfort_phrase
                 record_comfort_phrase(result[:80])
-            except Exception as e:  # silent
-                logger.debug(f"[?] {e}")
+            except Exception as e:
+                silent_exc("?", e)
         return result
     print(f"[主动] 3次尝试均失败，使用兜底")
     fallback_proactive = [

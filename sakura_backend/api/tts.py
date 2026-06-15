@@ -1,20 +1,20 @@
 # api/tts.py — 多引擎 TTS API
 """统一语音合成 API，支持多引擎切换。"""
 import os
-import re
 import time
 import asyncio
 import tempfile
 import logging
+from core.retry import silent_exc
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from core.tts_adapters import (
+from core.tts import (
     TTS_ENGINES, ENGINE_LABELS, ENGINE_FEATURES, BaseTTS, TTSResult,
-    _strip_markdown, get_cleanup_prefixes,
+    get_cleanup_prefixes,
 )
 from core.voice_emotion import get_voice_preset
 from core.db import get_config, set_config
@@ -174,8 +174,8 @@ async def generate_tts(request: TTSRequest):
                     try:
                         from core.relationship import get_relationship
                         aff, tr = get_relationship()
-                    except Exception as e:  # silent
-                        logger.debug(f"[generate_tts] {e}")
+                    except Exception as e:
+                        silent_exc("generate_tts", e)
                 preset = get_voice_preset(aff, tr)
                 edge_voice_map = {
                     "verylow": "zh-CN-YunxiNeural",
@@ -292,5 +292,5 @@ def _cleanup_old_audio():
                 if f.suffix in (".wav", ".mp3", ".ogg"):
                     if now - f.stat().st_mtime > AUDIO_TTL:
                         f.unlink(missing_ok=True)
-    except Exception as e:  # silent
-        logger.debug(f"[_cleanup_old_audio] {e}")
+    except Exception as e:
+        silent_exc("_cleanup_old_audio", e)

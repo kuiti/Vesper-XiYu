@@ -13,7 +13,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   props: { aiName: { type: String, default: '佐仓' } },

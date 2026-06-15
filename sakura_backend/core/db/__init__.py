@@ -7,6 +7,7 @@ import threading
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 import os
+from core.retry import silent_exc
 
 # 确保 data 目录存在
 os.makedirs("data", exist_ok=True)
@@ -337,8 +338,8 @@ def _init_db_locked():
             try:
                 conn.execute(f"ALTER TABLE chat_history ADD COLUMN {col} {col_def}")
                 conn.commit()
-            except sqlite3.OperationalError:
-                pass
+            except sqlite3.OperationalError as e:
+                silent_exc("db_init", e)
 
         # ─── schema 升级：为旧数据库补加缺失列 ───
         migrations = [

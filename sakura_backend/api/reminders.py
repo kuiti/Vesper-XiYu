@@ -1,6 +1,6 @@
 # version: 5.0.0
 from fastapi import APIRouter
-from core.db import get_reminders, add_reminder, delete_reminder, update_reminder_done, update_reminder_last_reminded
+from core.db import get_reminders, add_reminder, update_reminder_done, update_reminder_last_reminded
 from pydantic import BaseModel
 from typing import List, Optional
 

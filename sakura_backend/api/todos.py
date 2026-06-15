@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from core.db import get_todos, add_todo, delete_todo
+from core.db import get_todos, add_todo
 from pydantic import BaseModel
 from typing import List
 

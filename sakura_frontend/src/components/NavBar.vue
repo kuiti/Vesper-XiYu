@@ -53,19 +53,19 @@ export default {
 
 <style scoped>
 /* 桌面端：左侧竖栏 */
-.nav-bar { width: 60px; background: var(--sb); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 12px 0; height: 100dvh; box-sizing: border-box; }
-.nav-brand { font-size: 12px; font-weight: 700; color: var(--p); writing-mode: vertical-rl; letter-spacing: 4px; margin-bottom: 16px; user-select: none; }
+.nav-bar { width: 60px; background: var(--surface-sidebar); border-right: 1px solid var(--border-default); display: flex; flex-direction: column; align-items: center; padding: 12px 0; height: 100dvh; box-sizing: border-box; }
+.nav-brand { font-size: 12px; font-weight: 700; color: var(--accent-primary); writing-mode: vertical-rl; letter-spacing: 4px; margin-bottom: 16px; user-select: none; }
 .nav-items { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-.nav-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 52px; padding: 8px 4px; background: none; border: none; border-radius: 8px; color: var(--tc2); cursor: pointer; transition: all .15s; min-height: 44px; justify-content: center; }
-.nav-btn:hover { background: rgba(255,255,255,.04); color: var(--tc); }
-.nav-btn.active { background: rgba(255,255,255,.06); color: var(--p); }
+.nav-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 52px; padding: 8px 4px; background: none; border: none; border-radius: 8px; color: var(--text-secondary); cursor: pointer; transition: all .15s; min-height: 44px; justify-content: center; }
+.nav-btn:hover { background: rgba(255,255,255,.04); color: var(--text-primary); }
+.nav-btn.active { background: rgba(255,255,255,.06); color: var(--accent-primary); }
 .nav-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
 .nav-label { font-size: 10px; white-space: nowrap; }
 .nav-spacer { flex: 1; }
 .nav-status { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #f85149; flex-shrink: 0; }
 .nav-status.online .status-dot { background: #2ea043; }
-.status-label { font-size: 9px; color: var(--tc2); white-space: nowrap; }
+.status-label { font-size: 9px; color: var(--text-secondary); white-space: nowrap; }
 
 /* 移动端：底部横栏 */
 @media (max-width: 768px) {
@@ -74,7 +74,7 @@ export default {
     height: auto;
     flex-direction: row;
     border-right: none;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--border-default);
     padding: 0;
     padding-bottom: env(safe-area-inset-bottom, 0);
     position: fixed;

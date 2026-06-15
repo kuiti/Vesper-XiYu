@@ -51,7 +51,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   data() {
@@ -127,21 +127,21 @@ export default {
 <style scoped>
 .chat-manage { padding: 10px; }
 .section { margin-bottom: 20px; }
-.section h4 { margin: 0 0 10px 0; color: var(--p); font-size: 14px; }
+.section h4 { margin: 0 0 10px 0; color: var(--accent-primary); font-size: 14px; }
 .quick-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
-.quick-buttons button { background: var(--sb); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; color: var(--tc); cursor: pointer; font-size: 12px; transition: background .15s; }
-.quick-buttons button:hover { background: var(--p); color: #fff; }
+.quick-buttons button { background: var(--surface-sidebar); border: 1px solid var(--border-default); border-radius: 6px; padding: 6px 12px; color: var(--text-primary); cursor: pointer; font-size: 12px; transition: background .15s; }
+.quick-buttons button:hover { background: var(--accent-primary); color: #fff; }
 .date-range { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.range-label { color: var(--tc2); font-size: 13px; }
+.range-label { color: var(--text-secondary); font-size: 13px; }
 .date-selects { display: flex; gap: 4px; }
-.date-selects select { padding: 6px 4px; border-radius: 6px; background: var(--bg); color: var(--tc); border: 1px solid var(--border); font-size: 13px; }
-.date-range > button { background: var(--p); border: none; border-radius: 6px; padding: 6px 14px; color: #fff; cursor: pointer; }
+.date-selects select { padding: 6px 4px; border-radius: 6px; background: var(--surface-app); color: var(--text-primary); border: 1px solid var(--border-default); font-size: 13px; }
+.date-range > button { background: var(--accent-primary); border: none; border-radius: 6px; padding: 6px 14px; color: #fff; cursor: pointer; }
 .date-range > button:disabled { opacity: .4; cursor: not-allowed; }
 .date-error { color: #e74c3c; font-size: 11px; margin-top: 6px; }
 .danger-btn { background: #e74c3c !important; color: #fff !important; border-color: #e74c3c !important; }
 .danger-btn:hover { background: #c0392b !important; }
 .auto-cleanup { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.auto-cleanup input { width: 80px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--tc); }
-.auto-cleanup span { color: var(--tc2); font-size: 13px; }
-.auto-cleanup button { background: var(--p); border: none; border-radius: 6px; padding: 6px 14px; color: #fff; cursor: pointer; }
+.auto-cleanup input { width: 80px; padding: 6px; border-radius: 6px; border: 1px solid var(--border-default); background: var(--surface-app); color: var(--text-primary); }
+.auto-cleanup span { color: var(--text-secondary); font-size: 13px; }
+.auto-cleanup button { background: var(--accent-primary); border: none; border-radius: 6px; padding: 6px 14px; color: #fff; cursor: pointer; }
 </style>

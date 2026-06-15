@@ -16,6 +16,7 @@ import importlib
 import os
 import asyncio
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 # ─── 启动阶段追踪 ───
@@ -107,12 +108,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─── 认证中间件（仅云端模式启用）───
+# ─── 认证中间件 ───
+from core.auth import AuthMiddleware, router as auth_router
 if os.environ.get("SAKURA_API_TOKEN"):
-    from core.auth import AuthMiddleware, router as auth_router
     app.add_middleware(AuthMiddleware)
-    app.include_router(auth_router)
     print("[启动] 云端模式：已启用 Token 认证")
+else:
+    print("[启动] 本地模式：Token 认证未启用")
+app.include_router(auth_router)  # /auth/verify 始终可用
 
 os.makedirs("data/avatars", exist_ok=True)
 app.mount("/avatars", StaticFiles(directory="data/avatars"), name="avatars")
@@ -155,8 +158,8 @@ def set_window_theme(data: dict):
             try:
                 with open(hwnd_file) as f:
                     hwnd = int(f.read().strip())
-            except Exception as e:  # silent
-                logger.debug(f"[set_window_theme] {e}")
+            except Exception as e:
+                silent_exc("set_window_theme", e)
         if not hwnd:
             hwnd = ctypes.windll.user32.FindWindowW(None, "佐仓")
         if hwnd:
@@ -166,8 +169,8 @@ def set_window_theme(data: dict):
                 wintypes.HWND(hwnd), DWMWA_USE_IMMERSIVE_DARK_MODE,
                 ctypes.byref(val), ctypes.sizeof(val))
             return {"status": "ok"}
-    except Exception as e:  # silent
-        logger.debug(f"[set_window_theme] {e}")
+    except Exception as e:
+        silent_exc("set_window_theme", e)
     return {"status": "ignored"}
 
 

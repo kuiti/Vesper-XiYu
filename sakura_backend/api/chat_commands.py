@@ -24,9 +24,9 @@ async def handle_welcome(websocket: WebSocket):
             await websocket.send_text(json.dumps({"type": "greeting", "content": greeting}))
             save_last_welcome()
         else:
-            await websocket.send_text(json.dumps({"type": "token", "content": "欢迎生成失败"}))
+            await websocket.send_text(json.dumps({"type": "token", "content": "欢迎回来～"}))
     except Exception as e:
-        await websocket.send_text(json.dumps({"type": "token", "content": f"欢迎语生成失败！"}))
+        await websocket.send_text(json.dumps({"type": "token", "content": "欢迎回来～（生成失败）"}))
         print(f"[welcome] 错误: {e}")
     await websocket.send_text(json.dumps({"type": "done"}))
 
@@ -41,9 +41,9 @@ async def handle_tease(websocket: WebSocket):
         if tease_reply:
             await websocket.send_text(json.dumps({"type": "token", "content": tease_reply}))
         else:
-            await websocket.send_text(json.dumps({"type": "token", "content": "调戏生成失败，请稍后再试~"}))
+            await websocket.send_text(json.dumps({"type": "token", "content": "（调侃生成失败，请稍后再试）"}))
     except Exception as e:
-        await websocket.send_text(json.dumps({"type": "token", "content": f"调戏出错啦: {e}。"}))
+        await websocket.send_text(json.dumps({"type": "token", "content": f"（调侃出错: {e}）"}))
     finally:
         set_config("current_tease_probability", _old_prob)
     await websocket.send_text(json.dumps({"type": "done"}))
@@ -67,20 +67,20 @@ async def handle_reroll(websocket: WebSocket):
 
 
 async def handle_reroll_from(websocket: WebSocket, msg_id: int):
-    """处理从指定消息处重新生成，返回 user_message 或 None"""
+    """处理 /reroll_from:<msg_id> 命令，返回 (user_message, should_continue)"""
     try:
         last_usr = reroll_from_message(msg_id)
         if last_usr:
-            await websocket.send_text(json.dumps({"type": "reroll_start", "content": "重新生成中..."}))
-            return last_usr
+            await websocket.send_text(json.dumps({"type": "reroll_start", "content": "从此处重新生成..."}))
+            return last_usr, False
         else:
-            await websocket.send_text(json.dumps({"type": "token", "content": "没有可以重新生成的消息"}))
+            await websocket.send_text(json.dumps({"type": "token", "content": f"无法从此消息(ID:{msg_id})重新生成，消息可能已被删除"}))
             await websocket.send_text(json.dumps({"type": "done"}))
-            return None
+            return None, True
     except Exception as e:
-        await websocket.send_text(json.dumps({"type": "token", "content": f"重生成出错: {e}"}))
+        await websocket.send_text(json.dumps({"type": "token", "content": f"重新生成出错: {e}"}))
         await websocket.send_text(json.dumps({"type": "done"}))
-        return None
+        return None, True
 
 
 async def handle_remind(websocket: WebSocket, msg: str):
@@ -110,7 +110,7 @@ async def handle_remind(websocket: WebSocket, msg: str):
             remain_content = m.group(2) or ''
         # 明天/今天 N点[M分] [上午/下午]
         if not target_time:
-            m = re.match(r'(明天|今天)?\s*(上午|下午|早上|晚上)?\s*(\d{1,2})点?\s*(?:(\d{1,2})分?)?\s*(.*)', content)
+            m = re.match(r'(明天|后天)?\s*(上午|下午|早上|晚上)?\s*(\d{1,2})点?\s*(?:(\d{1,2})分?)?\s*(.*)', content)
             if m:
                 day_offset, period, hour_str, minute_str, rest = m.group(1), m.group(2), m.group(3), m.group(4) or "0", m.group(5) or ''
                 parsed = _parse_time(hour_str, minute_str)
@@ -120,7 +120,7 @@ async def handle_remind(websocket: WebSocket, msg: str):
                         h += 12
                     elif period in ("上午", "早上") and h == 12:
                         h = 0
-                    days = 2 if day_offset == "明天" else 1 if day_offset == "今天" else 0
+                    days = 2 if day_offset == "后天" else 1 if day_offset == "明天" else 0
                     target_time = now.replace(hour=h, minute=mi, second=0, microsecond=0) + timedelta(days=days)
                     if days == 0 and target_time <= now:
                         target_time += timedelta(days=1)

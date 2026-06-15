@@ -1,0 +1,161 @@
+GitHub - Explodey54/minecraft-artifier-js: JavaScript/Node.js Web Converter from image to Minecraft blocks. · GitHub
+
+Skip to content
+
+You signed in with another tab or window. Reload to refresh your session.
+You signed out in another tab or window. Reload to refresh your session.
+You switched accounts on another tab or window. Reload to refresh your session.
+ 
+
+Dismiss alert
+
+        Explodey54
+ 
+/
+
+minecraft-artifier-js
+
+Public
+
+- 
+ 
+
+Notifications
+ You must be signed in to change notification settings
+
+- 
+ 
+
+Fork
+    30
+
+- 
+
+ 
+
+          Star
+ 83
+
+    masterBranchesTagsGo to fileCodeOpen more actions menu
+## Folders and files
+NameNameLast commit messageLast commit date
+## Latest commit
+ 
+## History
+60 Commits60 Commitsappapp  buildbuild  staticstatic  .babelrc.babelrc  .gitignore.gitignore  LICENSELICENSE  README.mdREADME.md  package.jsonpackage.json  prepare.jsprepare.js  View all files
+## Repository files navigation
+
+# minecraft-artifier-js
+
+JavaScript/Node.js Web Converter from image to Minecraft blocks.
+Can open and save 1.12 and lower .schematics of Minecraft.
+
+Public part of minecraftart.netlify.com (https://minecraftart.netlify.com/)
+
+## About
+
+        JavaScript/Node.js Web Converter from image to Minecraft blocks.
+      
+
+### Resources
+
+        Readme
+ 
+
+### License
+
+     MIT license
+    
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+Activity 
+
+### Stars
+
+83
+        stars 
+
+### Watchers
+
+2
+        watching 
+
+### Forks
+
+30
+        forks 
+
+          Report repository
+ 
+
+## 
+Releases
+
+No releases published
+
+## 
+Packages
+      0
+
+ 
+
+ 
+
+ 
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+## 
+Contributors 
+
+- 
+
+- 
+
+- 
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+## Languages
+
+- 
+
+JavaScript
+77.6%
+
+- 
+
+HTML
+11.4%
+
+- 
+
+CSS
+11.0%
+
+   
+
+    You can’t perform that action at this time.

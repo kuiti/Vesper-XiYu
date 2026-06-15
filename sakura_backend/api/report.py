@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query
 from core.db import get_conn, get_config
-from datetime import datetime, timedelta
+from datetime import datetime
 
 router = APIRouter(prefix="/report", tags=["report"])
 

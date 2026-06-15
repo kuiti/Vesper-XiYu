@@ -7,6 +7,7 @@ from core.persona_data import (
     FOUNDATION_TEMPLATES, DEFAULT_FOUNDATION, DEFAULT_TABOOS,
 )
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 
@@ -36,8 +37,8 @@ def _get_user_summary() -> str:
                 d = _json.loads(r["value"])
                 if d.get("importance", 0) >= 5:
                     facts.append(d["text"])
-            except Exception as e:  # silent
-                logger.debug(f"[_get_user_summary] {e}")
+            except Exception as e:
+                silent_exc("_get_user_summary", e)
     if not profile_items and not facts:
         return ""
     lines = []
@@ -513,8 +514,8 @@ def build_dynamic_context(current_time_str, emotion="neutral", idle_minutes=0):
     if msg_count % 20 == 0:
         try:
             emotion_behavior = get_emotion_behavior_hint()
-        except Exception as e:  # silent
-            logger.debug(f"[build_dynamic_context] {e}")
+        except Exception as e:
+            silent_exc("build_dynamic_context", e)
     # 感知用户离开时长（爱语方案）：超过 3 分钟未回复时注入
     absence_note = ""
     if idle_minutes > 3:

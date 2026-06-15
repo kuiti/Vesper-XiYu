@@ -51,7 +51,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   props: { aiName: { type: String, default: '佐仓' } },
@@ -139,41 +139,41 @@ export default {
 </script>
 
 <style scoped>
-.diary-view { display: flex; height: 100%; background: var(--bg); color: var(--tc); }
+.diary-view { display: flex; height: 100%; background: var(--surface-app); color: var(--text-primary); }
 
 /* 左侧栏 */
-.diary-sidebar { width: 220px; border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
-.diary-header { padding: 16px; border-bottom: 1px solid var(--border); }
+.diary-sidebar { width: 220px; border-right: 1px solid var(--border-default); display: flex; flex-direction: column; flex-shrink: 0; }
+.diary-header { padding: 16px; border-bottom: 1px solid var(--border-default); }
 .diary-header h2 { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
-.gen-btn { width: 100%; background: var(--p); border: none; color: #fff; border-radius: 6px; padding: 8px; cursor: pointer; font-size: 13px; transition: opacity .15s; }
+.gen-btn { width: 100%; background: var(--accent-primary); border: none; color: #fff; border-radius: 6px; padding: 8px; cursor: pointer; font-size: 13px; transition: opacity .15s; }
 .gen-btn:disabled { opacity: .5; cursor: not-allowed; }
-.diary-search { padding: 12px 16px; border-bottom: 1px solid var(--border); }
-.diary-search input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--sb); color: var(--tc); font-size: 13px; outline: none; box-sizing: border-box; }
-.diary-search input:focus { border-color: var(--p); }
+.diary-search { padding: 12px 16px; border-bottom: 1px solid var(--border-default); }
+.diary-search input { width: 100%; padding: 8px 10px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--surface-sidebar); color: var(--text-primary); font-size: 13px; outline: none; box-sizing: border-box; }
+.diary-search input:focus { border-color: var(--accent-primary); }
 .month-list { flex: 1; overflow-y: auto; padding: 8px 0; }
 .month-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; cursor: pointer; transition: all .15s; }
 .month-item:hover { background: rgba(255,255,255,.03); }
-.month-item.active { background: rgba(255,255,255,.06); color: var(--p); }
+.month-item.active { background: rgba(255,255,255,.06); color: var(--accent-primary); }
 .month-label { font-size: 13px; }
-.month-count { font-size: 11px; color: var(--tc2); background: rgba(255,255,255,.06); padding: 2px 8px; border-radius: 10px; }
-.empty-hint { text-align: center; color: var(--tc2); font-size: 13px; padding: 20px; }
+.month-count { font-size: 11px; color: var(--text-secondary); background: rgba(255,255,255,.06); padding: 2px 8px; border-radius: 10px; }
+.empty-hint { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 20px; }
 
 /* 右侧内容 */
 .diary-content { flex: 1; overflow-y: auto; padding: 20px 28px; }
-.diary-loading, .diary-empty { text-align: center; color: var(--tc2); font-size: 14px; padding: 40px; }
+.diary-loading, .diary-empty { text-align: center; color: var(--text-secondary); font-size: 14px; padding: 40px; }
 .diary-list { max-width: 720px; }
-.diary-entry { background: var(--sb); border-radius: 10px; padding: 16px 20px; margin-bottom: 14px; border: 1px solid var(--border); transition: border-color .15s; }
+.diary-entry { background: var(--surface-sidebar); border-radius: 10px; padding: 16px 20px; margin-bottom: 14px; border: 1px solid var(--border-default); transition: border-color .15s; }
 .diary-entry:hover { border-color: rgba(255,255,255,.1); }
 .entry-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.entry-date { color: var(--p); font-size: 14px; font-weight: 600; }
-.entry-mood { color: var(--tc2); font-size: 12px; background: rgba(255,255,255,.04); padding: 2px 8px; border-radius: 4px; }
-.entry-content { color: var(--tc); font-size: 14px; line-height: 1.8; white-space: pre-wrap; }
+.entry-date { color: var(--accent-primary); font-size: 14px; font-weight: 600; }
+.entry-mood { color: var(--text-secondary); font-size: 12px; background: rgba(255,255,255,.04); padding: 2px 8px; border-radius: 4px; }
+.entry-content { color: var(--text-primary); font-size: 14px; line-height: 1.8; white-space: pre-wrap; }
 
 /* 分页 */
 .diary-pagination { display: flex; justify-content: center; align-items: center; gap: 16px; padding: 20px 0; }
-.page-btn { background: none; border: 1px solid var(--border); color: var(--tc2); padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all .15s; }
-.page-btn:hover { border-color: var(--p); color: var(--p); }
-.page-info { font-size: 13px; color: var(--tc2); }
+.page-btn { background: none; border: 1px solid var(--border-default); color: var(--text-secondary); padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all .15s; }
+.page-btn:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+.page-info { font-size: 13px; color: var(--text-secondary); }
 
 /* 移动端适配 */
 @media (max-width: 768px) {
@@ -181,7 +181,7 @@ export default {
   .diary-sidebar {
     width: 100%;
     border-right: none;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-default);
     max-height: 200px;
   }
   .diary-header { padding: 12px; }

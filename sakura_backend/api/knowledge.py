@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form
+from fastapi import APIRouter, UploadFile, File
 from core.db import add_document, get_documents, delete_document, get_conn
 from core.vector_store import chunk_text, add_document_vectors, delete_document_vectors, is_model_ready
 import os

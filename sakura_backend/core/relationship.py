@@ -11,6 +11,7 @@ import threading
 from datetime import datetime, timedelta
 from core.db import get_conn, get_config, set_config
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 # 范围（支持负数）
@@ -81,8 +82,8 @@ def _get_foundation_defaults() -> tuple:
             foundation_type = bg_obj.get("foundation_type", "空白")
             from core.prompt_builder import get_foundation_defaults
             return get_foundation_defaults(foundation_type)
-    except Exception as e:  # silent
-        logger.debug(f"[_get_foundation_defaults] {e}")
+    except Exception as e:
+        silent_exc("_get_foundation_defaults", e)
     return 30, 30  # 默认空白
 
 
@@ -427,8 +428,8 @@ def switch_relationship_mode(new_mode: str) -> dict:
             if now < lock_until:
                 remaining = int((lock_until - now).total_seconds() / 3600) + 1
                 return {"ok": False, "error": f"切换冷却中，{remaining}小时后再试"}
-        except (ValueError, TypeError):
-            pass
+        except (ValueError, TypeError) as e:
+            silent_exc("relationship", e)
 
     current_mode = get_config("relationship_mode", "fast")
     if new_mode == current_mode:

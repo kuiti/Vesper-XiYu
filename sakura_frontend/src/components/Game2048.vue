@@ -15,7 +15,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 export default {
   emits: ['ai-event', 'help'],
   props: { aiName: { type: String, default: '佐仓' } },
@@ -107,12 +107,12 @@ export default {
 
 <style scoped>
 .game-2048 { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; outline: none; }
-.g2048-header { display: flex; align-items: center; gap: 12px; color: var(--tc); font-size: 13px; }
+.g2048-header { display: flex; align-items: center; gap: 12px; color: var(--text-primary); font-size: 13px; }
 .g2048-score { font-weight: 600; }
-.g2048-best { color: var(--tc2); }
-.g2048-new { background: var(--p); border: none; color: #fff; border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 12px; }
-.g2048-grid { display: grid; grid-template-columns: repeat(4, 60px); gap: 4px; background: var(--border); padding: 4px; border-radius: 6px; }
-.g2048-cell { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; border-radius: 4px; background: var(--sb); color: var(--tc); transition: all .12s ease; will-change: transform; }
+.g2048-best { color: var(--text-secondary); }
+.g2048-new { background: var(--accent-primary); border: none; color: #fff; border-radius: 4px; padding: 4px 12px; cursor: pointer; font-size: 12px; }
+.g2048-grid { display: grid; grid-template-columns: repeat(4, 60px); gap: 4px; background: var(--border-default); padding: 4px; border-radius: 6px; }
+.g2048-cell { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; border-radius: 4px; background: var(--surface-sidebar); color: var(--text-primary); transition: all .12s ease; will-change: transform; }
 .g2048-cell.tile-pop { animation: tilePop .18s ease; }
 @keyframes tilePop { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
 .tile-2 { background: rgba(255,255,255,.06); }
@@ -128,6 +128,6 @@ export default {
 .tile-2048 { background: #e74c3c; color: #fff; font-size: 16px; }
 .tile-4096, .tile-8192 { background: #2ecc71; color: #fff; font-size: 14px; }
 .g2048-over { position: absolute; margin-top: 100px; color: #e74c3c; font-weight: 700; font-size: 16px; background: rgba(0,0,0,.7); padding: 4px 12px; border-radius: 4px; }
-.g2048-hint { color: var(--tc2); font-size: 11px; }
-.help-btn { background: var(--p); border: none; color: #fff; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 12px; margin-top: 4px; }
+.g2048-hint { color: var(--text-secondary); font-size: 11px; }
+.help-btn { background: var(--accent-primary); border: none; color: #fff; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 12px; margin-top: 4px; }
 </style>

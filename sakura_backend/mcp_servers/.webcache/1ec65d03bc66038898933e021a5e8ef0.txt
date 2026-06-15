@@ -1,0 +1,75 @@
+Repository search results · GitHub
+
+Skip to content
+
+You signed in with another tab or window. Reload to refresh your session.
+You signed out in another tab or window. Reload to refresh your session.
+You switched accounts on another tab or window. Reload to refresh your session.
+ 
+
+Dismiss alert
+
+# repositories Search Results · 二次元 skill 蒸馏
+
+## Filter by
+
+- 
+- Code... (...)results (https://github.com/search?q=%E4%BA%8C%E6%AC%A1%E5%85%83+skill+%E8%92%B8%E9%A6%8F&type=code)
+- Repositoriesresults (https://github.com/search?q=%E4%BA%8C%E6%AC%A1%E5%85%83+skill+%E8%92%B8%E9%A6%8F&type=repositories)
+- Issuesresults (https://github.com/search?q=%E4%BA%8C%E6%AC%A1%E5%85%83+skill+%E8%92%B8%E9%A6%8F&type=issues)
+- Pull requestsresults (https://github.com/search?q=%E4%BA%8C%E6%AC%A1%E5%85%83+skill+%E8%92%B8%E9%A6%8F&type=pullrequests)
+- Discussionsresults (https://github.com/search?q=%E4%BA%8C%E6%AC%A1%E5%85%83+skill+%E8%92%B8%E9%A6%8F&type=discussions)
+- Usersresults (https://github.com/search?q=%E4%BA%8C%E6%AC%A1%E5%85%83+skill+%E8%92%B8%E9%A6%8F&type=users)
+- More
+- 
+- 
+### Languages
+
+- Python (https://github.com/search?q=%E4%BA%8C%E6%AC%A1%E5%85%83+skill+%E8%92%B8%E9%A6%8F+language%3APython&type=repositories)
+- Shell (https://github.com/search?q=%E4%BA%8C%E6%AC%A1%E5%85%83+skill+%E8%92%B8%E9%A6%8F+language%3AShell&type=repositories)
+- More languages...
+- 
+- 
+### Advanced
+
+- Owner
+- Size
+- Number of followers
+- Number of forks
+- Number of stars
+- Date created
+- Date pushed
+- Topic
+- License
+- Archived
+- Public (https://github.com/search?q=%E4%BA%8C%E6%AC%A1%E5%85%83+skill+%E8%92%B8%E9%A6%8F+is%3Apublic&type=repositories)
+- Private (https://github.com/search?q=%E4%BA%8C%E6%AC%A1%E5%85%83+skill+%E8%92%B8%E9%A6%8F+is%3Aprivate&type=repositories)
+- 
+- Advanced searchFilter:Repositories4 (4)4 results  (312 ms)
+## 4 results 
+Sort by:  Best matchFilter
+### momozi1996/awesome-ai-persona-skills
+全网最全的、持续更新的、最火爆的 100+ 人格 蒸馏skills 合集｜ 多agent系统 ｜名人/导演/天涯大神/古籍/二次元/职场/情感全品类agenttoolsaiskillsskill
+- Shell·
+- 237·
+- Updated 18 days agoStar
+### 1796448871/zhi-pian-ren
+试试蒸馏二次元人物skill
+- 0·
+- Updated on Apr 13Star
+### Men-HuLu/xiaofan-skill
+蒸馏知名B站二次元up主小饭中年事件簿，生成他的技能skill
+- Python·
+- 0·
+- Updated on Apr 17Star
+### AusertDream/ACGN-character-skill
+将二次元角色“蒸馏”成有关人设，故事等提示词用于后续角色扮演的一个SKILLskillacgnclaude-code
+- Python·
+- 0·
+- Updated 28 days agoStar
+## Sponsor open source projects you depend on
+Contributors are working behind the scenes to make open source better for everyone—give them the help and recognition they deserve.Explore sponsorable projects  (https://github.com/sponsors/explore)ProTip! Press the / key to activate the search input again and adjust your query.
+## Sponsor open source projects you depend on
+Contributors are working behind the scenes to make open source better for everyone—give them the help and recognition they deserve.Explore sponsorable projects  (https://github.com/sponsors/explore)ProTip! Press the / key to activate the search input again and adjust your query.
+
+    You can’t perform that action at this time.

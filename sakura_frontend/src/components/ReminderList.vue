@@ -31,7 +31,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 const LEVELS = [
   { level: 7, name: '强制', advance_minutes: 0 },
@@ -118,12 +118,12 @@ export default {
 <style scoped>
 .reminder-list { padding: 8px; }
 .add-item { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
-.add-item > input { flex: 1; min-width: 100px; padding: 6px 8px; border-radius: 6px; background: var(--bg); color: var(--tc); border: 1px solid var(--border); }
+.add-item > input { flex: 1; min-width: 100px; padding: 6px 8px; border-radius: 6px; background: var(--surface-app); color: var(--text-primary); border: 1px solid var(--border-default); }
 .time-selects { display: flex; gap: 4px; }
-.time-selects select { padding: 6px 3px; border-radius: 6px; background: var(--bg); color: var(--tc); border: 1px solid var(--border); font-size: 12px; }
-.add-item .lvl-sel { padding: 6px 8px; border-radius: 6px; background: var(--bg); color: var(--tc); border: 1px solid var(--border); }
-.add-item button { background: var(--p); border: none; color: #fff; border-radius: 6px; cursor: pointer; padding: 0 16px; white-space: nowrap; }
-.item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--sb); border-radius: 6px; margin-bottom: 8px; border-left: 3px solid transparent; transition: transform .15s, background .15s, border-color .2s; }
+.time-selects select { padding: 6px 3px; border-radius: 6px; background: var(--surface-app); color: var(--text-primary); border: 1px solid var(--border-default); font-size: 12px; }
+.add-item .lvl-sel { padding: 6px 8px; border-radius: 6px; background: var(--surface-app); color: var(--text-primary); border: 1px solid var(--border-default); }
+.add-item button { background: var(--accent-primary); border: none; color: #fff; border-radius: 6px; cursor: pointer; padding: 0 16px; white-space: nowrap; }
+.item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--surface-sidebar); border-radius: 6px; margin-bottom: 8px; border-left: 3px solid transparent; transition: transform .15s, background .15s, border-color .2s; }
 .item:hover { background: rgba(255,255,255,.04); transform: translateX(2px); }
 .item.done { opacity: 0.5; }
 .item.done strong { text-decoration: line-through; }
@@ -131,10 +131,10 @@ export default {
 .item[data-level="5"], .item[data-level="4"] { border-left-color: #f59e0b; }
 .item[data-level="3"], .item[data-level="2"] { border-left-color: #5390d4; }
 .item[data-level="1"] { border-left-color: #4caf50; }
-.meta { font-size: 12px; color: var(--tc2); margin-top: 4px; }
+.meta { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
 .actions { display: flex; gap: 6px; align-items: center; }
-.actions button { background: none; border: none; cursor: pointer; opacity: .4; transition: opacity .15s; color: var(--tc); }
+.actions button { background: none; border: none; cursor: pointer; opacity: .4; transition: opacity .15s; color: var(--text-primary); }
 .actions button:hover { opacity: 1; }
 .btn-done { color: #4caf50 !important; font-size: 16px; font-weight: bold; opacity: 1 !important; }
-.empty { text-align: center; color: var(--tc2); font-size: 13px; padding: 20px; }
+.empty { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 20px; }
 </style>

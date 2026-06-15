@@ -123,7 +123,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   name: 'EmotionPanel',
@@ -289,7 +289,7 @@ export default {
 .emotion-panel { min-height: 300px; color: #ecf0f1; }
 .ep-tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,.06); padding-bottom: 8px; }
 .ep-tabs button { border: none; background: none; padding: 5px 14px; border-radius: 6px; cursor: pointer; color: #7f8c8d; font-size: 13px; }
-.ep-tabs button.active { background: var(--p); color: #fff; }
+.ep-tabs button.active { background: var(--accent-primary); color: #fff; }
 .ep-tab { min-height: 200px; }
 .ep-loading, .ep-empty { text-align: center; color: #7f8c8d; padding: 40px 0; font-size: 13px; }
 
@@ -297,7 +297,7 @@ export default {
 .ep-curve-box { text-align: center; }
 .curve-hint { font-size: 13px; color: #7f8c8d; margin-bottom: 12px; }
 .curve-section { margin-bottom: 16px; }
-.curve-title { font-size: 12px; color: var(--tc2); margin-bottom: 6px; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.curve-title { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; display: flex; align-items: center; justify-content: center; gap: 4px; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 2px; }
 .dot.red { background: #c0392b; }
 .dot.blue { background: #5b9bd5; }

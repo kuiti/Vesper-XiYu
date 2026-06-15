@@ -56,7 +56,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   name: 'InsightPanel',
@@ -125,7 +125,7 @@ export default {
 .insight-panel { min-height: 260px; }
 .ip-tabs { display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,.06); padding-bottom: 8px; }
 .ip-tabs button { border: none; background: none; padding: 5px 14px; border-radius: 6px; cursor: pointer; color: #7f8c8d; font-size: 13px; }
-.ip-tabs button.active { background: var(--p); color: #fff; }
+.ip-tabs button.active { background: var(--accent-primary); color: #fff; }
 .ip-tab { min-height: 180px; }
 .ip-loading, .ip-empty { text-align: center; color: #7f8c8d; padding: 30px 0; font-size: 13px; }
 .ip-stats { display: flex; gap: 16px; margin-bottom: 14px; font-size: 13px; }

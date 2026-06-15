@@ -21,7 +21,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   inject: { showConfirm: { default: () => (msg) => window.confirm(msg) } },
@@ -99,16 +99,16 @@ export default {
 <style scoped>
 .countdown-list { padding: 8px; }
 .add-item { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
-.add-item > input { flex: 1; min-width: 100px; padding: 6px 8px; border-radius: 6px; background: var(--bg); color: var(--tc); border: 1px solid var(--border); }
+.add-item > input { flex: 1; min-width: 100px; padding: 6px 8px; border-radius: 6px; background: var(--surface-app); color: var(--text-primary); border: 1px solid var(--border-default); }
 .date-selects { display: flex; gap: 4px; }
-.date-selects select { padding: 6px 4px; border-radius: 6px; background: var(--bg); color: var(--tc); border: 1px solid var(--border); font-size: 13px; }
-.add-item button { background: var(--p); border: none; color: #fff; border-radius: 6px; cursor: pointer; padding: 0 12px; white-space: nowrap; }
-.item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--sb); border-radius: 6px; margin-bottom: 6px; transition: transform .15s, background .15s; }
+.date-selects select { padding: 6px 4px; border-radius: 6px; background: var(--surface-app); color: var(--text-primary); border: 1px solid var(--border-default); font-size: 13px; }
+.add-item button { background: var(--accent-primary); border: none; color: #fff; border-radius: 6px; cursor: pointer; padding: 0 12px; white-space: nowrap; }
+.item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--surface-sidebar); border-radius: 6px; margin-bottom: 6px; transition: transform .15s, background .15s; }
 .item:hover { background: rgba(255,255,255,.04); transform: translateX(2px); }
-.item span { color: var(--tc); }
+.item span { color: var(--text-primary); }
 .item button { background: none; border: none; color: #e74c3c; cursor: pointer; opacity: .4; transition: opacity .15s; }
 .item button:hover { opacity: 1; }
-.empty { text-align: center; color: var(--tc2); font-size: 13px; padding: 20px; }
+.empty { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 20px; }
 .days-urgent { color: #e74c3c !important; font-weight: 600; }
 .days-soon { color: #f59e0b !important; }
 .days-normal { color: #4caf50 !important; }

@@ -79,7 +79,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 import WeatherCard from './WeatherCard.vue'
 import ChatInput from './ChatInput.vue'
 import TodayLearning from './TodayLearning.vue'
@@ -251,12 +251,12 @@ export default {
 
 <style scoped>
 .chat-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-.chat-top-bar { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 16px; background: var(--sb); border-bottom: 1px solid var(--border); font-size: 11px; color: var(--tc2); flex-shrink: 0; }
-.ctb-sep { color: var(--tc2); opacity: .4; }
-.ctb-rel { color: var(--p); font-weight: 500; }
-.ctb-msg-count { color: var(--tc2); }
-.ctb-reminder { color: var(--tc2); }
-.ctb-location { color: var(--tc2); }
+.chat-top-bar { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 16px; background: var(--surface-sidebar); border-bottom: 1px solid var(--border-default); font-size: 11px; color: var(--text-secondary); flex-shrink: 0; }
+.ctb-sep { color: var(--text-secondary); opacity: .4; }
+.ctb-rel { color: var(--accent-primary); font-weight: 500; }
+.ctb-msg-count { color: var(--text-secondary); }
+.ctb-reminder { color: var(--text-secondary); }
+.ctb-location { color: var(--text-secondary); }
 .msg-list { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; position: relative; scrollbar-width: none; }
 .msg-list::-webkit-scrollbar { display: none; }
 .msg-list::before { content: ''; position: fixed; inset: 0; background-image: var(--chat-bg-img); background-size: var(--bg-mode, cover); background-position: center; opacity: var(--bg-opacity, 1); filter: blur(var(--bg-blur, 0px)); z-index: 0; pointer-events: none; }
@@ -264,61 +264,61 @@ export default {
 .msg.user { flex-direction: row-reverse; }
 .msg-avatar { width: 36px; height: 36px; border-radius: 4px; flex-shrink: 0; object-fit: cover; }
 .msg-body { max-width: 70%; }
-.msg-name { font-size: 11px; color: var(--tc2); margin-bottom: 4px; }
+.msg-name { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
 .msg.user .msg-name { text-align: right; }
-.msg-bubble { padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; word-break: break-word; background: var(--ab); color: var(--tc); }
-.msg.user .msg-bubble { background: var(--ub); }
+.msg-bubble { padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.6; word-break: break-word; background: var(--bubble-assistant); color: var(--text-primary); }
+.msg.user .msg-bubble { background: var(--bubble-user); }
 .msg-bubbles { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
 .msg-bubbles .msg-bubble { max-width: 100%; }
 .msg.user .msg-bubbles { align-items: flex-end; }
 .msg-bubbles .msg-bubble:not(:first-child) { border-top-left-radius: 4px; border-top-right-radius: 4px; }
 .msg-bubbles .msg-bubble:not(:last-child) { border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }
-.msg-bubble a { color: var(--p); }
+.msg-bubble a { color: var(--accent-primary); }
 .msg-bubble.streaming { opacity: .8; }
 .msg-bubble.typing-dots { padding: 10px 18px; display: flex; gap: 5px; align-items: center; }
-.dot-bounce { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--p); animation: dotBounce 1.2s infinite; }
+.dot-bounce { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent-primary); animation: dotBounce 1.2s infinite; }
 .dot-bounce:nth-child(2) { animation-delay: .15s; }
 .dot-bounce:nth-child(3) { animation-delay: .3s; }
 @keyframes dotBounce { 0%,60%,100% { opacity: .2; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-6px); } }
-.msg.proactive .msg-bubble { border-left: 2px solid var(--p); opacity: .85; }
+.msg.proactive .msg-bubble { border-left: 2px solid var(--accent-primary); opacity: .85; }
 .msg.surprise .msg-bubble { border: 1px solid rgba(255,255,255,.1); }
 .msg-footer { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
-.msg-time { font-size: 10px; color: var(--tc2); }
+.msg-time { font-size: 10px; color: var(--text-secondary); }
 .msg.user .msg-footer { justify-content: flex-end; }
 .feedback-btns { display: flex; gap: 6px; }
-.fb-btn { background: none; border: none; cursor: pointer; color: var(--tc2); opacity: 0.5; transition: all .15s; padding: 2px; display: flex; align-items: center; }
-.fb-btn:hover { opacity: 1; color: var(--p); }
-.tts-btn { background: none; border: none; cursor: pointer; color: var(--tc2); opacity: 0.5; transition: all .15s; padding: 2px; display: flex; align-items: center; }
-.tts-btn:hover { opacity: 1; color: var(--p); }
+.fb-btn { background: none; border: none; cursor: pointer; color: var(--text-secondary); opacity: 0.5; transition: all .15s; padding: 2px; display: flex; align-items: center; }
+.fb-btn:hover { opacity: 1; color: var(--accent-primary); }
+.tts-btn { background: none; border: none; cursor: pointer; color: var(--text-secondary); opacity: 0.5; transition: all .15s; padding: 2px; display: flex; align-items: center; }
+.tts-btn:hover { opacity: 1; color: var(--accent-primary); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; }
 .fb-done { display: flex; align-items: center; }
-.fb-liked { color: var(--p); opacity: 0.6; }
+.fb-liked { color: var(--accent-primary); opacity: 0.6; }
 .fb-disliked { color: #e74c3c; opacity: 0.5; }
 .empty-chat { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px; }
-.empty-greeting { font-size: 24px; color: var(--tc); font-weight: 300; letter-spacing: 2px; }
-.empty-hint { font-size: 13px; color: var(--tc2); }
+.empty-greeting { font-size: 24px; color: var(--text-primary); font-weight: 300; letter-spacing: 2px; }
+.empty-hint { font-size: 13px; color: var(--text-secondary); }
 .empty-chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
-.empty-chip { padding: 6px 14px; background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 16px; font-size: 12px; color: var(--tc2); cursor: pointer; transition: all .15s; }
-.empty-chip:hover { background: var(--p); color: #fff; border-color: var(--p); }
+.empty-chip { padding: 6px 14px; background: rgba(255,255,255,.04); border: 1px solid var(--border-default); border-radius: 16px; font-size: 12px; color: var(--text-secondary); cursor: pointer; transition: all .15s; }
+.empty-chip:hover { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
 /* bubble tails - only on last paragraph */
 .msg.user .msg-bubbles .msg-bubble:last-child { position: relative; }
-.msg.user .msg-bubbles .msg-bubble:last-child::after { content: ''; position: absolute; bottom: 0; right: -6px; width: 0; height: 0; border-left: 6px solid var(--ub); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+.msg.user .msg-bubbles .msg-bubble:last-child::after { content: ''; position: absolute; bottom: 0; right: -6px; width: 0; height: 0; border-left: 6px solid var(--bubble-user); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
 .msg.assistant .msg-bubbles .msg-bubble:last-child { position: relative; }
-.msg.assistant .msg-bubbles .msg-bubble:last-child::after { content: ''; position: absolute; bottom: 0; left: -6px; width: 0; height: 0; border-right: 6px solid var(--ab); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
-.date-sep { text-align: center; font-size: 11px; color: var(--tc2); padding: 8px 0; }
-.loading-indicator { text-align: center; color: var(--tc2); font-size: 12px; padding: 8px; }
+.msg.assistant .msg-bubbles .msg-bubble:last-child::after { content: ''; position: absolute; bottom: 0; left: -6px; width: 0; height: 0; border-right: 6px solid var(--bubble-assistant); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+.date-sep { text-align: center; font-size: 11px; color: var(--text-secondary); padding: 8px 0; }
+.loading-indicator { text-align: center; color: var(--text-secondary); font-size: 12px; padding: 8px; }
 .quick-replies { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
-.qr-chip { padding: 3px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 12px; font-size: 11px; color: var(--tc2); cursor: pointer; }
-.qr-chip:hover { background: var(--p); color: #fff; border-color: var(--p); }
+.qr-chip { padding: 3px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border-default); border-radius: 12px; font-size: 11px; color: var(--text-secondary); cursor: pointer; }
+.qr-chip:hover { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
 .timeline-bar { position: absolute; right: 4px; top: 0; bottom: 0; width: 60px; overflow-y: auto; padding: 4px 0; z-index: 5; scrollbar-width: none; }
 .timeline-bar::-webkit-scrollbar { display: none; }
-.tl-close { text-align: center; font-size: 12px; color: var(--tc2); cursor: pointer; padding: 2px 0; opacity: .4; transition: opacity .15s; }
+.tl-close { text-align: center; font-size: 12px; color: var(--text-secondary); cursor: pointer; padding: 2px 0; opacity: .4; transition: opacity .15s; }
 .tl-close:hover { opacity: 1; color: #e74c3c; }
-.tl-date { padding: 3px 6px; font-size: 10px; color: var(--tc2); cursor: pointer; text-align: center; border-radius: 3px; }
-.tl-date:hover { background: rgba(255,255,255,.06); color: var(--tc); }
-.context-menu { position: fixed; z-index: 2000; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.4); overflow: hidden; min-width: 120px; }
-.ctx-item { padding: 8px 16px; font-size: 13px; color: var(--tc); cursor: pointer; }
+.tl-date { padding: 3px 6px; font-size: 10px; color: var(--text-secondary); cursor: pointer; text-align: center; border-radius: 3px; }
+.tl-date:hover { background: rgba(255,255,255,.06); color: var(--text-primary); }
+.context-menu { position: fixed; z-index: 2000; background: var(--surface-app); border: 1px solid var(--border-default); border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.4); overflow: hidden; min-width: 120px; }
+.ctx-item { padding: 8px 16px; font-size: 13px; color: var(--text-primary); cursor: pointer; }
 .ctx-item:hover { background: rgba(255,255,255,.04); }
 .ctx-danger { color: #e74c3c; }
 

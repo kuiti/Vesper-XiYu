@@ -1,0 +1,60 @@
+Issues · Aider-AI/aider · GitHub
+
+Skip to content
+
+You signed in with another tab or window. Reload to refresh your session.
+You signed out in another tab or window. Reload to refresh your session.
+You switched accounts on another tab or window. Reload to refresh your session.
+ 
+
+Dismiss alert
+
+        Aider-AI
+ 
+/
+
+aider
+
+Public
+
+- 
+ 
+
+Notifications
+ You must be signed in to change notification settings
+
+- 
+ 
+
+Fork
+    4.6k
+
+- 
+
+ 
+
+          Star
+ 46k
+
+- Python 3.13 support (https://github.com/Aider-AI/aider/issues/3037)#3037 · paul-gauthier (https://github.com/paul-gauthier) opened on Jan 28, 202531
+# Issues
+Search Issuesreasoning_contentreasoning_contentSearchLabelsMilestonesNew issue
+## Search results
+OpenClosed
+- 
+### Make sure LLM calls are logged, including reasoning traces
+Status: Closed (abandoned).Aider-AI/aidernumber 4819 #4819 In Aider-AI/aider;·  by golivax  was closed on Feb 11, 2026
+- 
+### Unable to use lm_studio model with aider
+Status: Open.#4512 In Aider-AI/aider;· planetf1  opened on Sep 10, 2025
+- 
+### feat: streaming reasoning content
+priorityStatus: Closed (abandoned).Aider-AI/aidernumber 3310 #3310 In Aider-AI/aider;·  by fangzhen  was closed on Mar 12, 2025
+- 
+### Suggestion: See what the reasoning models are thinking before they give their output.
+enhancementNew feature or requestNew feature or requestfixedStatus: Open.#3086 In Aider-AI/aider;· V4G4X  opened on Jan 31, 2025
+- 
+### deepseek-r1 model long commit message includes think
+enhancementNew feature or requestNew feature or requestfixedStatus: Closed (completed).#3073 In Aider-AI/aider;·  by zwilch  was closed on Feb 26, 2025
+
+    You can’t perform that action at this time.

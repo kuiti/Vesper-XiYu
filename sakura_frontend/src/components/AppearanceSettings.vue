@@ -2,10 +2,7 @@
   <div class="sc-pane">
     <div class="card"><h3>主题</h3>
       <div class="theme-row">
-        <button :class="['theme-btn', { active: themeLocal==='dark' }]" @click="$emit('set-theme', 'dark')">暗色</button>
-        <button :class="['theme-btn', { active: themeLocal==='light' }]" @click="$emit('set-theme', 'light')">亮色</button>
-        <button :class="['theme-btn', { active: themeLocal==='sakura' }]" @click="$emit('set-theme', 'sakura')">樱花</button>
-        <button :class="['theme-btn', { active: themeLocal==='vesper' }]" @click="$emit('set-theme', 'vesper')">夕语</button>
+        <button v-for="t in themeList" :key="t.id" :class="['theme-btn', { active: themeLocal===t.id }]" @click="$emit('set-theme', t.id)" :style="t.id===themeLocal ? {background:'var(--accent-primary)', color:'#fff', borderColor:'var(--accent-primary)'} : {}">{{ t.label }}</button>
       </div>
     </div>
     <div class="card"><h3>聊天背景</h3>
@@ -35,20 +32,36 @@ export default {
   emits: ['set-theme','upload-bg','clear-bg','save-cfg','save-bg-style',
           'install-rag','rebuild-rag',
           'update:chatBgImage','update:bgOpacity','update:bgBlur','update:bgMode'],
+  computed: {
+    themeList() {
+      return [
+        { id: 'dark', label: '暗色' },
+        { id: 'light', label: '亮色' },
+        { id: 'sakura', label: '樱花' },
+        { id: 'vesper', label: '夕语' },
+        { id: 'ocean', label: '深海' },
+        { id: 'forest', label: '森林' },
+        { id: 'sunset', label: '日落' },
+        { id: 'mono', label: '单色' },
+        { id: 'candy', label: '甜系' },
+        { id: 'nord', label: '北欧' },
+      ]
+    },
+  },
 }
 </script>
 <style scoped>
 .sc-pane { display: flex; flex-direction: column; gap: 12px; }
-.card { background: rgba(255,255,255,.02); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+.card { background: rgba(255,255,255,.02); border: 1px solid var(--border-default); border-radius: 8px; padding: 14px; }
 .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-.hint { font-size: 11px; color: var(--tc2); margin: 0 0 10px 0; line-height: 1.5; opacity: .75; }
+.hint { font-size: 11px; color: var(--text-secondary); margin: 0 0 10px 0; line-height: 1.5; opacity: .75; }
 .field { margin-bottom: 10px; }
-.field label { display: block; font-size: 12px; color: var(--tc2); margin-bottom: 4px; }
-.field input, .field select { width: 100%; padding: 7px 10px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg); color: var(--tc); font-size: 13px; font-family: inherit; box-sizing: border-box; }
-.btn-s { padding: 5px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 4px; color: var(--tc2); cursor: pointer; font-size: 12px; }
+.field label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.field input, .field select { width: 100%; padding: 7px 10px; border-radius: 5px; border: 1px solid var(--border-default); background: var(--surface-app); color: var(--text-primary); font-size: 13px; font-family: inherit; box-sizing: border-box; }
+.btn-s { padding: 5px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-secondary); cursor: pointer; font-size: 12px; }
 .theme-row { display: flex; gap: 6px; flex-wrap: wrap; }
-.theme-btn { flex: 1; padding: 8px; background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 6px; color: var(--tc2); cursor: pointer; font-size: 12px; min-width: 50px; }
-.theme-btn.active { background: var(--p); color: #fff; border-color: var(--p); }
+.theme-btn { flex: 1; padding: 8px; background: rgba(255,255,255,.03); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-secondary); cursor: pointer; font-size: 12px; min-width: 50px; }
+.theme-btn.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
 .ok { color: #2ea043; font-size: 12px; }
 .fail { color: #e74c3c; font-size: 12px; }
 </style>

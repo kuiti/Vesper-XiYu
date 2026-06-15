@@ -1,0 +1,88 @@
+Suggestion: See what the reasoning models are thinking before they give their output. · Issue #3086 · Aider-AI/aider · GitHub
+
+Skip to content
+
+You signed in with another tab or window. Reload to refresh your session.
+You signed out in another tab or window. Reload to refresh your session.
+You switched accounts on another tab or window. Reload to refresh your session.
+ 
+
+Dismiss alert
+
+        Aider-AI
+ 
+/
+
+aider
+
+Public
+
+- 
+ 
+
+Notifications
+ You must be signed in to change notification settings
+
+- 
+ 
+
+Fork
+    4.6k
+
+- 
+
+ 
+
+          Star
+ 46k
+
+# Suggestion: See what the reasoning models are thinking before they give their output. #3086
+New issueCopy linkNew issueCopy linkOpenOpenSuggestion: See what the reasoning models are thinking before they give their output.#3086Copy linkLabelsenhancementNew feature or request (https://github.com/Aider-AI/aider/issues?q=state%3Aopen%20label%3A%22enhancement%22)New feature or requestfixed (https://github.com/Aider-AI/aider/issues?q=state%3Aopen%20label%3A%22fixed%22) (https://github.com/V4G4X)
+## Description
+ (https://github.com/V4G4X)V4G4X (https://github.com/V4G4X)opened on Jan 31, 2025 (https://github.com/Aider-AI/aider/issues/3086#issue-2822841108)Issue body actions
+### Issue
+
+Since I was facing a lot of wait time using reasoning models like DeepSeek R1 (https://openrouter.ai/deepseek/deepseek-r1) and Perplexity: Sonar Reasoning (https://openrouter.ai/perplexity/sonar-reasoning) in Aider,
+i.e an average wait time in minutes even for simple prompts like:
+
+Ignore any other prompt before this. Tell me how many "r"s are in the word "Strawberry"
+
+I tried testing them out in Openrouter's chatroom.
+I noticed that the models/APIs were not lagging, but that they took a lot of time to think before they responded.
+And I could see what they were thinking as they did.
+
+ (https://private-user-images.githubusercontent.com/34249137/408488496-37257604-c89d-4091-86e8-7e64d9b3b09f.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3ODExNjAzOTgsIm5iZiI6MTc4MTE2MDA5OCwicGF0aCI6Ii8zNDI0OTEzNy80MDg0ODg0OTYtMzcyNTc2MDQtYzg5ZC00MDkxLTg2ZTgtN2U2NGQ5YjNiMDlmLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjA2MTElMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwNjExVDA2NDEzOFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTgyMWNmMjAxZjhmZWRkZGNiZDlkNjYyNzQzMDhlMTdmM2Y5OTE2NTg3NDM2M2E4MmFhMGY2Y2M1MjA1MzJiYzgmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JnJlc3BvbnNlLWNvbnRlbnQtdHlwZT1pbWFnZSUyRnBuZyJ9.8zA_b5nnG7FphQLzfgDTR4NOwa9Kd-lY-N0bax8RELA)
+It would help my user experience A LOT, if I could see this thought process when using Aider.
+Do I have to wait because it's thinking, is it thinking in the right direction? (If it's not, I can cancel the request and direct it better)
+Or is it the API just stuck?
+
+Since the OpenRouter chatroom can get the reasoning tokens, I assume that we can too?
+
+### Version and model info
+
+aider 0.72.3
+model: openrouter/deepseek/deepseek-r1
+Reactions are currently unavailable
+## Metadata
+
+## Metadata
+
+### Assignees
+No one assigned
+### Labels
+enhancementNew feature or request (https://github.com/Aider-AI/aider/issues?q=state%3Aopen%20label%3A%22enhancement%22)New feature or requestfixed (https://github.com/Aider-AI/aider/issues?q=state%3Aopen%20label%3A%22fixed%22)
+### Type
+No type
+### Fields
+Give feedback (https://github.com/orgs/community/discussions/189141)No fields configured for issues without a type.
+### Projects
+No projects
+### Milestone
+No milestone
+### Relationships
+None yet
+### Development
+No branches or pull requests
+## Issue actions
+
+    You can’t perform that action at this time.

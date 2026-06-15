@@ -1,0 +1,83 @@
+Issues · RooCodeInc/Roo-Code · GitHub
+
+Skip to content
+
+You signed in with another tab or window. Reload to refresh your session.
+You signed out in another tab or window. Reload to refresh your session.
+You switched accounts on another tab or window. Reload to refresh your session.
+ 
+
+Dismiss alert
+
+    This repository was archived by the owner on May 15, 2026. It is now read-only.
+  
+
+        RooCodeInc
+ 
+/
+
+Roo-Code
+
+Public archive
+
+- 
+ 
+
+Notifications
+ You must be signed in to change notification settings
+
+- 
+ 
+
+Fork
+    3.3k
+
+- 
+
+ 
+
+          Star
+ 24.2k
+
+# Issues
+Search Issuesreasoning_contentreasoning_contentSearchLabelsMilestones
+## Search results
+OpenClosed
+- 
+### [ENHANCEMENT] DeepSeek v4 is here.
+EnhancementNew feature or requestNew feature or requestStatus: Closed (completed).#12276 In RooCodeInc/Roo-Code;·  by zhengkw614  was closed on May 6, 2026
+- 
+### [BUG] OpenAI Compatible 非流式模式（stream: false）下 reasoning_content 字段被静默丢弃
+bugSomething isn't workingSomething isn't workingStatus: Open.#12260 In RooCodeInc/Roo-Code;· JK-LIL  opened on May 3, 2026
+- 
+### [BUG] ERRO 400 con modelos nuevo como DeepSeek v4,
+bugSomething isn't workingSomething isn't workingStatus: Open.#12203 In RooCodeInc/Roo-Code;· awemancba  opened on Apr 26, 2026
+- 
+### Bug: DeepSeek 400 Error "reasoning_content must be passed back" due to malformed history payload
+bugSomething isn't workingSomething isn't workingStatus: Open.#12196 In RooCodeInc/Roo-Code;· Mayocampo  opened on Apr 26, 2026
+- 
+### [BUG] DeepSeek V4 Pro via OpenAI proxy: error "reasoning_content must be passed back" (400)
+bugSomething isn't workingSomething isn't workingStatus: Open.#12195 In RooCodeInc/Roo-Code;· Anthony-Perriolat  opened on Apr 25, 2026
+- 
+### [BUG] Cannot work with DeepSeek V4 Pro
+bugSomething isn't workingSomething isn't workingStatus: Open.#12177 In RooCodeInc/Roo-Code;· wuhaolxp  opened on Apr 24, 2026
+- 
+### [ENHANCEMENT] support deepseek v4 and new thinking mode
+EnhancementNew feature or requestNew feature or requestStatus: Open.#12174 In RooCodeInc/Roo-Code;· Yue-bin  opened on Apr 24, 2026
+- 
+### [ENHANCEMENT] Request to support DeepSeek V4 flash and V4 pro models
+EnhancementNew feature or requestNew feature or requestStatus: Open.#12173 In RooCodeInc/Roo-Code;· kavehsfv  opened on Apr 24, 2026
+- 
+### [BUG] Prompt enhancement broken on qwen3-coder models
+bugSomething isn't workingSomething isn't workingStatus: Open.#12102 In RooCodeInc/Roo-Code;· MinimackStudios  opened on Apr 13, 2026
+- 
+### [BUG] Missing thinking output with "Enable Reasoning Effort" when using OpenAI Compatible
+bugSomething isn't workingSomething isn't workingStatus: Open.#12076 In RooCodeInc/Roo-Code;· marivk  opened on Apr 8, 2026
+- 
+### [ENHANCEMENT] Migrate Grok to Responses API
+EnhancementNew feature or requestNew feature or requestStatus: Closed (completed).#11961 In RooCodeInc/Roo-Code;·  by carlesso  was closed on Apr 8, 2026
+- 
+### [BUG] OpenAiHandler doesn't support reasoning field for OpenAI-compatible providers
+bugSomething isn't workingSomething isn't workingStatus: Open.#11495 In RooCodeInc/Roo-Code;· R-omk  opened on Feb 17, 2026
+
+    You can’t perform that action at this time.

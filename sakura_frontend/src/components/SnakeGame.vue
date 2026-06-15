@@ -15,7 +15,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 const GS = 20, COLS = 18, ROWS = 18
 
 export default {
@@ -137,11 +137,11 @@ export default {
 
 <style scoped>
 .snake-game { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; }
-.snake-header { display: flex; justify-content: space-between; width: 100%; max-width: 360px; color: var(--tc); font-size: 14px; }
-.snake-score { color: var(--p); font-weight: 600; }
-.snake-canvas { border: 1px solid var(--border); border-radius: 6px; }
-.snake-controls button { background: var(--p); border: none; color: #fff; border-radius: 6px; padding: 8px 24px; cursor: pointer; font-size: 14px; }
+.snake-header { display: flex; justify-content: space-between; width: 100%; max-width: 360px; color: var(--text-primary); font-size: 14px; }
+.snake-score { color: var(--accent-primary); font-weight: 600; }
+.snake-canvas { border: 1px solid var(--border-default); border-radius: 6px; }
+.snake-controls button { background: var(--accent-primary); border: none; color: #fff; border-radius: 6px; padding: 8px 24px; cursor: pointer; font-size: 14px; }
 .snake-over { color: #e74c3c; font-weight: 600; }
-.snake-hint { color: var(--tc2); font-size: 11px; }
-.help-btn { background: var(--p); border: none; color: #fff; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 12px; margin-top: 4px; }
+.snake-hint { color: var(--text-secondary); font-size: 11px; }
+.help-btn { background: var(--accent-primary); border: none; color: #fff; border-radius: 6px; padding: 4px 12px; cursor: pointer; font-size: 12px; margin-top: 4px; }
 </style>

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from core.db import get_countdowns, add_countdown, delete_countdown
+from core.db import get_countdowns, add_countdown
 from pydantic import BaseModel
 from typing import List, Optional
 

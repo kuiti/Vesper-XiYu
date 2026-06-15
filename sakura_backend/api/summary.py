@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from core.db import (
     get_active_tiered_summaries, get_all_active_keypoints,
-    get_death_archive, get_msg_counter, get_config, set_config,
+    get_death_archive, get_msg_counter,
     get_messages_since_last_tiered_summary, get_last_trigger_at
 )
 

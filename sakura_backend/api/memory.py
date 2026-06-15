@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Dict
 import json as _json
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 _PROFILE_KEY_LABELS = {
@@ -24,8 +25,8 @@ def _human_value(val: str) -> str:
         obj = _json.loads(val)
         if isinstance(obj, dict):
             return obj.get("text") or obj.get("value") or obj.get("name") or obj.get("summary") or str(obj)
-    except (_json.JSONDecodeError, TypeError):
-        pass
+    except (_json.JSONDecodeError, TypeError) as e:
+        silent_exc("memory", e)
     return val
 
 router = APIRouter(prefix="/memory", tags=["memory"])
@@ -56,10 +57,10 @@ async def memory_vault():
     """记忆保险箱：AI 记住的关于用户的所有信息"""
     from core.db import get_conn, get_active_tiered_summaries, get_all_active_keypoints
     import json
-    # 用户画像（不含原子事实）
+    # 用户画像（不含原子事实和事件追踪key）
     with get_conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT key, value, confidence, extracted_at FROM user_profile WHERE key NOT LIKE '_fact_%' ORDER BY confidence DESC")
+        cursor.execute("SELECT key, value, confidence, extracted_at FROM user_profile WHERE key NOT LIKE '_fact_%' AND key NOT LIKE '_event_%' AND key NOT LIKE '_plan_%' AND key NOT LIKE '_progress_%' ORDER BY confidence DESC")
         profile = [{"key": _human_label(r["key"]), "raw_key": r["key"], "value": _human_value(r["value"]), "confidence": r["confidence"], "extracted_at": r["extracted_at"]} for r in cursor.fetchall()]
     # 原子事实
     facts = []
@@ -77,8 +78,8 @@ async def memory_vault():
                     "confidence": r["confidence"],
                     "extracted_at": r["extracted_at"],
                 })
-            except Exception as e:  # silent
-                logger.debug(f"[memory_vault] {e}")
+            except Exception as e:
+                silent_exc("memory_vault", e)
     # 实体
     entities = []
     with get_conn() as conn:
@@ -163,8 +164,8 @@ async def delete_memory_item(vtype: str, key: str = ""):
                                               (json.dumps(list(linked)), row["id"]))
                             else:
                                 cursor.execute("DELETE FROM entities WHERE id = ?", (row["id"]))
-                    except Exception as e:  # silent
-                        logger.debug(f"[delete_memory_item] {e}")
+                    except Exception as e:
+                        silent_exc("delete_memory_item", e)
             # 清除画像缓存
             from core.profile_builder import clear_profile_cache
             clear_profile_cache()

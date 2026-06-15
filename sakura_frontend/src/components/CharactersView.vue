@@ -60,7 +60,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   data() {
@@ -151,28 +151,28 @@ export default {
 <style scoped>
 .characters-view { padding: 20px; overflow-y: auto; height: 100%; }
 .cv-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.cv-header h2 { font-size: 18px; font-weight: 600; color: var(--tc); margin: 0; }
+.cv-header h2 { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
 .cv-actions { display: flex; gap: 8px; }
-.import-area { background: var(--sb); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 16px; }
-.import-area textarea { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--tc); border: 1px solid var(--border); border-radius: 6px; padding: 8px; font-size: 12px; resize: vertical; }
+.import-area { background: var(--surface-sidebar); border: 1px solid var(--border-default); border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+.import-area textarea { width: 100%; box-sizing: border-box; background: var(--surface-app); color: var(--text-primary); border: 1px solid var(--border-default); border-radius: 6px; padding: 8px; font-size: 12px; resize: vertical; }
 .import-btns { display: flex; gap: 8px; margin-top: 8px; }
 .err-msg { color: #e74c3c; font-size: 12px; margin-top: 6px; }
-.current-card { background: var(--sb); border: 1px solid var(--p); border-radius: 8px; padding: 12px; margin-bottom: 16px; }
-.current-card h3 { font-size: 13px; color: var(--tc2); margin: 0 0 8px 0; }
+.current-card { background: var(--surface-sidebar); border: 1px solid var(--accent-primary); border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+.current-card h3 { font-size: 13px; color: var(--text-secondary); margin: 0 0 8px 0; }
 .card-info { display: flex; flex-direction: column; gap: 4px; }
-.card-name { font-size: 16px; font-weight: 600; color: var(--p); }
+.card-name { font-size: 16px; font-weight: 600; color: var(--accent-primary); }
 .card-meta { display: flex; gap: 6px; flex-wrap: wrap; }
-.tag { background: var(--border); color: var(--tc2); font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+.tag { background: var(--border-default); color: var(--text-secondary); font-size: 11px; padding: 2px 8px; border-radius: 10px; }
 .card-list { display: flex; flex-direction: column; gap: 8px; }
-.card-item { background: var(--sb); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.card-item { background: var(--surface-sidebar); border: 1px solid var(--border-default); border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .card-body { flex: 1; min-width: 0; }
-.card-desc { font-size: 12px; color: var(--tc2); margin: 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-desc { font-size: 12px; color: var(--text-secondary); margin: 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .card-tags { display: flex; gap: 4px; flex-wrap: wrap; }
 .card-actions { display: flex; gap: 6px; flex-shrink: 0; }
-.loading, .empty { text-align: center; color: var(--tc2); font-size: 13px; padding: 24px; }
-.btn { background: var(--p); border: none; border-radius: 6px; padding: 6px 14px; color: #fff; cursor: pointer; font-size: 12px; }
+.loading, .empty { text-align: center; color: var(--text-secondary); font-size: 13px; padding: 24px; }
+.btn { background: var(--accent-primary); border: none; border-radius: 6px; padding: 6px 14px; color: #fff; cursor: pointer; font-size: 12px; }
 .btn:disabled { opacity: .5; cursor: wait; }
-.btn-s { background: var(--border); border: none; border-radius: 6px; padding: 6px 14px; color: var(--tc); cursor: pointer; font-size: 12px; }
+.btn-s { background: var(--border-default); border: none; border-radius: 6px; padding: 6px 14px; color: var(--text-primary); cursor: pointer; font-size: 12px; }
 .btn-s.danger { color: #e74c3c; }
 .file-label { display: inline-block; }
 </style>

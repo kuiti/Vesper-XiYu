@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from core.db import get_favorites, add_favorite, remove_favorite, is_favorite, get_conn
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/favorites", tags=["favorites"])
@@ -9,8 +10,8 @@ router = APIRouter(prefix="/favorites", tags=["favorites"])
 try:
     with get_conn() as _c:
         _c.execute('CREATE TABLE IF NOT EXISTS favorites (id INTEGER PRIMARY KEY AUTOINCREMENT, msg_id INTEGER UNIQUE, content TEXT, role TEXT, timestamp TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)')
-except Exception as e:  # silent
-    logger.debug(f"[?] {e}")
+except Exception as e:
+    silent_exc("?", e)
 
 @router.get("/")
 async def list_favorites():

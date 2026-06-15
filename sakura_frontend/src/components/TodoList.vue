@@ -16,7 +16,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   data() {
@@ -70,14 +70,14 @@ export default {
 <style scoped>
 .todo-list { padding: 10px; }
 .add-todo { display: flex; gap: 8px; margin-bottom: 12px; }
-.add-todo input { flex: 1; padding: 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--tc); }
-.add-todo button { background: var(--p); border: none; border-radius: 8px; color: #fff; cursor: pointer; width: 32px; }
-.todo-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 8px 10px; background: var(--sb); border-radius: 8px; transition: transform .15s, background .15s; }
+.add-todo input { flex: 1; padding: 6px; border-radius: 8px; border: 1px solid var(--border-default); background: var(--surface-app); color: var(--text-primary); }
+.add-todo button { background: var(--accent-primary); border: none; border-radius: 8px; color: #fff; cursor: pointer; width: 32px; }
+.todo-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 8px 10px; background: var(--surface-sidebar); border-radius: 8px; transition: transform .15s, background .15s; }
 .todo-item:hover { background: rgba(255,255,255,.04); transform: translateX(2px); }
 .todo-item input[type="checkbox"] { accent-color: var(--p, #e8929b); width: 16px; height: 16px; cursor: pointer; }
-.todo-item span { flex: 1; color: var(--tc); }
-.todo-item span.done { text-decoration: line-through; color: var(--tc2); transition: all .25s; }
+.todo-item span { flex: 1; color: var(--text-primary); }
+.todo-item span.done { text-decoration: line-through; color: var(--text-secondary); transition: all .25s; }
 .todo-item button { background: none; border: none; cursor: pointer; font-size: 14px; opacity: .4; transition: opacity .15s; }
 .todo-item button:hover { opacity: 1; }
-.empty { color: var(--tc2); text-align: center; font-size: 14px; padding: 20px; }
+.empty { color: var(--text-secondary); text-align: center; font-size: 14px; padding: 20px; }
 </style>

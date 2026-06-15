@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from core.db import get_notes, add_note, delete_note
+from core.db import get_notes, add_note
 from pydantic import BaseModel
 from typing import List, Optional
 

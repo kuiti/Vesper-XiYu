@@ -14,6 +14,7 @@ import random
 import json
 from datetime import datetime, timedelta
 from abc import ABC, abstractmethod
+from core.retry import silent_exc
 from typing import Optional
 from core.db import get_config, set_config, get_conn, get_msg_counter
 from core.persona_data import (
@@ -103,8 +104,8 @@ class PromptPipeline:
             if result:
                 dynamic_parts.append(result)
 
-        # Token 预算：动态部分最多 3500 token
-        _BUDGET = 14000
+        # Token 预算
+        from core.config_keys import TOKEN_BUDGET_CHARS as _BUDGET
         _total = 0
         _filtered = []
         for _p in dynamic_parts:
@@ -390,8 +391,8 @@ class SchedulePipe(PromptPipe):
             try:
                 import jieba
                 query_words = set(w for w in jieba.cut(ctx.user_message) if len(w) > 1)
-            except ImportError:
-                pass
+            except ImportError as e:
+                silent_exc("prompt_pipeline", e)
             relevant = []
             for r in upcoming:
                 title_lower = r['title'].lower()

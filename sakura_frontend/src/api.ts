@@ -1,10 +1,19 @@
-import axios from 'axios'
+import axios, { type AxiosInstance, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios'
+
+// ─── 类型定义 ───
+
+interface ServerConfig {
+  host: string
+  port: string | number
+  protocol: string
+  token: string
+}
 
 // 配置版本：config.js 变了就自动清除旧缓存
-const CONFIG_VERSION = 'v2';
+const CONFIG_VERSION = 'v2'
 
-function _getConfig() {
-  const cfg = window.__SAKURA_CONFIG__ || {}
+function _getConfig(): ServerConfig {
+  const cfg: SakuraConfig = window.__SAKURA_CONFIG__ || {}
   // 版本变化或地址不匹配时，清除旧 localStorage
   const savedVer = localStorage.getItem('sakura_config_ver')
   const savedHost = localStorage.getItem('sakura_server_host')
@@ -23,20 +32,20 @@ function _getConfig() {
   }
 }
 
-function getBaseUrl() {
+function getBaseUrl(): string {
   const c = _getConfig()
   return `${c.protocol}://${c.host}:${c.port}`
 }
 
-function getToken() {
+function getToken(): string {
   return _getConfig().token
 }
 
 // 创建 axios 实例（baseURL 会在拦截器中动态设置）
-const api = axios.create({ timeout: 30000 })
+const api: AxiosInstance = axios.create({ timeout: 30000 })
 
 // 请求拦截器：动态设置 baseURL 和 Token
-api.interceptors.request.use(config => {
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const c = _getConfig()
   config.baseURL = `${c.protocol}://${c.host}:${c.port}`
   if (c.token) {
@@ -46,16 +55,16 @@ api.interceptors.request.use(config => {
 })
 
 // 上传类接口使用更长超时
-const originalPost = api.post
-api.post = function (url, data, config = {}) {
+const originalPost = api.post.bind(api)
+api.post = function (url: string, data?: unknown, config: AxiosRequestConfig = {}): Promise<any> {
   if (typeof url === 'string' && /upload|import|rebuild|tts/i.test(url)) {
     config.timeout = config.timeout || 120000
   }
-  return originalPost.call(this, url, data, config)
+  return originalPost(url, data, config)
 }
 
 // WebSocket 连接（每次实时读取 localStorage）
-function createWebSocket(path) {
+function createWebSocket(path: string): WebSocket {
   const c = _getConfig()
   const wsProto = c.protocol === 'https' ? 'wss' : 'ws'
   const base = `${wsProto}://${c.host}:${c.port}`
@@ -65,8 +74,9 @@ function createWebSocket(path) {
 }
 
 // 兼容导出
-const BASE_URL = getBaseUrl()
+const BASE_URL: string = getBaseUrl()
 const WS_URL = ''
 
 export { api, BASE_URL, WS_URL, createWebSocket, getToken, getBaseUrl }
+export type { ServerConfig }
 export default api

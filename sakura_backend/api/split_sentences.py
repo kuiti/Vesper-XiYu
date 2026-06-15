@@ -8,7 +8,6 @@ import asyncio
 from fastapi import APIRouter
 from pydantic import BaseModel
 from core.db import get_config
-import json
 
 router = APIRouter(prefix="/text", tags=["text"])
 

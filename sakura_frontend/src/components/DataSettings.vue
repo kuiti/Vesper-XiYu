@@ -57,20 +57,20 @@ export default {
 </script>
 <style scoped>
 .sc-pane { display: flex; flex-direction: column; gap: 12px; }
-.card { background: rgba(255,255,255,.02); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+.card { background: rgba(255,255,255,.02); border: 1px solid var(--border-default); border-radius: 8px; padding: 14px; }
 .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-.btn { padding: 7px 16px; background: var(--p); color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; }
-.btn-s { padding: 5px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 4px; color: var(--tc2); cursor: pointer; font-size: 12px; }
+.btn { padding: 7px 16px; background: var(--accent-primary); color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 13px; }
+.btn-s { padding: 5px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-secondary); cursor: pointer; font-size: 12px; }
 .btn-s.danger { color: #f85149; border-color: #f85149; }
 .btn-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .fav-item { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.03); font-size: 12px; }
-.fav-role { color: var(--p); white-space: nowrap; min-width: 30px; }
-.fav-content { flex: 1; color: var(--tc); }
-.empty { color: var(--tc2); font-size: 12px; padding: 10px; }
+.fav-role { color: var(--accent-primary); white-space: nowrap; min-width: 30px; }
+.fav-content { flex: 1; color: var(--text-primary); }
+.empty { color: var(--text-secondary); font-size: 12px; padding: 10px; }
 .cloud-panel { display: flex; flex-direction: column; gap: 8px; }
 .cloud-row { display: flex; align-items: center; gap: 8px; }
-.cloud-row label { font-size: 12px; color: var(--tc2); min-width: 80px; }
-.cloud-row input { flex: 1; padding: 6px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--tc); font-size: 12px; }
+.cloud-row label { font-size: 12px; color: var(--text-secondary); min-width: 80px; }
+.cloud-row input { flex: 1; padding: 6px 8px; background: var(--surface-app); border: 1px solid var(--border-default); border-radius: 6px; color: var(--text-primary); font-size: 12px; }
 .cloud-actions { display: flex; gap: 8px; margin-top: 4px; }
 .ok { color: #2ea043; font-size: 12px; }
 .fail { color: #e74c3c; font-size: 12px; }

@@ -8,6 +8,7 @@ import json
 from datetime import datetime
 from typing import Optional
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 
@@ -100,8 +101,8 @@ class TagExecutor:
         try:
             from core.profile_builder import clear_profile_cache
             clear_profile_cache()
-        except Exception as e:  # silent
-            logger.debug(f"[_add] {e}")
+        except Exception as e:
+            silent_exc("_add", e)
         return f"已记住：{content}"
 
     @staticmethod

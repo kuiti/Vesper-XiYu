@@ -17,6 +17,15 @@ MENTION_BOOST_TIERS = [0.4, 0.6, 0.8, 1.0, 1.2]
 # 重要性离散映射
 IMPORTANCE_MAP = {"低": 0.2, "中": 0.5, "高": 0.8, "low": 0.2, "medium": 0.5, "high": 0.8}
 
+# 共享 prompt 片段
+_SUMMARY_SCHEMA = '{"summary": "摘要文本", "importance": "低/中/高", "key_points": ["关键信息1", ...]}'
+_IMPORTANCE_RULES = "importance 评分：高=涉及个人重要信息/决定/情感，中=日常交流，低=闲聊寒暄"
+_KEYPOINT_RULES = """key_points 规则（非常重要）：
+- 只提取用户的个人信息、偏好、习惯、重要事件、情绪变化、目标计划
+- 不要提取：AI的感受/想法、日常问候、天气查询、吃饭建议、闲聊寒暄、AI的回复内容
+- 示例正确：["用户叫小明", "用户在上海工作", "用户下周有考试"]
+- 示例错误：["助手感到高兴", "用户询问天气", "晚安道别", "助手推荐吃饭"]"""
+
 _summary_lock = threading.Lock()
 
 
@@ -153,14 +162,10 @@ def generate_summary_for_tier(level, messages, existing_summaries=None):
     if level == 3 and existing_summaries:
         summaries_text = "\n".join([f"- {s['summary']}" for s in existing_summaries])
         prompt = f"""请基于以下摘要和最新对话，输出一份300字以内的高级摘要。输出 JSON，三个字段都必须有：
-{{"summary": "摘要文本", "importance": "低/中/高", "key_points": ["关键信息1", ...]}}
-importance 评分：高=涉及个人重要信息/决定/情感，中=日常交流，低=闲聊寒暄
+{_SUMMARY_SCHEMA}
+{_IMPORTANCE_RULES}
 
-key_points 规则（非常重要）：
-- 只提取用户的个人信息、偏好、习惯、重要事件、情绪变化、目标计划
-- 不要提取：AI的感受/想法、日常问候、天气查询、吃饭建议、闲聊寒暄、AI的回复内容
-- 示例正确：["用户叫小明", "用户在上海工作", "用户下周有考试"]
-- 示例错误：["助手感到高兴", "用户询问天气", "晚安道别", "助手推荐吃饭"]
+{_KEYPOINT_RULES}
 
 已有摘要：
 {summaries_text}
@@ -170,14 +175,10 @@ key_points 规则（非常重要）：
     else:
         max_len = {1: 50, 2: 150}.get(level, 150)
         prompt = f"""请用{max_len}字以内总结以下对话。输出 JSON，三个字段都必须有：
-{{"summary": "摘要文本", "importance": "低/中/高", "key_points": ["关键信息1", ...]}}
-importance 评分：高=涉及个人重要信息/决定/情感，中=日常交流，低=闲聊寒暄
+{_SUMMARY_SCHEMA}
+{_IMPORTANCE_RULES}
 
-key_points 规则（非常重要）：
-- 只提取用户的个人信息、偏好、习惯、重要事件、情绪变化、目标计划
-- 不要提取：AI的感受/想法、日常问候、天气查询、吃饭建议、闲聊寒暄、AI的回复内容
-- 示例正确：["用户叫小明", "用户在上海工作", "用户下周有考试"]
-- 示例错误：["助手感到高兴", "用户询问天气", "晚安道别", "助手推荐吃饭"]
+{_KEYPOINT_RULES}
 
 对话：
 {msgs_text}"""

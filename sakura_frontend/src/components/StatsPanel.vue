@@ -33,7 +33,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   data() { return { data: {} } },
@@ -50,19 +50,19 @@ export default {
 .stats-panel { padding: 8px; }
 .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
 .stat-card { background: rgba(255,255,255,.04); border-radius: 8px; padding: 14px; text-align: center; }
-.stat-num { font-size: 24px; font-weight: 700; color: var(--p); }
-.stat-label { font-size: 11px; color: var(--tc2); margin-top: 2px; }
+.stat-num { font-size: 24px; font-weight: 700; color: var(--accent-primary); }
+.stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
 .stat-section { margin-bottom: 14px; }
-.stat-section h4 { font-size: 13px; color: var(--tc2); margin: 0 0 8px; }
+.stat-section h4 { font-size: 13px; color: var(--text-secondary); margin: 0 0 8px; }
 .hour-bars { display: flex; gap: 2px; align-items: flex-end; height: 80px; }
 .hour-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
-.hour-bar { width: 100%; max-width: 20px; background: var(--p); border-radius: 2px 2px 0 0; min-height: 2px; transition: height .3s; }
-.hour-label { font-size: 9px; color: var(--tc2); margin-top: 2px; }
+.hour-bar { width: 100%; max-width: 20px; background: var(--accent-primary); border-radius: 2px 2px 0 0; min-height: 2px; transition: height .3s; }
+.hour-label { font-size: 9px; color: var(--text-secondary); margin-top: 2px; }
 .emotion-pie { display: flex; height: 24px; border-radius: 12px; overflow: hidden; }
 .pie-slice { display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; min-width: 0; }
 .pie-slice.pos { background: #2ea043; }
 .pie-slice.neu { background: #6e7681; }
 .pie-slice.neg { background: #da3633; }
 .word-cloud { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.word-tag { color: var(--tc); opacity: .8; cursor: default; }
+.word-tag { color: var(--text-primary); opacity: .8; cursor: default; }
 </style>

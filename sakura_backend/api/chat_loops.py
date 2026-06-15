@@ -4,7 +4,6 @@
 import asyncio
 import json
 import threading
-import time
 from datetime import datetime, timedelta
 from fastapi import WebSocket, WebSocketDisconnect
 from core.db import (
@@ -13,6 +12,7 @@ from core.db import (
 )
 from api.chat_tasks import check_reminders
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 
@@ -81,8 +81,8 @@ async def proactive_loop(
                         # 如果最近2条都是AI说的（一条主动消息用户没回，就别再发了）
                         if len(_recent) >= 2 and all(r["role"] == "assistant" for r in _recent):
                             continue
-                    except Exception as e:  # silent
-                        logger.debug(f"[?] {e}")
+                    except Exception as e:
+                        silent_exc("?", e)
 
                     # 关怀类每日上限检查
                     from api.proactive import check_care_category_limit, record_care_trigger, get_care_category
@@ -173,3 +173,4 @@ async def diary_scheduler():
                 print(f"[AI日记] 已自动生成 {today}")
         except Exception as e:
             print(f"[AI日记] 自动生成失败: {e}")
+        last_generated = today

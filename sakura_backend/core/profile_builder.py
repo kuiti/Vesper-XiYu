@@ -6,6 +6,7 @@ import threading
 from datetime import datetime
 from core.db import get_config, get_conn, get_recent_chat_messages
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 _profile_cache = None
@@ -219,8 +220,8 @@ def _get_existing_facts(limit=50):
         try:
             d = json.loads(r["value"])
             facts.append(d.get("text", ""))
-        except (json.JSONDecodeError, TypeError):
-            pass
+        except (json.JSONDecodeError, TypeError) as e:
+            silent_exc("profile_builder", e)
     return facts
 
 
@@ -242,8 +243,8 @@ def _get_existing_facts_with_status(limit=50):
                 "status": d.get("status", "active"),
                 "category": d.get("category", "general"),
             })
-        except (json.JSONDecodeError, TypeError):
-            pass
+        except (json.JSONDecodeError, TypeError) as e:
+            silent_exc("profile_builder", e)
     return facts
 
 
@@ -261,8 +262,8 @@ def _handle_contradictions(contradictions):
             try:
                 d = json.loads(r["value"])
                 facts_map[d.get("text", "")] = (r["key"], d)
-            except (json.JSONDecodeError, TypeError):
-                pass
+            except (json.JSONDecodeError, TypeError) as e:
+                silent_exc("profile_builder", e)
 
         for contra in contradictions:
             old_text = contra.get("old_text", "")
@@ -309,11 +310,11 @@ def get_facts_context(max_facts=15):
                         days_ago = (_dt.now() - created).days
                         if days_ago > 0:
                             text = f"【{days_ago}天前】{text}"
-                    except Exception as e:  # silent
-                        logger.debug(f"[get_facts_context] {e}")
+                    except Exception as e:
+                        silent_exc("get_facts_context", e)
                 facts.append((importance, text))
-        except (json.JSONDecodeError, TypeError):
-            pass
+        except (json.JSONDecodeError, TypeError) as e:
+            silent_exc("profile_builder", e)
     # 按重要性排序，取 top N
     facts.sort(key=lambda x: -x[0])
     selected = [f[1] for f in facts[:max_facts]]
@@ -346,8 +347,8 @@ def extract_entities_from_text(text: str) -> list:
             # 专有名词
             elif flag.startswith('nz'):
                 entities.append((w, 'THING'))
-    except ImportError:
-        pass
+    except ImportError as e:
+        silent_exc("profile_builder", e)
     # 引号内文本作为实体
     import re
     for match in re.finditer(r'[「""](.+?)[」""]', text):

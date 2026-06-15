@@ -71,8 +71,9 @@ def get_current_weather(city: str) -> dict:
     return {}
 
 # 天气相关函数统一从 core.weather 导入，不再重复定义
-from core.weather import WMO_WEATHER, get_city_coords, get_openmeteo_weather, wind_direction_name
+from core.weather import get_city_coords, get_openmeteo_weather, wind_direction_name
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 
@@ -439,8 +440,8 @@ def _handle_weather(user_message: str) -> tuple:
                 if extras:
                     parts.append("，".join(extras))
                 weather_text = "，".join(parts)
-        except Exception as e:  # silent
-            logger.debug(f"[?] {e}")
+        except Exception as e:
+            silent_exc("?", e)
 
     # 3. Open-Meteo 最后兜底
     if not weather_text:

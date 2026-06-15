@@ -1,8 +1,7 @@
 """
 chat_tasks.py —— 从 chat.py 提取的后台任务和工具函数
 
-包含：深度提示、DSML清理、提醒规则、背景更新、每日演化、成就、惊喜等。
-天气/日记调度器因依赖全局 WS 状态，留在 chat.py。
+包含：深度提示、DSML清理、提醒规则、背景更新、每日演化、成就、惊喜、RAG 上下文构建等。
 """
 
 import asyncio
@@ -10,12 +9,16 @@ import json
 import random
 import re
 import threading
+import os
+import time
 from datetime import datetime, timedelta
 
 from core.db import (
     get_config, set_config, get_reminders, update_reminder_last_reminded, get_conn,
 )
+from core.vector_store import search_similar, search_knowledge_similar, is_model_ready
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 
@@ -207,8 +210,8 @@ def _check_achievements(msg_count, consecutive_days, ws, loop):
                     asyncio.run_coroutine_threadsafe(
                         ws.send_text(json.dumps({"type": "achievement", "data": a})), loop
                     )
-                except Exception as e:  # silent
-                    logger.debug(f"[_check_achievements] {e}")
+                except Exception as e:
+                    silent_exc("_check_achievements", e)
     except Exception as e:
         print(f"[成就] 检查失败: {e}")
 
@@ -266,8 +269,69 @@ def _parse_dsml_tool_calls(text: str) -> list:
             pval = pm.group(2).strip()
             try:
                 pval = int(pval)
-            except ValueError:
-                pass
+            except ValueError as e:
+                silent_exc("chat_tasks", e)
             args[pname] = pval
         results.append({"name": func_name, "args": args})
     return results
+
+
+# ─── RAG 上下文构建（KB 标题匹配 + 向量搜索）───
+
+def _build_rag_context(user_message: str, is_system: bool) -> tuple[str, str]:
+    """构建 RAG 上下文：KB 标题提示 + 向量检索结果。
+
+    Returns:
+        (kb_title_hint, rag_context) — 两个字符串，为空表示无匹配。
+    """
+    kb_title_hint = ""
+    if not is_system:
+        try:
+            now_ts = time.time()
+            if not hasattr(_build_rag_context, '_kb_titles_cache') or now_ts - _build_rag_context._kb_titles_cache_ts > 60:
+                from core.db import get_knowledge_filenames
+                _build_rag_context._kb_titles_cache = get_knowledge_filenames()
+                _build_rag_context._kb_titles_cache_ts = now_ts
+            for title in _build_rag_context._kb_titles_cache:
+                name = os.path.splitext(title)[0]
+                if len(name) >= 2 and name in user_message:
+                    kb_title_hint = f"【知识库关联】用户的话题可能与知识库文档「{title}」相关，你可以自然地引用其中的内容。"
+                    break
+        except Exception as e:
+            silent_exc("_kb_title", e)
+
+    rag_context = ""
+    if not is_system and is_model_ready():
+        try:
+            similar_docs = search_similar(user_message, top_k=3, include_metadata=True)
+            kb_docs = search_knowledge_similar(user_message, top_k=3)
+            if similar_docs:
+                RAG_THRESHOLD = 0.55
+                rag_lines = []
+                for doc, dist, meta in similar_docs:
+                    cos_score = 1.0 - (dist / 2.0) if dist <= 2 else 0
+                    if cos_score < RAG_THRESHOLD:
+                        continue
+                    if len(doc) > 300:
+                        doc = doc[:300] + "..."
+                    role = meta.get("role", "user") if meta else "user"
+                    speaker = "你" if role == "assistant" else "用户"
+                    rag_lines.append(f"{speaker}：{doc}")
+                if rag_lines:
+                    rag_context = "\n".join(rag_lines)
+            if kb_docs:
+                kb_lines = []
+                for doc, dist in kb_docs:
+                    cos_score = 1.0 - (dist / 2.0) if dist <= 2 else 0
+                    if cos_score < RAG_THRESHOLD:
+                        continue
+                    if len(doc) > 300:
+                        doc = doc[:300] + "..."
+                    kb_lines.append(f"- {doc}")
+                if kb_lines:
+                    kb_context = "【知识库参考】\n" + "\n".join(kb_lines)
+                    rag_context = (rag_context + "\n" + kb_context) if rag_context else kb_context
+        except Exception as e:
+            print(f"向量检索失败: {e}")
+
+    return kb_title_hint, rag_context

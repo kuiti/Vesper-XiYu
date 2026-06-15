@@ -21,6 +21,7 @@ from datetime import datetime
 from typing import Optional
 from core.db import get_config, set_config, get_conn
 import logging
+from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 
@@ -241,8 +242,8 @@ class CharacterCard:
             affection, trust = get_relationship()
             sakura["affection"] = affection
             sakura["trust"] = trust
-        except Exception as e:  # silent
-            logger.debug(f"[sync_from_current] {e}")
+        except Exception as e:
+            silent_exc("sync_from_current", e)
         sakura["created_at"] = datetime.now().isoformat()
 
     def apply_to_current(self, card_name: str = None):
@@ -290,8 +291,8 @@ class CharacterCard:
             affection = sakura.get("affection", 30)
             trust = sakura.get("trust", 30)
             set_relationship(affection, trust)
-        except Exception as e:  # silent
-            logger.debug(f"[?] {e}")
+        except Exception as e:
+            silent_exc("?", e)
 
     def _get_bg_field(self, key: str, default=None):
         """从 ai_background JSON 中读取字段"""

@@ -1,0 +1,682 @@
+Releases · djlastnight/KeyboardSplitterXbox · GitHub
+
+Skip to content
+
+You signed in with another tab or window. Reload to refresh your session.
+You signed out in another tab or window. Reload to refresh your session.
+You switched accounts on another tab or window. Reload to refresh your session.
+ 
+
+Dismiss alert
+
+        djlastnight
+ 
+/
+
+KeyboardSplitterXbox
+
+Public
+
+- 
+ 
+
+Notifications
+ You must be signed in to change notification settings
+
+- 
+ 
+
+Fork
+    68
+
+- 
+
+ 
+
+          Star
+ 751
+
+# Releases: djlastnight/KeyboardSplitterXbox
+
+ 
+
+Releases · djlastnight/KeyboardSplitterXbox
+
+## Release 2.3.0.0
+
+        28 Oct 13:11
+      
+
+djlastnight
+
+            2.3.0.0
+          
+
+5586d64
+
+ 
+Compare
+
+# 
+        Choose a tag to compare
+      
+
+ 
+
+## Sorry, something went wrong.
+
+ 
+
+        Filter
+
+ Loading
+
+ 
+
+## Sorry, something went wrong.
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+ 
+
+## No results found
+
+ 
+  
+View all tags
+
+ 
+ 
+
+ 
+
+Release 2.3.0.0
+
+Latest
+
+Latest
+
+ (https://github.com/djlastnight/KeyboardSplitterXbox/releases/2.3.0.0)
+
+- Added support for CLI autostart by providing game= argument ReadMe (https://github.com/djlastnight/KeyboardSplitterXbox/#command-line-interface-cli)
+
+- Added an explanation how to move axis by custom percentage ReadMe (https://github.com/djlastnight/KeyboardSplitterXbox/#custom-axes-range-from--100-to-100)
+
+ 
+Assets
+3
+
+ 
+
+ Loading
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+ 👍
+9
+ rayman3003, Blankgoattt, chirag90-beep, fuhaokanxiangxian130, DSGuber, iamrunn, khoafalcon, owemnancy, and gabbifx-sketch reacted with thumbs up emoji
+ 🎉
+1
+ gabbifx-sketch reacted with hooray emoji
+ ❤️
+15
+ Musaka96, Asher-1971, ammar1182, linkretro999, YaLapushok, Mid3us, Geguuuul, fuhaokanxiangxian130, iamrunn, adem667, and 5 more reacted with heart emoji
+ 👀
+2
+ DxTea and yusi4585 reacted with eyes emoji
+
+ 
+All reactions
+
+- 
+👍
+9 reactions
+
+- 
+🎉
+1 reaction
+
+- 
+❤️
+15 reactions
+
+- 
+👀
+2 reactions
+
+ 22 people reacted
+
+## Release 2.2
+
+        05 Jul 01:12
+      
+
+djlastnight
+
+            2.2.0.0
+          
+
+92ab700
+
+ 
+Compare
+
+# 
+        Choose a tag to compare
+      
+
+ 
+
+## Sorry, something went wrong.
+
+ 
+
+        Filter
+
+ Loading
+
+ 
+
+## Sorry, something went wrong.
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+ 
+
+## No results found
+
+ 
+  
+View all tags
+
+ 
+ 
+
+ 
+
+Release 2.2
+
+ (https://github.com/djlastnight/KeyboardSplitterXbox/releases/2.2.0.0)
+Fix for issue #17 (https://github.com/djlastnight/KeyboardSplitterXbox/issues/17)
+
+ 
+Assets
+3
+
+ 
+
+ Loading
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+ 👍
+14
+ nomanisky, Livesi5e, benjidaluz, jhr5138559, PieroDRibos, ndungtse, MetalistPavlenko, Fsmallcold, Lschulzes, szymsun, and 4 more reacted with thumbs up emoji
+ 😄
+3
+ Tuvelout, Lschulzes, and CrispyChicken01 reacted with laugh emoji
+ ❤️
+10
+ Livesi5e, U3mura, jhr5138559, Dinesht04, ndungtse, Tuvelout, pavelacamposp, shafay098, Tnghuy, and Lschulzes reacted with heart emoji
+ 🚀
+1
+ Lschulzes reacted with rocket emoji
+ 👀
+1
+ ingname reacted with eyes emoji
+
+ 
+All reactions
+
+- 
+👍
+14 reactions
+
+- 
+😄
+3 reactions
+
+- 
+❤️
+10 reactions
+
+- 
+🚀
+1 reaction
+
+- 
+👀
+1 reaction
+
+ 21 people reacted
+
+## Release 2.1.0.0
+
+        19 Jun 00:23
+      
+
+djlastnight
+
+            2.1.0.0
+          
+
+0ef9ebb
+
+ 
+Compare
+
+# 
+        Choose a tag to compare
+      
+
+ 
+
+## Sorry, something went wrong.
+
+ 
+
+        Filter
+
+ Loading
+
+ 
+
+## Sorry, something went wrong.
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+ 
+
+## No results found
+
+ 
+  
+View all tags
+
+ 
+ 
+
+ 
+
+Release 2.1.0.0
+
+ (https://github.com/djlastnight/KeyboardSplitterXbox/releases/2.1.0.0)
+
+- Added the ability to control the splitter 'block keyboards' and 'block mice' from any Splitter Game.
+
+- Added the ability to specify arguments to splitter game executable.
+
+- Windows® reports that some (game) executable files are being closed right after they are opened.
+It's normal, when this executable runs another executable and immediately close itself.
+Game manager will avoid showing useless modal dialogs, which informs the user that the game exe has been closed, when such case is detected. Of course when the user closes such game, he/she won't be notified for that and he/she have to stop the emulation manually.
+
+ 
+Assets
+3
+
+ 
+
+ Loading
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+ 
+All reactions
+
+ 
+
+## Release 2.0.0.4
+
+        15 Jun 13:44
+      
+
+djlastnight
+
+            2.0.0.4
+          
+
+2c6054e
+
+ 
+Compare
+
+# 
+        Choose a tag to compare
+      
+
+ 
+
+## Sorry, something went wrong.
+
+ 
+
+        Filter
+
+ Loading
+
+ 
+
+## Sorry, something went wrong.
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+ 
+
+## No results found
+
+ 
+  
+View all tags
+
+ 
+ 
+
+ 
+
+Release 2.0.0.4
+
+Fixed issue #15 (https://github.com/djlastnight/KeyboardSplitterXbox/issues/15) (Cannot delete a preset)
+Thanks to @Rex000 (https://github.com/Rex000) for reporting it.
+Keyboard.Splitter.2.0.0.4.zip (https://github.com/djlastnight/KeyboardSplitterXbox/files/3293143/Keyboard.Splitter.2.0.0.4.zip)
+
+ 
+Assets
+2
+
+ 
+
+ Loading
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+ 
+All reactions
+
+ 
+
+## Release 2.0 beta RC1
+
+        05 Oct 10:43
+      
+
+djlastnight
+
+            2.0.0.3
+          
+
+61548bb
+
+ 
+Compare
+
+# 
+        Choose a tag to compare
+      
+
+ 
+
+## Sorry, something went wrong.
+
+ 
+
+        Filter
+
+ Loading
+
+ 
+
+## Sorry, something went wrong.
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+ 
+
+## No results found
+
+ 
+  
+View all tags
+
+ 
+ 
+
+ 
+
+Release 2.0 beta RC1
+
+ (https://github.com/djlastnight/KeyboardSplitterXbox/releases/2.0.0.3)
+
+This release has absolutely new core. It improves the code readability and maintainability.
+
+Main features added:
+-Better Windows 10 support (some users had problems with native modules loading)
+-Mice support (allows you to use keyboards and mice for each slot)
+-User settings (allows you to change various app settings)
+-Game manager (allows you to save slot states and run specific game)
+-Preset manager (allows you to import/export presets)
+-Xinput controller tester (allows you to test virtual and real xinput controllers)
+-Controller subtype patcher (allows you to change real and virtual xinput controllers subtype to guitar in example)
+
+Known bugs: Mouse resizing is slow.
+
+ 
+Assets
+3
+
+ 
+
+ Loading
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+ 
+All reactions
+
+ 
+
+## Added support for manual mouse input
+
+        09 May 10:30
+      
+
+djlastnight
+
+            1.2.0.2
+          
+
+5c9aa2a
+
+ 
+Compare
+
+# 
+        Choose a tag to compare
+      
+
+ 
+
+## Sorry, something went wrong.
+
+ 
+
+        Filter
+
+ Loading
+
+ 
+
+## Sorry, something went wrong.
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+ 
+
+## No results found
+
+ 
+  
+View all tags
+
+ 
+ 
+
+ 
+
+Added support for manual mouse input
+
+ (https://github.com/djlastnight/KeyboardSplitterXbox/releases/1.2.0.2)
+
+ 
+Assets
+3
+
+ 
+
+ Loading
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+ 
+All reactions
+
+ 
+
+## Keyboard Splitter First Public Release
+
+        23 Aug 19:46
+      
+
+djlastnight
+
+            1.2.0.0
+          
+
+57bcf0d
+
+ 
+Compare
+
+# 
+        Choose a tag to compare
+      
+
+ 
+
+## Sorry, something went wrong.
+
+ 
+
+        Filter
+
+ Loading
+
+ 
+
+## Sorry, something went wrong.
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+ 
+
+## No results found
+
+ 
+  
+View all tags
+
+ 
+ 
+
+ 
+
+Keyboard Splitter First Public Release
+
+ (https://github.com/djlastnight/KeyboardSplitterXbox/releases/1.2.0.0)
+
+ 
+Assets
+3
+
+ 
+
+ Loading
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+ ❤️
+1
+ Musaka96 reacted with heart emoji
+
+ 
+All reactions
+
+- 
+❤️
+1 reaction
+
+ 1 person reacted
+
+    You can’t perform that action at this time.

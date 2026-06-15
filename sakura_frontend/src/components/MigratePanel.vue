@@ -46,7 +46,7 @@
 </template>
 
 <script>
-import api from '../api.js'
+import api from '../api'
 
 export default {
   data() {
@@ -108,16 +108,16 @@ export default {
 <style scoped>
 .migrate-panel { padding: 8px; }
 .section { margin-bottom: 16px; }
-.section h4 { margin: 0 0 6px 0; color: var(--p); font-size: 14px; }
-.desc { font-size: 12px; color: var(--tc2); margin: 0 0 10px 0; }
-hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
-.btn-primary { width: 100%; padding: 10px; background: var(--p); border: none; border-radius: 8px; color: #fff; cursor: pointer; font-size: 14px; }
+.section h4 { margin: 0 0 6px 0; color: var(--accent-primary); font-size: 14px; }
+.desc { font-size: 12px; color: var(--text-secondary); margin: 0 0 10px 0; }
+hr { border: none; border-top: 1px solid var(--border-default); margin: 12px 0; }
+.btn-primary { width: 100%; padding: 10px; background: var(--accent-primary); border: none; border-radius: 8px; color: #fff; cursor: pointer; font-size: 14px; }
 .btn-primary:disabled { opacity: .5; cursor: wait; }
 .result { margin-top: 8px; padding: 8px; border-radius: 6px; font-size: 13px; }
 .result.ok { background: #4caf5022; color: #4caf50; }
 .result.error { background: #e74c3c22; color: #e74c3c; }
-.restored-detail { margin-top: 6px; font-size: 11px; color: var(--tc2); }
+.restored-detail { margin-top: 6px; font-size: 11px; color: var(--text-secondary); }
 .restored-detail div { padding: 2px 0; }
-ul { font-size: 12px; color: var(--tc2); padding-left: 16px; }
+ul { font-size: 12px; color: var(--text-secondary); padding-left: 16px; }
 ul li { margin-bottom: 3px; }
 </style>

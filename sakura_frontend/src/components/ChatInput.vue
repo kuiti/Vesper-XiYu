@@ -27,7 +27,7 @@ export default {
   emits: ['update:input', 'send', 'clear-quote'],
   data() { return { text: '', showEmoji: false, placeholderText: '输入消息…', _placeIdx: 0 } },
   watch: { input(v) { if (v !== undefined && v !== this.text) this.text = v } },
-  created() { this.text = this.input || ''; this._placeTimer = setInterval(() => { const tips = ['输入消息…', '比如：提醒我明天9点开会', '随便聊聊也行～', '可以问天气、记待办、设提醒']; this._placeIdx = (this._placeIdx + 1) % tips.length; this.placeholderText = tips[this._placeIdx] }, 5000) },
+  created() { this.text = this.input || ''; this._placeTimer = setInterval(() => { const tips = ['输入消息…', '比如：提醒我明天9点开会', '设待办：买牛奶', '记笔记：项目思路', '倒计时：春节30天', '帮我回顾上周聊天', '可以问天气、查记忆']; this._placeIdx = (this._placeIdx + 1) % tips.length; this.placeholderText = tips[this._placeIdx] }, 5000) },
   beforeUnmount() { if (this._placeTimer) { clearInterval(this._placeTimer); this._placeTimer = null } },
   methods: {
     send() { const msg = this.text.trim(); if (!msg) return; this.$emit('send', msg); this.text = ''; this.showEmoji = false },
@@ -39,25 +39,25 @@ export default {
 </script>
 
 <style scoped>
-.chat-input-area { padding: 10px 16px 8px; border-top: 1px solid var(--border); background: var(--cb); }
+.chat-input-area { padding: 10px 16px 8px; border-top: 1px solid var(--border-default); background: var(--surface-chat); }
 .quick-bar { display: flex; gap: 6px; padding-bottom: 6px; flex-wrap: wrap; }
-.qp-chip { padding: 3px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 14px; font-size: 11px; color: var(--tc2); cursor: pointer; }
-.qp-chip:hover { background: var(--p); color: #fff; border-color: var(--p); }
-.quote-bar { display: flex; align-items: center; gap: 8px; padding: 4px 10px; background: rgba(255,255,255,.03); border-left: 2px solid var(--p); border-radius: 4px; margin-bottom: 6px; font-size: 12px; }
-.quote-preview { flex: 1; color: var(--tc2); }
-.quote-close { background: none; border: none; color: var(--tc2); cursor: pointer; font-size: 14px; }
+.qp-chip { padding: 3px 10px; background: rgba(255,255,255,.04); border: 1px solid var(--border-default); border-radius: 14px; font-size: 11px; color: var(--text-secondary); cursor: pointer; }
+.qp-chip:hover { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
+.quote-bar { display: flex; align-items: center; gap: 8px; padding: 4px 10px; background: rgba(255,255,255,.03); border-left: 2px solid var(--accent-primary); border-radius: 4px; margin-bottom: 6px; font-size: 12px; }
+.quote-preview { flex: 1; color: var(--text-secondary); }
+.quote-close { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 14px; }
 .input-row { display: flex; align-items: flex-end; gap: 8px; position: relative; }
-.emoji-btn { background: none; border: 1px solid var(--border); border-radius: 4px; color: var(--tc2); font-size: 14px; padding: 6px 8px; cursor: pointer; }
+.emoji-btn { background: none; border: 1px solid var(--border-default); border-radius: 4px; color: var(--text-secondary); font-size: 14px; padding: 6px 8px; cursor: pointer; }
 .emoji-btn:hover { background: rgba(255,255,255,.04); }
-.emoji-picker { position: absolute; bottom: 44px; left: 0; background: var(--sb); border: 1px solid var(--border); border-radius: 6px; padding: 8px; display: flex; flex-wrap: wrap; gap: 4px; width: 260px; z-index: 100; }
-.emoji-item { font-size: 13px; padding: 4px 6px; cursor: pointer; border-radius: 4px; color: var(--tc); }
+.emoji-picker { position: absolute; bottom: 44px; left: 0; background: var(--surface-sidebar); border: 1px solid var(--border-default); border-radius: 6px; padding: 8px; display: flex; flex-wrap: wrap; gap: 4px; width: 260px; z-index: 100; }
+.emoji-item { font-size: 13px; padding: 4px 6px; cursor: pointer; border-radius: 4px; color: var(--text-primary); }
 .emoji-item:hover { background: rgba(255,255,255,.06); }
-.chat-input { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--tc); font-size: 14px; resize: none; outline: none; font-family: inherit; line-height: 1.5; }
-.chat-input:focus { border-color: var(--p); }
-.send-btn { padding: 8px 20px; background: var(--p); color: #fff; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.chat-input { flex: 1; padding: 8px 12px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--surface-app); color: var(--text-primary); font-size: 14px; resize: none; outline: none; font-family: inherit; line-height: 1.5; }
+.chat-input:focus { border-color: var(--accent-primary); }
+.send-btn { padding: 8px 20px; background: var(--accent-primary); color: #fff; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
 .send-btn:disabled { opacity: .4; cursor: default; }
 .send-btn:not(:disabled):hover { filter: brightness(1.1); }
-.input-hint { text-align: center; font-size: 10px; color: var(--tc2); padding-top: 4px; opacity: .5; }
+.input-hint { text-align: center; font-size: 10px; color: var(--text-secondary); padding-top: 4px; opacity: .5; }
 
 /* 移动端适配 */
 @media (max-width: 768px) {

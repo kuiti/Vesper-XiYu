@@ -1,0 +1,299 @@
+GitHub - SillyTavern/SillyTavern: LLM Frontend for Power Users. · GitHub
+
+Skip to content
+
+You signed in with another tab or window. Reload to refresh your session.
+You signed out in another tab or window. Reload to refresh your session.
+You switched accounts on another tab or window. Reload to refresh your session.
+ 
+
+Dismiss alert
+
+        SillyTavern
+ 
+/
+
+SillyTavern
+
+Public
+
+- 
+ 
+
+Notifications
+ You must be signed in to change notification settings
+
+- 
+ 
+
+Fork
+    5.6k
+
+- 
+
+ 
+
+          Star
+ 29.5k
+
+    releaseBranchesTagsGo to fileCodeOpen more actions menu
+## Folders and files
+NameNameLast commit messageLast commit date
+## Latest commit
+ 
+## History
+11,718 Commits11,718 Commits.gemini.gemini  .github.github  .vscode.vscode  backupsbackups  colabcolab  datadata  defaultdefault  dockerdocker  pluginsplugins  publicpublic  srcsrc  teststests  .dockerignore.dockerignore  .editorconfig.editorconfig  .eslintrc.cjs.eslintrc.cjs  .gitignore.gitignore  .nomedia.nomedia  .npmignore.npmignore  .npmrc.npmrc  .replit.replit  CONTRIBUTING.mdCONTRIBUTING.md  DockerfileDockerfile  LICENSELICENSE  README.mdREADME.md  Remote-Link.cmdRemote-Link.cmd  SECURITY.mdSECURITY.md  Start.batStart.bat  Update-Instructions.txtUpdate-Instructions.txt  UpdateAndStart.batUpdateAndStart.bat  UpdateForkAndStart.batUpdateForkAndStart.bat  index.d.tsindex.d.ts  jsconfig.jsonjsconfig.json  package-lock.jsonpackage-lock.json  package.jsonpackage.json  plugins.jsplugins.js  recover.jsrecover.js  replit.nixreplit.nix  server.jsserver.js  start.shstart.sh  webpack.config.jswebpack.config.js  View all files
+## Repository files navigation
+
+ (https://private-user-images.githubusercontent.com/18619528/369641394-01a6ae9a-16aa-45f2-8bff-32b5dc587e44.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3ODE1OTQzODYsIm5iZiI6MTc4MTU5NDA4NiwicGF0aCI6Ii8xODYxOTUyOC8zNjk2NDEzOTQtMDFhNmFlOWEtMTZhYS00NWYyLThiZmYtMzJiNWRjNTg3ZTQ0LnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjA2MTYlMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwNjE2VDA3MTQ0NlomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTEzNzA2ZjQ3ZGNmNzU2YzhjYWQ5ZmRkYzU3OTg3ODc5MTg1NjMwYWNjYTliOGY3NDA4M2IzNGI3NTRiODkzNTImWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0JnJlc3BvbnNlLWNvbnRlbnQtdHlwZT1pbWFnZSUyRnBuZyJ9.pVFI21UU-CV7MjFKvI4uHnRo6lSVH-kiX6lm_aR_Flo)
+
+English | German | 中文 | 繁體中文 | 日本語 | Русский | 한국어
+
+ (https://github.com/SillyTavern/SillyTavern/stargazers)
+ (https://github.com/SillyTavern/SillyTavern/forks)
+ (https://github.com/SillyTavern/SillyTavern/issues)
+ (https://github.com/SillyTavern/SillyTavern/pulls)
+
+SillyTavern provides a single unified interface for many LLM APIs (KoboldAI/CPP, Horde, NovelAI, Ooba, Tabby, OpenAI, OpenRouter, Claude, Mistral and more), a mobile-friendly layout, Visual Novel Mode, Automatic1111 & ComfyUI API image generation integration, TTS, WorldInfo (lorebooks), customizable UI, auto-translate, more prompt options than you'd ever want or need, and endless growth potential via third-party extensions.
+
+We have a Documentation website (https://docs.sillytavern.app/) to answer most of your questions and help you get started.
+
+## What is SillyTavern?
+
+SillyTavern (or ST for short) is a locally installed user interface that allows you to interact with text generation LLMs, image generation engines, and TTS voice models.
+
+Beginning in February 2023 as a fork of TavernAI 1.2.8, SillyTavern now has over 300 contributors and 3 years of independent development under its belt, and continues to serve as a leading software for savvy AI hobbyists.
+
+## Our Vision
+
+- We aim to empower users with as much utility and control over their LLM prompts as possible. The steep learning curve is part of the fun!
+
+- We do not provide any online or hosted services, nor programmatically track any user data.
+
+- SillyTavern is a passion project brought to you by a dedicated community of LLM enthusiasts, and will always be free and open sourced.
+
+## Do I need a powerful PC to run SillyTavern?
+
+The hardware requirements are minimal: it will run on anything that can run NodeJS 20 or higher. If you intend to do LLM inference on your local machine, we recommend a 3000-series NVIDIA graphics card with at least 6GB of VRAM, but actual requirements may vary depending on the model and backend you choose to use.
+
+## Questions or suggestions?
+
+### Discord server
+
+ (https://discord.gg/sillytavern)
+Join our Discord community! (https://discord.gg/sillytavern) Get support, share favorite characters and prompts.
+
+Or get in touch with the developers directly:
+
+- Discord: cohee, rossascends, wolfsblvt
+
+- Reddit: /u/RossAscends (https://www.reddit.com/user/RossAscends/), /u/sillylossy (https://www.reddit.com/user/sillylossy/), u/Wolfsblvt (https://www.reddit.com/user/Wolfsblvt/)
+
+- Post a GitHub issue (https://github.com/SillyTavern/SillyTavern/issues)
+
+### I like your project! How do I contribute?
+
+- Send pull requests. Learn how to contribute: CONTRIBUTING.md
+
+- Send feature suggestions and issue reports using the provided templates.
+
+- Read this entire readme file and check the documentation website first, to avoid sending duplicate issues.
+
+## Screenshots
+
+ (https://private-user-images.githubusercontent.com/18619528/369641642-9b5f32f0-c3b3-4102-b3f5-0e9213c0f50f.jpeg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3ODE1OTQzODYsIm5iZiI6MTc4MTU5NDA4NiwicGF0aCI6Ii8xODYxOTUyOC8zNjk2NDE2NDItOWI1ZjMyZjAtYzNiMy00MTAyLWIzZjUtMGU5MjEzYzBmNTBmLmpwZWc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjYwNjE2JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI2MDYxNlQwNzE0NDZaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1jNDdiYjFiMjkxNDNlNTBiYWQ5NTM2MTljMGJmMjFkZmM5MWY1ODMwNGQ5MDkxY2JhMzYxNjExZTk3ZjAwNGU5JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZyZXNwb25zZS1jb250ZW50LXR5cGU9aW1hZ2UlMkZqcGVnIn0.Zl7Ig4PiSpJXer2a7Z1OGelk80VvXKoB2b-leDJlDII)
+ (https://private-user-images.githubusercontent.com/18619528/369641568-913fdbaa-7d33-42f1-ae2c-89dca41c53d1.jpeg?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3ODE1OTQzODYsIm5iZiI6MTc4MTU5NDA4NiwicGF0aCI6Ii8xODYxOTUyOC8zNjk2NDE1NjgtOTEzZmRiYWEtN2QzMy00MmYxLWFlMmMtODlkY2E0MWM1M2QxLmpwZWc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjYwNjE2JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI2MDYxNlQwNzE0NDZaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT0xYWQ0ZTYzYjQxZDA4YjIyMTE2OGNhYjg1ZWI3MDdkMzVkMDgzYTQ5ZGZlZjFlMzJkNzdkZTliN2ExOWUyOWJkJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCZyZXNwb25zZS1jb250ZW50LXR5cGU9aW1hZ2UlMkZqcGVnIn0.cspJDeU0_S8tOg6ebc0B0aayBOsVRoNNQIC82vI0_jA)
+
+## Installation
+
+For detailed installation instructions, please visit our documentation:
+
+- Windows Installation Guide (https://docs.sillytavern.app/installation/windows/)
+
+- MacOS/Linux Installation Guide (https://docs.sillytavern.app/installation/linuxmacos/)
+
+- Android (Termux) Installation Guide (https://docs.sillytavern.app/installation/android-(termux)/)
+
+- Docker Installation Guide (https://docs.sillytavern.app/installation/docker/)
+
+## License and credits
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+- TavernAI (https://github.com/TavernAI/TavernAI) 1.2.8 by Humi: MIT License
+
+- Portions of CncAnon's TavernAITurbo mod used with permission
+
+- Visual Novel Mode inspired by the work of PepperTaco (https://github.com/peppertaco/Tavern/ (https://github.com/peppertaco/Tavern/))
+
+- Noto Sans font by Google (OFL license)
+
+- Lexer/Parser by Chevrotain (Apache-2.0 license) https://github.com/chevrotain/chevrotain (https://github.com/chevrotain/chevrotain)
+
+- Icon theme by Font Awesome https://fontawesome.com (https://fontawesome.com) (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License)
+
+- Default content by @OtisAlejandro (Seraphina character and lorebook) and @kallmeflocc (10K Discord Users Celebratory Background)
+
+- Docker guide by @mrguymiah (https://github.com/mrguymiah) and @Bronya-Rand (https://github.com/Bronya-Rand)
+
+- kokoro-js library by @hexgrad (https://github.com/hexgrad) (Apache-2.0 License)
+
+## Top Contributors
+
+ (https://github.com/SillyTavern/SillyTavern/graphs/contributors)
+
+## About
+
+        LLM Frontend for Power Users.
+      
+
+sillytavern.app (https://sillytavern.app)
+
+### Topics
+
+  chat
+
+  ai
+
+  llm
+
+### Resources
+
+        Readme
+ 
+
+### License
+
+     AGPL-3.0 license
+    
+
+### Contributing
+
+        Contributing
+      
+
+### Security policy
+
+        Security policy
+      
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+Activity 
+
+Custom properties 
+
+### Stars
+
+29.5k
+        stars 
+
+### Watchers
+
+137
+        watching 
+
+### Forks
+
+5.6k
+        forks 
+
+          Report repository
+ 
+
+## 
+Releases
+      102
+
+1.18.0
+
+          Latest
+ 
+May 3, 2026
+
+ 
++ 101 releases
+
+## 
+Packages
+      0
+
+ 
+
+ 
+
+ 
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+## 
+Contributors 
+
+- 
+
+- 
+
+- 
+
+###         Uh oh!
+
+ There was an error while loading. Please reload this page.
+
+ 
+ 
+
+## Languages
+
+- 
+
+JavaScript
+86.2%
+
+- 
+
+HTML
+9.9%
+
+- 
+
+CSS
+3.4%
+
+- 
+
+Less
+0.3%
+
+- 
+
+Jupyter Notebook
+0.1%
+
+- 
+
+Batchfile
+0.1%
+
+   
+
+    You can’t perform that action at this time.

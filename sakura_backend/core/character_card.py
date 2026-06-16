@@ -234,7 +234,6 @@ class CharacterCard:
         sakura["tone"] = (get_config("personality", {}) or {}).get("tone", "冷静")
         sakura["foundation_type"] = self._get_bg_field("foundation_type", "空白")
         sakura["foundation"] = self._get_bg_field("foundation", "")
-        sakura["taboos"] = self._get_bg_field("taboos", [])
         sakura["background"] = self._get_bg_field("legacy", {}) or self._get_bg_field("role", {})
         # 好感/信任
         try:
@@ -263,7 +262,6 @@ class CharacterCard:
             "post_history_instructions": self.data.get("post_history_instructions", ""),
             "creator_notes": self.data.get("creator_notes", ""),
             "tags": self.data.get("tags", []),
-            "taboos": sakura.get("taboos", []),
             "foundation": sakura.get("foundation", ""),
         }, ensure_ascii=False)
         set_config("_character_card_extra", extra_fields)
@@ -278,8 +276,6 @@ class CharacterCard:
             bg["foundation_type"] = sakura["foundation_type"]
         if sakura.get("foundation"):
             bg["foundation"] = sakura["foundation"]
-        if sakura.get("taboos"):
-            bg["taboos"] = sakura["taboos"]
         if sakura.get("background"):
             for k, v in sakura["background"].items():
                 if isinstance(v, str) and v:
@@ -341,45 +337,4 @@ class CharacterCard:
             cursor.execute("DELETE FROM characters WHERE name = ?", (card_name,))
 
 
-# ─── Prompt 注入 ───
 
-def get_active_card_prompt_block() -> str:
-    """构建当前激活的角色卡的 prompt 注入块。
-    返回空字符串表示无角色卡或字段为空。
-    """
-    card_name = get_config("_active_character_card", "")
-    if not card_name:
-        return ""
-    extra_raw = get_config("_character_card_extra", "{}")
-    try:
-        extra = json.loads(extra_raw) if isinstance(extra_raw, str) else extra_raw
-    except Exception:
-        return ""
-
-    parts = []
-    if extra.get("description"):
-        parts.append(f"【角色描述】{extra['description']}")
-    if extra.get("personality"):
-        parts.append(f"【性格】{extra['personality']}")
-    if extra.get("scenario"):
-        parts.append(f"【场景设定】{extra['scenario']}")
-    taboos = extra.get("taboos", [])
-    if taboos:
-        parts.append(f"【禁忌话题】{'、'.join(taboos if isinstance(taboos, list) else [taboos])}")
-    if extra.get("foundation"):
-        parts.append(f"【关系基础】{extra['foundation']}")
-    if extra.get("post_history_instructions"):
-        parts.append(f"【回复指引】{extra['post_history_instructions']}")
-
-    # mes_example 太长时只取头尾
-    mes = extra.get("mes_example", "")
-    if mes:
-        lines = mes.strip().split("\n")
-        if len(lines) > 12:
-            mes = "\n".join(lines[:6]) + "\n……（中间省略）……\n" + "\n".join(lines[-4:])
-        parts.append(f"【对话示例】\n{mes}")
-
-    if not parts:
-        return ""
-
-    return f"\n——角色卡「{card_name}」设定——\n" + "\n".join(parts)

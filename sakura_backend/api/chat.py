@@ -586,10 +586,8 @@ async def chat_websocket(websocket: WebSocket):
                 elif intent_type == "search" and intent_data:
                     user_message = f"（搜到了这些：{intent_data}）\n\n{user_message}"
 
-                # 添加时间上下文
-                now = datetime.now()
-                time_context = f"（当前时间：{now.strftime('%Y-%m-%d %H:%M')}）"
-                messages.append({"role": "user", "content": f"{time_context}\n{user_message}"})
+                # 添加用户消息（动态上下文已包含时间信息）
+                messages.append({"role": "user", "content": user_message})
 
                 # 事实型意图用低温(0.3)减少幻觉，创意对话用高温(0.65)增加变化
                 tool_temp = 0.3 if intent_type in ("weather", "location", "search") else 0.5
@@ -610,22 +608,34 @@ async def chat_websocket(websocket: WebSocket):
                     assistant_content = ""
                     token_queue = asyncio.Queue()
                     loop = asyncio.get_running_loop()
+                    _stream_stop = threading.Event()
 
                     def _stream_request():
-                        """在线程中执行流式请求，逐 chunk 放入队列（使用 LLMProvider）"""
+                        """在线程中执行流式请求，逐 chunk 放入队列"""
+                        gen = None
                         try:
-                            for chunk in provider.chat_stream(
+                            gen = provider.chat_stream(
                                 messages,
                                 temperature=tool_temp,
                                 max_tokens=2000,
                                 tools=OPENAI_TOOLS,
                                 tool_choice="auto",
                                 **extra_kwargs,
-                            ):
+                            )
+                            for chunk in gen:
+                                if _stream_stop.is_set():
+                                    break
                                 asyncio.run_coroutine_threadsafe(token_queue.put(chunk), loop)
                         except Exception as e:
                             asyncio.run_coroutine_threadsafe(token_queue.put({"type": "error", "data": str(e)}), loop)
                         finally:
+                            if gen is not None:
+                                try:
+                                    gen.close()
+                                except (RuntimeError, StopIteration, GeneratorExit):
+                                    pass
+                                except Exception:
+                                    pass
                             asyncio.run_coroutine_threadsafe(token_queue.put({"type": "_eos"}), loop)
 
                     threading.Thread(target=_stream_request, daemon=True).start()
@@ -634,25 +644,26 @@ async def chat_websocket(websocket: WebSocket):
                     fallback_triggered = False
                     tool_calls_buffer = []
 
-                    while True:
-                        try:
-                            chunk = await asyncio.wait_for(token_queue.get(), timeout=90)
-                        except asyncio.TimeoutError:
-                            print("[流式] token_queue 超时，强制结束")
-                            break
+                    try:
+                        while True:
+                            try:
+                                chunk = await asyncio.wait_for(token_queue.get(), timeout=90)
+                            except asyncio.TimeoutError:
+                                print("[流式] token_queue 超时，强制结束")
+                                break
 
-                        # 流结束
-                        if chunk["type"] == "_eos":
-                            if parser:
-                                if not fallback_triggered and parser.state == "thinking" and parser.buffer:
-                                    print("[ThinkingParser] 流结束仍未找到【回复】，智能提取")
-                                    reply = parser.extract_reply_from_buffer()
-                                    if reply:
-                                        await websocket.send_text(json.dumps({"type": "token", "content": reply}))
-                            break
+                            # 流结束
+                            if chunk["type"] == "_eos":
+                                if parser:
+                                    if not fallback_triggered and parser.state == "thinking" and parser.buffer:
+                                        print("[ThinkingParser] 流结束仍未找到【回复】，智能提取")
+                                        reply = parser.extract_reply_from_buffer()
+                                        if reply:
+                                            await websocket.send_text(json.dumps({"type": "token", "content": reply}))
+                                break
 
-                        if chunk["type"] == "error":
-                            raise Exception(chunk["data"])
+                            if chunk["type"] == "error":
+                                raise Exception(chunk["data"])
 
                         # tool_calls（provider 已累积完成，直接赋值）
                         if chunk["type"] == "tool_calls":
@@ -688,6 +699,8 @@ async def chat_websocket(websocket: WebSocket):
                             reply = parser.extract_reply_from_buffer()
                             if reply:
                                 await websocket.send_text(json.dumps({"type": "token", "content": reply}))
+                    finally:
+                        _stream_stop.set()
 
                     # ─── DSML 格式工具调用检测（DeepSeek 文本输出兜底）───
                     if not tool_calls_buffer and not _is_system:
@@ -755,6 +768,7 @@ async def chat_websocket(websocket: WebSocket):
                             await websocket.send_text(json.dumps({"type": "token", "content": assistant_content}))
                         # 发送完成信号
                         await websocket.send_text(json.dumps({"type": "done"}))
+                        set_config("_dropped_context", "")
                         # 保存消息（拆句保存）
                         if assistant_content:
                             sentences = fallback_split(assistant_content)
@@ -842,6 +856,8 @@ async def chat_websocket(websocket: WebSocket):
                             print(f"[口嗨检测] AI口嗨了但没有调工具，提示词: {original_user_message[:50]}")
 
                     await websocket.send_text(json.dumps({"type": "done", "_system": _is_system}))
+                    # LLM 回复成功，清理 dropped_context（DroppedContextPipe 只读不删）
+                    set_config("_dropped_context", "")
                     if _is_system and assistant_content:
                         await websocket.send_text(json.dumps({"type": "toast", "content": assistant_content.strip()[:120]}))
 
@@ -911,6 +927,10 @@ async def chat_websocket(websocket: WebSocket):
                     err_msg = "生成回复失败，请稍后重试" if full_reply else "AI 服务请求失败，请稍后重试"
                     await websocket.send_text(json.dumps({"type": "error", "content": err_msg}))
             except Exception as e:
+                # generator cleanup 警告不影响用户体验，静默处理
+                if "generator didn't stop after throw" in str(e):
+                    print(f"[WS] generator cleanup 警告（已忽略）: {e}")
+                    continue
                 import traceback
                 print(f"消息处理异常: {traceback.format_exc()}")
                 await websocket.send_text(json.dumps({"type": "error", "content": f"出错: {e}"}))

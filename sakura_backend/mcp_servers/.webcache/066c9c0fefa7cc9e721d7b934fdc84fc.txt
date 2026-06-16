@@ -1,0 +1,236 @@
+Text Generation System | SillyTavern/SillyTavern | DeepWikiLoading...Index your code with DevinDeepWikiDeepWikiSillyTavern/SillyTavern  (https://github.com/SillyTavern/SillyTavern)
+Index your code withDevinEdit WikiShareLoading...Last indexed: 13 May 2026 (51ad27 (https://github.com/SillyTavern/SillyTavern/commits/51ad27fb))
+- SillyTavern Overview
+- Installation and Setup
+- System Dependencies and Libraries
+- Core Architecture
+- Application Lifecycle and Initialization
+- Server Architecture and Routing
+- Event System and Module Communication
+- Client-Server Data Flow
+- Authentication and Security
+- AI Integration
+- Chat Completion System
+- Text Generation System
+- Prompt Assembly Pipeline
+- Tokenization and Token Management
+- Tool Calling and Function Execution
+- Streaming and Response Processing
+- Preset and Sampler Management
+- Reasoning Display System
+- User Interface
+- Main UI Components and Layout
+- Tags, Filtering, and Organization
+- Personas and User Identity
+- Backgrounds and Theming
+- Localization and Internationalization
+- Accessibility and Keyboard Navigation
+- Data Management
+- Character Management
+- Chat Storage and Persistence
+- Settings and Configuration Management
+- Asset and File Management
+- Caching Architecture
+- Context and Memory Systems
+- World Info System
+- Chat Summarization Extension
+- Vector Storage and RAG System
+- User Interaction Systems
+- Slash Command System
+- Quick Reply System
+- Variables, Macros, and Scripting
+- Extension Framework
+- Extension Architecture and APIs
+- Image Generation Extensions
+- Character Expressions System
+- Visual Novel Mode
+- Image Captioning and Multimodal AI
+- Text-to-Speech Extensions
+- Regex and Translation Extensions
+- Group Chats and Multi-Character Interactions
+- Developer Guide
+- Project Structure and Build System
+- Extension Development Guide
+- Backend API Development
+- Testing Infrastructure
+- GlossaryMenu
+# Text Generation System
+
+Relevant source files
+
+- public/scripts/authors-note.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/authors-note.js)
+
+- public/scripts/cfg-scale.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/cfg-scale.js)
+
+- public/scripts/kai-settings.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/kai-settings.js)
+
+- public/scripts/nai-settings.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/nai-settings.js)
+
+- public/scripts/preset-manager.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/preset-manager.js)
+
+- public/scripts/textgen-models.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-models.js)
+
+- public/scripts/textgen-settings.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js)
+
+- public/scripts/tokenizers.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/tokenizers.js)
+
+- src/endpoints/backends/kobold.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/kobold.js)
+
+- src/endpoints/backends/text-completions.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/text-completions.js)
+
+- src/endpoints/novelai.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/novelai.js)
+
+- src/endpoints/speech.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/speech.js)
+
+- src/endpoints/tokenizers.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/tokenizers.js)
+
+- tests/util.test.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/tests/util.test.js)
+
+## Purpose and Scope
+
+This document covers SillyTavern's text completion system, which supports 15+ self-hosted and commercial backends using the text completion paradigm (prompt → text continuation). This system manages the lifecycle of text generation from configuration and model discovery to payload transformation and streaming response handling.
+
+Text completion backends are characterized by:
+
+- Single prompt string input (managed by the Prompt Assembly Pipeline).
+
+- Direct text continuation output.
+
+- Extensive sampling parameter support (Temperature, Top-P, Min-P, etc.).
+
+- Specialized local inference features (DRY, XTC, Mirostat).
+
+For message-based APIs (OpenAI, Claude, etc.), see the Chat Completion System.
+
+## Backend Architecture
+
+SillyTavern utilizes a proxy architecture where the client communicates with a unified server-side router, which then dispatches requests to specific backend adapters.
+
+### Supported Backend Types
+
+Sources: public/scripts/textgen-settings.js31-47 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L31-L47) src/endpoints/backends/text-completions.js121-150 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/text-completions.js#L121-L150)
+
+### Key Code Entities
+
+EntityLocationRoletextgen_typestextgen-settings.jsEnumeration of all supported text completion backends. public/scripts/textgen-settings.js31-47 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L31-L47)textgenerationwebui_settingstextgen-settings.jsGlobal state object holding active parameters, models, and URLs. public/scripts/textgen-settings.js144-237 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L144-L237)routertext-completions.jsExpress router handling /api/backends/text-completions/* endpoints. src/endpoints/backends/text-completions.js20-21 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/text-completions.js#L20-L21)PresetManagerpreset-manager.jsOrchestrates saving/loading of sampler and template configurations. public/scripts/preset-manager.js111-115 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/preset-manager.js#L111-L115)
+
+## Configuration and Sampler Management
+
+### Sampler Ordering Logic
+
+Different inference engines require specific sampler execution sequences. SillyTavern maintains default orders for major backends.
+
+- llama.cpp: Defined by LLAMACPP_DEFAULT_ORDER including penalties, dry, top_n_sigma, top_k, typ_p, top_p, min_p, xtc, temperature, and adaptive_p. public/scripts/textgen-settings.js67-78 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L67-L78)
+
+- Ooba (text-generation-webui): Defined by OOBA_DEFAULT_ORDER, prioritizing repetition_penalty, dry, and temperature. public/scripts/textgen-settings.js79-101 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L79-L101)
+
+- Aphrodite: Defined by APHRODITE_DEFAULT_ORDER, prioritizing dry, penalties, and no_repeat_ngram. public/scripts/textgen-settings.js102-117 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L102-L117)
+
+- KoboldCpp: Uses a numeric index array KOBOLDCPP_ORDER ([6, 0, 1, 3, 4, 2, 5]). public/scripts/textgen-settings.js143 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L143-L143) public/scripts/kai-settings.js76 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/kai-settings.js#L76-L76)
+
+### Settings Object Structure
+
+The textgenerationwebui_settings object public/scripts/textgen-settings.js144-237 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L144-L237) tracks:
+
+- Sampling: temp, top_p, top_k, top_a, tfs, epsilon_cutoff, eta_cutoff, typical_p, min_p. public/scripts/textgen-settings.js145-154 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L145-L154)
+
+- Penalties: rep_pen, rep_pen_range, rep_pen_decay, rep_pen_slope, no_repeat_ngram_size, penalty_alpha, freq_pen, presence_pen. public/scripts/textgen-settings.js155-166 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L155-L166)
+
+- Advanced: xtc_threshold, xtc_probability, mirostat_mode, dynatemp, smoothing_factor, dry_multiplier, dry_base. public/scripts/textgen-settings.js170-178 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L170-L178) public/scripts/textgen-settings.js228-229 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L228-L229)
+
+- Backend State: type, server_urls, and provider-specific model strings (e.g., mancer_model, ollama_model, openrouter_model). public/scripts/textgen-settings.js208-220 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L208-L220)
+
+Sources: public/scripts/textgen-settings.js67-237 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/textgen-settings.js#L67-L237)
+
+## Data Flow: Request Pipeline
+
+The following diagram bridges the Natural Language space (Prompt) to the Code Entity space (API Routes and Backend Handlers).
+
+Sources: src/endpoints/backends/text-completions.js100-232 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/text-completions.js#L100-L232) src/endpoints/backends/text-completions.js272-432 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/text-completions.js#L272-L432) src/endpoints/backends/text-completions.js29-72 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/text-completions.js#L29-L72)
+
+## Backend-Specific Implementations
+
+### Ollama Integration
+
+Ollama requires specialized handling due to its unique API structure.
+
+- Model Discovery: Uses /api/tags instead of the standard /v1/models. src/endpoints/backends/text-completions.js146-147 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/text-completions.js#L146-L147)
+
+- Streaming: Implements parseOllamaStream to manually parse non-standard JSON chunks into valid Server-Sent Events (SSE). src/endpoints/backends/text-completions.js29-72 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/text-completions.js#L29-L72)
+
+- Multimodal: Supports image captioning via the /api/generate endpoint with an images array. src/endpoints/backends/text-completions.js476-518 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/text-completions.js#L476-L518)
+
+### KoboldCpp and AI Horde
+
+- Status: Checked via native /v1/info/version or /extra/version. src/endpoints/backends/kobold.js163-172 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/kobold.js#L163-L172)
+
+- Abortion: Implements abortKoboldCppRequest (server-side) and local listeners in kobold.js which send a POST to /extra/abort when a generation is cancelled by the user. src/endpoints/backends/text-completions.js80-97 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/text-completions.js#L80-L97) src/endpoints/backends/kobold.js21-38 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/kobold.js#L21-L38)
+
+- Data Construction: getKoboldGenerationData assembles the payload, including stop_sequence, sampler_order, and version-dependent flags like can_use_min_p. public/scripts/kai-settings.js174-213 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/kai-settings.js#L174-L213)
+
+### NovelAI (NAI)
+
+NovelAI is treated as a distinct text completion provider with its own subscription and tier logic.
+
+- Subscription: Fetches tier data from /user/subscription via loadNovelSubscriptionData to determine context limits. src/endpoints/novelai.js133-166 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/novelai.js#L133-L166) public/scripts/nai-settings.js162-175 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/nai-settings.js#L162-L175)
+
+- Max Context: Dynamically calculated based on tier (e.g., Opus tier grants 8192 tokens for Kayra). public/scripts/nai-settings.js92-103 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/nai-settings.js#L92-L103)
+
+- Bad Words: Maintains specialized lists like eratoBadWordsList and hypeBotBadWordsList to prevent undesirable token generation. src/endpoints/novelai.js20-47 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/novelai.js#L20-L47) src/endpoints/novelai.js75-92 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/novelai.js#L75-L92)
+
+Sources: src/endpoints/backends/text-completions.js29-97 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/text-completions.js#L29-L97) src/endpoints/novelai.js133-166 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/novelai.js#L133-L166) public/scripts/nai-settings.js92-103 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/nai-settings.js#L92-L103) src/endpoints/backends/kobold.js21-38 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/kobold.js#L21-L38)
+
+## Tokenization and Token Management
+
+### Local and Remote Tokenizers
+
+SillyTavern supports both local (client-side and server-side) and remote (API-side) tokenization.
+
+- Local Tokenizers: Includes GPT2, OpenAI (Tiktoken), Llama (SentencePiece), Mistral, and others. public/scripts/tokenizers.js16-38 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/tokenizers.js#L16-L38)
+
+- Server-side Execution: The src/endpoints/tokenizers.js file handles intensive tokenization tasks using @agnai/web-tokenizers and tiktoken. src/endpoints/tokenizers.js11-13 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/tokenizers.js#L11-L13)
+
+- Remote Tokenization: Probes for support via backend-specific endpoints (e.g., Ooba internal info). src/endpoints/backends/text-completions.js190-201 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/text-completions.js#L190-L201)
+
+### Tokenizer Caching
+
+To improve performance, token counts are cached in an objectStore (via localforage) under the name SillyTavern_ChatCompletions. public/scripts/tokenizers.js157-159 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/tokenizers.js#L157-L159)
+
+- Loading: loadTokenCache() retrieves cached counts on initialization. public/scripts/tokenizers.js171-179 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/tokenizers.js#L171-L179)
+
+- Saving: saveTokenCache() persists the tokenCache object. public/scripts/tokenizers.js181-189 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/tokenizers.js#L181-L189)
+
+Sources: public/scripts/tokenizers.js16-189 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/tokenizers.js#L16-L189) src/endpoints/tokenizers.js1-13 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/tokenizers.js#L1-L13) src/endpoints/backends/text-completions.js190-201 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/text-completions.js#L190-L201)
+
+## Authors Note and Floating Prompts
+
+The system supports "floating" prompt injections through the Authors Note system.
+
+- Metadata: Uses keys like note_prompt, note_depth, and note_role to store settings per chat. public/scripts/authors-note.js30-36 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/authors-note.js#L30-L36)
+
+- Injection Depth: Managed by onExtensionFloatingDepthInput, which ensures the depth is a positive integer. public/scripts/authors-note.js149-160 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/authors-note.js#L149-L160)
+
+- Token Counting: Dynamically updates token counters for main, character, and default notes using getTokenCountAsync. public/scripts/authors-note.js132-134 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/authors-note.js#L132-L134)
+
+Sources: public/scripts/authors-note.js30-160 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/authors-note.js#L30-L160)
+DismissRefresh this wiki
+Enter email to refresh
+### On this page
+
+- Text Generation System
+- Purpose and Scope
+- Backend Architecture
+- Supported Backend Types
+- Key Code Entities
+- Configuration and Sampler Management
+- Sampler Ordering Logic
+- Settings Object Structure
+- Data Flow: Request Pipeline
+- Backend-Specific Implementations
+- Ollama Integration
+- KoboldCpp and AI Horde
+- NovelAI (NAI)
+- Tokenization and Token Management
+- Local and Remote Tokenizers
+- Tokenizer Caching
+- Authors Note and Floating Prompts

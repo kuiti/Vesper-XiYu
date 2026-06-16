@@ -125,14 +125,16 @@ def search_similar(query: str, top_k: int = 3, include_metadata: bool = False):
             tokenized_query = _tokenize(query)
             bm25_scores = bm25.get_scores(tokenized_query)
             bm25_max = max(bm25_scores) if len(bm25_scores) > 0 and max(bm25_scores) > 0 else 1
+            # 预构建 doc->idx 映射，避免 O(n) 线性查找
+            _doc_to_idx = {}
+            if _bm25_mod._bm25_docs:
+                for _i, _d in enumerate(_bm25_mod._bm25_docs):
+                    _doc_to_idx[_d] = _i
             scored = []
             for doc, dist, meta, emb in candidates:
                 cos_score = 1.0 - dist  # ChromaDB cosine space: dist = 1 - cos_sim
-                try:
-                    idx = _bm25_mod._bm25_docs.index(doc) if _bm25_mod._bm25_docs else -1
-                    bm25_norm = (bm25_scores[idx] / bm25_max) if idx >= 0 and idx < len(bm25_scores) else 0
-                except (ValueError, IndexError):
-                    bm25_norm = 0
+                idx = _doc_to_idx.get(doc, -1)
+                bm25_norm = (bm25_scores[idx] / bm25_max) if idx >= 0 and idx < len(bm25_scores) else 0
 
                 # 时效性分数（指数衰减）
                 recency_score = 1.0

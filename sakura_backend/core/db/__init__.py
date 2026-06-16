@@ -4,6 +4,7 @@
 import sqlite3
 import json
 import threading
+import time
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 import os
@@ -15,12 +16,11 @@ DB_FILE = os.path.join("data", "sakura.db")
 
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=10)
     conn.row_factory = sqlite3.Row
-    # WAL 模式支持 WebSocket 线程并发读写不互锁
     conn.execute("PRAGMA journal_mode=WAL")
-    # busy_timeout=3000：写锁等待最多 3 秒再放弃，避免并发写入立即报错
-    conn.execute("PRAGMA busy_timeout=3000")
+    conn.execute("PRAGMA busy_timeout=10000")
+    conn.execute("PRAGMA synchronous=NORMAL")
     return conn
 
 
@@ -368,6 +368,23 @@ def _init_db_locked():
                 cursor.execute("REPLACE INTO presets (name, data) VALUES (?, ?)",
                               (name, json.dumps(data, ensure_ascii=False)))
             cursor.execute("INSERT OR IGNORE INTO config (key, value) VALUES ('_default_presets_seeded', '1')")
+
+        # ─── 迁移：taboos 从 ai_background → user_taboos ───
+        cursor.execute("SELECT value FROM config WHERE key='user_taboos'")
+        if not cursor.fetchone():
+            cursor.execute("SELECT value FROM config WHERE key='ai_background'")
+            row = cursor.fetchone()
+            old_taboos = []
+            if row:
+                try:
+                    bg = json.loads(row[0])
+                    old_taboos = bg.get("taboos", []) if isinstance(bg, dict) else []
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+            cursor.execute("INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)",
+                           ("user_taboos", json.dumps(old_taboos, ensure_ascii=False)))
+            if old_taboos:
+                print(f"[迁移] 已从 ai_background 迁移 {len(old_taboos)} 条禁忌到 user_taboos")
         conn.commit()
         _db_initialized = True
     finally:
@@ -383,17 +400,28 @@ def _get_config_direct(cursor, key, default=""):
 
 @contextmanager
 def get_conn():
-    """数据库连接上下文管理器，自动 commit/rollback/close"""
+    """数据库连接上下文管理器，遇到锁冲突自动重试最多 3 次"""
     _ensure_db()
-    conn = get_db_connection()
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    last_e = None
+    for attempt in range(3):
+        try:
+            conn = get_db_connection()
+            try:
+                yield conn
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+            return
+        except sqlite3.OperationalError as e:
+            if "locked" not in str(e) and "busy" not in str(e):
+                raise
+            last_e = e
+            silent_exc(f"get_conn retry {attempt+1}", e)
+            time.sleep(0.5 * (attempt + 1))
+    raise last_e or RuntimeError("get_conn failed")
 
 
 # ========== 默认角色预设种子 ==========

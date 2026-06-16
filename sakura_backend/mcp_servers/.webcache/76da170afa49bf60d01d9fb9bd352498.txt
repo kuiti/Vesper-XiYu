@@ -1,0 +1,231 @@
+Prompt Assembly Pipeline | SillyTavern/SillyTavern | DeepWikiLoading...Index your code with DevinDeepWikiDeepWikiSillyTavern/SillyTavern  (https://github.com/SillyTavern/SillyTavern)
+Index your code withDevinEdit WikiShareLoading...Last indexed: 13 May 2026 (51ad27 (https://github.com/SillyTavern/SillyTavern/commits/51ad27fb))
+- SillyTavern Overview
+- Installation and Setup
+- System Dependencies and Libraries
+- Core Architecture
+- Application Lifecycle and Initialization
+- Server Architecture and Routing
+- Event System and Module Communication
+- Client-Server Data Flow
+- Authentication and Security
+- AI Integration
+- Chat Completion System
+- Text Generation System
+- Prompt Assembly Pipeline
+- Tokenization and Token Management
+- Tool Calling and Function Execution
+- Streaming and Response Processing
+- Preset and Sampler Management
+- Reasoning Display System
+- User Interface
+- Main UI Components and Layout
+- Tags, Filtering, and Organization
+- Personas and User Identity
+- Backgrounds and Theming
+- Localization and Internationalization
+- Accessibility and Keyboard Navigation
+- Data Management
+- Character Management
+- Chat Storage and Persistence
+- Settings and Configuration Management
+- Asset and File Management
+- Caching Architecture
+- Context and Memory Systems
+- World Info System
+- Chat Summarization Extension
+- Vector Storage and RAG System
+- User Interaction Systems
+- Slash Command System
+- Quick Reply System
+- Variables, Macros, and Scripting
+- Extension Framework
+- Extension Architecture and APIs
+- Image Generation Extensions
+- Character Expressions System
+- Visual Novel Mode
+- Image Captioning and Multimodal AI
+- Text-to-Speech Extensions
+- Regex and Translation Extensions
+- Group Chats and Multi-Character Interactions
+- Developer Guide
+- Project Structure and Build System
+- Extension Development Guide
+- Backend API Development
+- Testing Infrastructure
+- GlossaryMenu
+# Prompt Assembly Pipeline
+
+Relevant source files
+
+- default/content/index.json (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/default/content/index.json)
+
+- default/content/presets/context/GLM-4.json (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/default/content/presets/context/GLM-4.json)
+
+- default/content/presets/context/Gemma 4.json (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/default/content/presets/context/Gemma 4.json)
+
+- default/content/presets/context/Tulu.json (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/default/content/presets/context/Tulu.json)
+
+- default/content/presets/instruct/GLM-4.json (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/default/content/presets/instruct/GLM-4.json)
+
+- default/content/presets/instruct/Gemma 4.json (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/default/content/presets/instruct/Gemma 4.json)
+
+- default/content/presets/instruct/Tulu.json (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/default/content/presets/instruct/Tulu.json)
+
+- default/content/presets/openai/Default.json (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/default/content/presets/openai/Default.json)
+
+- default/content/presets/reasoning/Gemma 4.json (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/default/content/presets/reasoning/Gemma 4.json)
+
+- default/content/presets/reasoning/Think XML.json (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/default/content/presets/reasoning/Think XML.json)
+
+- default/content/settings.json (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/default/content/settings.json)
+
+- public/css/promptmanager.css (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/css/promptmanager.css)
+
+- public/index.html (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/index.html)
+
+- public/scripts/PromptManager.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js)
+
+- public/scripts/RossAscends-mods.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/RossAscends-mods.js)
+
+- public/scripts/chat-templates.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/chat-templates.js)
+
+- public/scripts/openai.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/openai.js)
+
+- public/scripts/reasoning.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/reasoning.js)
+
+- public/scripts/secrets.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/secrets.js)
+
+- public/scripts/sysprompt.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/sysprompt.js)
+
+- public/scripts/templates/migrateInstructPrompt.html (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/templates/migrateInstructPrompt.html)
+
+- public/scripts/templates/promptManagerFooter.html (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/templates/promptManagerFooter.html)
+
+- public/scripts/templates/promptManagerHeader.html (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/templates/promptManagerHeader.html)
+
+- public/scripts/templates/promptManagerListHeader.html (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/templates/promptManagerListHeader.html)
+
+- public/scripts/tool-calling.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/tool-calling.js)
+
+- src/constants.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/constants.js)
+
+- src/endpoints/backends/chat-completions.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/backends/chat-completions.js)
+
+- src/endpoints/secrets.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/secrets.js)
+
+- src/prompt-converters.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/prompt-converters.js)
+
+## Purpose and Scope
+
+The prompt assembly pipeline is a multi-stage process that constructs the final context sent to Large Language Models (LLMs). It handles the aggregation of disparate data sources—character definitions, user personas, chat history, World Info (Lorebooks), and extension data—and formats them into a single payload. This system is governed by the PromptManager class and influenced by Instruct Mode and Context Templates. Depending on the target API, the output is either a structured message array (Chat Completion) or a raw string (Text Completion).
+
+## Pipeline Overview
+
+The pipeline transforms raw data into a structured format suitable for the target API. SillyTavern branches this logic based on the main_api selected by the user.
+
+### API-Specific Assembly Flows
+
+"Natural Language Space to Code Entity Space: Assembly Logic"
+
+Sources: public/scripts/openai.js90-92 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/openai.js#L90-L92) public/scripts/PromptManager.js432-440 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js#L432-L440) public/scripts/openai.js175-202 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/openai.js#L175-L202)
+
+## The PromptManager System
+
+The PromptManager class is the central orchestrator for Chat Completion prompts. It manages a PromptCollection and handles the injection of prompts at specific depths within the chat history.
+
+### Code Entity Space: Prompt and Collection
+
+ClassRoleReferencePromptData structure for a single prompt unit (role, content, identifier).public/scripts/PromptManager.js80-196 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js#L80-L196)PromptCollectionA list-like container that handles adding and overriding prompts.public/scripts/PromptManager.js201-222 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js#L201-L222)PromptManagerOrchestrates the UI, rendering, and prompt preparation for generation.public/scripts/PromptManager.js432-440 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js#L432-L440)
+
+### Prompt Injection Logic
+
+Prompts can be injected at different positions relative to the chat history. This is defined by the INJECTION_POSITION enum.
+
+- RELATIVE (0): Positioned relative to the end of the chat history (e.g., "Depth 4" means 4 messages from the bottom). public/scripts/PromptManager.js37-38 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js#L37-L38)
+
+- ABSOLUTE (1): Positioned at a fixed location in the prompt list, regardless of chat length. public/scripts/PromptManager.js39-40 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js#L39-L40)
+
+Sources: public/scripts/PromptManager.js37-40 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js#L37-L40) public/scripts/PromptManager.js130-134 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js#L130-L134)
+
+## Component Assembly
+
+### 1. System Prompts and Story Strings
+
+The system prompt defines the base behavior of the model. Users can select from presets or define character-specific prompts.
+
+- Default Prompt: "Write {{char}}'s next reply in a fictional chat between {{charIfNotGroup}} and {{user}}." public/scripts/openai.js101 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/openai.js#L101-L101)
+
+- Reasoning Injection: If enabled, reasoning templates (e.g., "Think XML") guide model thought processes. The extractReasoningFromData function parses these from provider-specific fields like reasoning_content. public/scripts/reasoning.js93-148 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/reasoning.js#L93-L148)
+
+### 2. Context Templates and Story String
+
+The Context Template determines how character data (Description, Personality, Scenario) is structured before the chat history begins.
+
+- Macro Substitution: Templates are processed through renderTemplateAsync to replace placeholders like {{char}} and {{user}}. public/scripts/PromptManager.js11 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js#L11-L11)
+
+- Reasoning Templates: Templates like DEFAULT_REASONING_TEMPLATE define how thought blocks are wrapped (prefix/suffix/separator). public/scripts/reasoning.js22-35 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/reasoning.js#L22-L35)
+
+### 3. Post-Processing and Conversion
+
+Once prompts are assembled into a message array, they may require backend conversion to fit specific provider requirements. This is handled by src/prompt-converters.js.
+
+Processing TypeDescriptionReferenceMERGEMerges consecutive messages with the same role (required for Claude/Anthropic).src/prompt-converters.js87-89 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/prompt-converters.js#L87-L89)STRICTEnforces strict alternating User/Assistant roles and handles placeholders.src/prompt-converters.js96-97 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/prompt-converters.js#L96-L97)SINGLECollapses the entire history into a single message.src/prompt-converters.js100-101 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/prompt-converters.js#L100-L101)
+
+## Data Flow: From Settings to API Payload
+
+The following diagram bridges the user-facing settings and the internal code entities that process them.
+
+Title: Settings to API Payload Flow
+
+Sources: public/scripts/openai.js86-91 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/openai.js#L86-L91) public/scripts/PromptManager.js182-196 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js#L182-L196) public/scripts/reasoning.js93-100 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/reasoning.js#L93-L100) public/scripts/openai.js92 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/openai.js#L92-L92)
+
+## Implementation Details
+
+### Prompt Migration and Defaults
+
+SillyTavern maintains backward compatibility for prompts through migration functions that move legacy settings into the PromptManager structure.
+
+- Migration: registerPromptManagerMigration handles moving main_prompt, nsfw_prompt, and jailbreak_prompt from settings into the prompts array. public/scripts/PromptManager.js45-75 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js#L45-L75)
+
+### Tool Calling Integration
+
+If the model supports tool calling, the pipeline integrates tool definitions and results.
+
+- Tool Registration: Tools are defined with a name, description, and JSON schema for parameters. public/scripts/tool-calling.js35-44 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/tool-calling.js#L35-L44)
+
+- In-Context Results: Tool results are injected back into the message array for follow-up generation. public/scripts/tool-calling.js16-25 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/tool-calling.js#L16-L25)
+
+### Reasoning and Thinking Extraction
+
+For models that provide a separate "thinking" field (like DeepSeek or Claude 3.7), the pipeline extracts this data for display and future context.
+
+- Extraction: extractReasoningFromData maps provider-specific keys (e.g., reasoning_content for DeepSeek, thinking for Claude) to a unified format. public/scripts/reasoning.js113-127 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/reasoning.js#L113-L127)
+
+Sources: public/scripts/PromptManager.js11-13 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js#L11-L13) public/scripts/openai.js85-91 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/openai.js#L85-L91) public/scripts/reasoning.js57-62 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/reasoning.js#L57-L62) public/scripts/tool-calling.js115-162 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/tool-calling.js#L115-L162)
+
+## Summary Table: Prompt Components
+
+ComponentCode SourceInjection TypePurposeSystem Promptoai_settings.promptsAbsolute (Top)Global instructions for the model behavior.Chat HistoryMessageCollectionSequentialThe core conversation logs and context.Reasoningreasoning.jsTemplateGuides model logic via specific prefixes/suffixes.Tool Callstool-calling.jsDynamicInjects function definitions and execution results.
+Sources: public/scripts/openai.js94-96 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/openai.js#L94-L96) public/scripts/PromptManager.js132-139 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/PromptManager.js#L132-L139) public/scripts/reasoning.js32-35 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/reasoning.js#L32-L35) public/scripts/tool-calling.js175-184 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/tool-calling.js#L175-L184)
+DismissRefresh this wiki
+Enter email to refresh
+### On this page
+
+- Prompt Assembly Pipeline
+- Purpose and Scope
+- Pipeline Overview
+- API-Specific Assembly Flows
+- The PromptManager System
+- Code Entity Space: Prompt and Collection
+- Prompt Injection Logic
+- Component Assembly
+- 1. System Prompts and Story Strings
+- 2. Context Templates and Story String
+- 3. Post-Processing and Conversion
+- Data Flow: From Settings to API Payload
+- Implementation Details
+- Prompt Migration and Defaults
+- Tool Calling Integration
+- Reasoning and Thinking Extraction
+- Summary Table: Prompt Components

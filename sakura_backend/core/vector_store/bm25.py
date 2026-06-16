@@ -31,7 +31,7 @@ def _get_bm25(collection_name: str = None):
         docs = data.get("documents", [])
         if not docs:
             return None
-        if _bm25_docs != docs:
+        if _bm25_docs is None or len(_bm25_docs) != len(docs) or _bm25_docs != docs:
             from rank_bm25 import BM25Okapi
             tokenized = [_tokenize(d) for d in docs]
             _bm25 = BM25Okapi(tokenized)

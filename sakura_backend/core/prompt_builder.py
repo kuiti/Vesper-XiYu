@@ -1,6 +1,6 @@
 # core/prompt_builder.py  |  v3.9.0
 from core.db import get_config, set_config, get_conn, get_msg_counter
-from core.relationship import get_relationship_hint, get_emotion_behavior_hint
+from core.relationship import get_relationship_hint, get_emotion_behavior_hint, get_relationship
 from core.persona_data import (
     LENGTH_MAP, PERSONA_TEMPLATE_WITH_FOUNDATION,
     PERSONA_TEMPLATE_WITHOUT_FOUNDATION, TONE_DESCRIPTIONS,
@@ -21,16 +21,13 @@ def _get_user_summary() -> str:
     """从画像和事实中生成用户摘要（Zep 方案）"""
     # 收集画像
     profile_items = {}
+    import json as _json
+    facts = []
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT key, value, confidence FROM user_profile WHERE confidence >= 0.55 AND key NOT LIKE '_fact_%'")
         for r in cursor.fetchall():
             profile_items[r["key"]] = r["value"]
-    # 收集事实
-    import json as _json
-    facts = []
-    with get_conn() as conn:
-        cursor = conn.cursor()
         cursor.execute("SELECT value FROM user_profile WHERE key LIKE '_fact_%' ORDER BY extracted_at DESC LIMIT 20")
         for r in cursor.fetchall():
             try:
@@ -43,8 +40,10 @@ def _get_user_summary() -> str:
         return ""
     lines = []
     if profile_items:
+        KEY_FIXES = {"层城市": "城市"}
         for k, v in list(profile_items.items())[:8]:
-            lines.append(f"📝 {k}：{v}")
+            k_clean = KEY_FIXES.get(k, k)
+            lines.append(f"📝 {k_clean}：{v}")
     if facts:
         for f in facts[:5]:
             lines.append(f"📝 {f}")
@@ -253,7 +252,7 @@ def build_persona():
     ai_bg = get_config("ai_background", "").strip()
 
     # 计算配置 hash，内容不变时返回缓存
-    config_key = f"{ai_name}|{tone}|{length_level}|{recall_past}|{allow_emotion}|{custom_prompt}|{ai_bg}"
+    config_key = f"{ai_name}|{tone}|{length_level}|{recall_past}|{allow_emotion}|{custom_prompt}|{ai_bg}|{card_name}"
     current_hash = hash(config_key)
     if _persona_cache["hash"] == current_hash and _persona_cache["text"]:
         return _persona_cache["text"]
@@ -281,7 +280,12 @@ def build_persona():
         foundation = foundation.replace("{user_name}", user_name)
 
     # 禁忌列表
-    user_taboos = bg_obj.get("taboos", [])
+    user_taboos_raw = get_config("user_taboos", "[]")
+    try:
+        import json as _json
+        user_taboos = _json.loads(user_taboos_raw) if isinstance(user_taboos_raw, str) else user_taboos_raw
+    except Exception:
+        user_taboos = []
     all_taboos = DEFAULT_TABOOS + user_taboos
     taboos_text = "\n".join(f"- {t}" for t in all_taboos)
 

@@ -35,7 +35,8 @@ _SETTINGS_WHITELIST = {
     "user_name", "ai_name", "api_key", "api_provider", "llm_provider", "api_base_url", "api_model",
     "tts_enabled", "tts_engine", "tts_voice", "tts_api_key", "tts_server_url",
     "tts_api_url", "stt_enabled", "auto_play_voice", "tts_clone_audio",
-    "fallback_models",
+    "fallback_models", "user_taboos", "card_description", "card_personality",
+    "card_scenario", "card_mes_example",
 } | set(PERSONALITY_KEY_MAP.keys())
 
 @router.get("/")
@@ -105,6 +106,11 @@ async def get_all_settings() -> Dict[str, Any]:
         "2048_best": get_config("2048_best", 0),
         "minesweeper_wins": get_config("minesweeper_wins", 0),
         "tts_clone_audio": get_config("tts_clone_audio", ""),
+        "card_description": get_config("card_description", ""),
+        "card_personality": get_config("card_personality", ""),
+        "card_scenario": get_config("card_scenario", ""),
+        "card_mes_example": get_config("card_mes_example", ""),
+        "user_taboos": get_config("user_taboos", "[]"),
     }
 
 @router.post("/relationship-mode")
@@ -120,15 +126,16 @@ _NUMERIC_KEYS = {
     "bg_blur": (0, 20),
 }
 
+PERSONA_KEYS = {"custom_system_prompt", "ai_name", "user_name", "ai_background",
+                 "card_description", "card_personality", "card_scenario", "card_mes_example"} | set(PERSONALITY_KEY_MAP.keys())
+
+
 @router.post("/")
 async def update_setting(update: ConfigUpdate):
-    # 拒绝内部配置键（_ 开头）
     if update.key.startswith("_"):
         return {"status": "error", "message": "不能修改内部配置"}
-    # 白名单校验（防止前端注入任意配置）
     if update.key not in _SETTINGS_WHITELIST:
         return {"status": "error", "message": f"不允许修改配置: {update.key}"}
-    # 数值范围校验
     if update.key in _NUMERIC_KEYS:
         lo, hi = _NUMERIC_KEYS[update.key]
         try:
@@ -138,7 +145,6 @@ async def update_setting(update: ConfigUpdate):
         except (ValueError, TypeError):
             return {"status": "error", "message": f"{update.key} 需要数值"}
 
-    # 名字验证：防注入、防空、防过长、防保留字
     if update.key in ("user_name", "ai_name"):
         v = str(update.value).strip()
         if not v or len(v) > 20:
@@ -155,10 +161,32 @@ async def update_setting(update: ConfigUpdate):
         set_config("personality", p)
     else:
         set_config(update.key, update.value)
-    # 切换 provider 时清除缓存
+
+    # card_* 字段同步到 _character_card_extra
+    if update.key.startswith("card_") and get_config("_active_character_card", ""):
+        try:
+            import json as _json
+            _extra = get_config("_character_card_extra", "{}")
+            _extra_obj = _json.loads(_extra) if isinstance(_extra, str) else _extra
+            _field = update.key.replace("card_", "")
+            _extra_obj[_field] = update.value
+            set_config("_character_card_extra", _json.dumps(_extra_obj, ensure_ascii=False))
+        except Exception as e:
+            from core.retry import silent_exc
+            silent_exc("sync_card_extra", e)
+
     if update.key in ("llm_provider", "api_base_url", "api_model", "api_key"):
         from core.llm_provider import clear_provider_cache
         clear_provider_cache()
+    if update.key in PERSONA_KEYS and get_config("_active_character_card", ""):
+        try:
+            from core.character_card import CharacterCard
+            card = CharacterCard()
+            card.sync_from_current()
+            card.save_to_db()
+        except Exception as e:
+            from core.retry import silent_exc
+            silent_exc("auto_save_card", e)
     return {"status": "ok"}
 
 @router.get("/presets")
@@ -202,10 +230,10 @@ async def list_foundation_types():
 
 @router.post("/foundation")
 async def set_foundation(data: FoundationUpdate):
-    """设置基石类型，可选择是否重置好感/信任值"""
+    """设置基石类型，选择是否重置好感/信任值"""
     import json
     from core.prompt_builder import FOUNDATION_TEMPLATES
-    from core.relationship import set_relationship_by_foundation
+    from core.relationship import set_relationship_by_foundation, get_relationship
 
     foundation_type = data.foundation_type
     if foundation_type not in FOUNDATION_TEMPLATES:
@@ -215,20 +243,25 @@ async def set_foundation(data: FoundationUpdate):
     from core.persona_data import parse_ai_background
     current_bg = get_config("ai_background", "")
     bg_obj = parse_ai_background(current_bg)
-
     bg_obj["foundation_type"] = foundation_type
-    # 清除自定义 foundation（如果有），使用模板
     if "foundation" in bg_obj:
         del bg_obj["foundation"]
-
     set_config("ai_background", json.dumps(bg_obj, ensure_ascii=False))
 
-    # 根据用户选择决定是否重置关系值
-    if data.reset_values:
+    # 判断是否需要重置关系值
+    should_reset = data.reset_values
+    if not should_reset:
+        try:
+            aff, trust = get_relationship()
+            if aff == 0 and trust == 0:
+                should_reset = True
+        except Exception:
+            pass
+
+    if should_reset:
         set_relationship_by_foundation(foundation_type)
         return {"status": "ok", "foundation_type": foundation_type, "values_reset": True}
-    else:
-        return {"status": "ok", "foundation_type": foundation_type, "values_reset": False}
+    return {"status": "ok", "foundation_type": foundation_type, "values_reset": False}
 
 # ========== onboarding ==========
 

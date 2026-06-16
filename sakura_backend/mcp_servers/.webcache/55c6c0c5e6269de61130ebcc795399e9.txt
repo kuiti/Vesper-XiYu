@@ -1,0 +1,251 @@
+Character Management | SillyTavern/SillyTavern | DeepWikiLoading...Index your code with DevinDeepWikiDeepWikiSillyTavern/SillyTavern  (https://github.com/SillyTavern/SillyTavern)
+Index your code withDevinEdit WikiShareLoading...Last indexed: 13 May 2026 (51ad27 (https://github.com/SillyTavern/SillyTavern/commits/51ad27fb))
+- SillyTavern Overview
+- Installation and Setup
+- System Dependencies and Libraries
+- Core Architecture
+- Application Lifecycle and Initialization
+- Server Architecture and Routing
+- Event System and Module Communication
+- Client-Server Data Flow
+- Authentication and Security
+- AI Integration
+- Chat Completion System
+- Text Generation System
+- Prompt Assembly Pipeline
+- Tokenization and Token Management
+- Tool Calling and Function Execution
+- Streaming and Response Processing
+- Preset and Sampler Management
+- Reasoning Display System
+- User Interface
+- Main UI Components and Layout
+- Tags, Filtering, and Organization
+- Personas and User Identity
+- Backgrounds and Theming
+- Localization and Internationalization
+- Accessibility and Keyboard Navigation
+- Data Management
+- Character Management
+- Chat Storage and Persistence
+- Settings and Configuration Management
+- Asset and File Management
+- Caching Architecture
+- Context and Memory Systems
+- World Info System
+- Chat Summarization Extension
+- Vector Storage and RAG System
+- User Interaction Systems
+- Slash Command System
+- Quick Reply System
+- Variables, Macros, and Scripting
+- Extension Framework
+- Extension Architecture and APIs
+- Image Generation Extensions
+- Character Expressions System
+- Visual Novel Mode
+- Image Captioning and Multimodal AI
+- Text-to-Speech Extensions
+- Regex and Translation Extensions
+- Group Chats and Multi-Character Interactions
+- Developer Guide
+- Project Structure and Build System
+- Extension Development Guide
+- Backend API Development
+- Testing Infrastructure
+- GlossaryMenu
+# Character Management
+
+Relevant source files
+
+- public/css/welcome.css (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/css/welcome.css)
+
+- public/scripts/events.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/events.js)
+
+- public/scripts/itemized-prompts.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/itemized-prompts.js)
+
+- public/scripts/templates/importCharacters.html (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/templates/importCharacters.html)
+
+- public/scripts/templates/welcomePanel.html (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/templates/welcomePanel.html)
+
+- public/scripts/welcome-screen.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/welcome-screen.js)
+
+- src/byaf.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/byaf.js)
+
+- src/character-card-parser.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/character-card-parser.js)
+
+- src/endpoints/avatars.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/avatars.js)
+
+- src/endpoints/characters.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js)
+
+- src/endpoints/chats.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/chats.js)
+
+- src/endpoints/groups.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/groups.js)
+
+- src/png/encode.js (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/png/encode.js)
+
+- src/types/byaf.d.ts (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/types/byaf.d.ts)
+
+- src/types/spec-v2.d.ts (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/types/spec-v2.d.ts)
+
+## Purpose and Scope
+
+This document covers the management of character cards in SillyTavern: their storage format, import/export mechanisms, caching strategies, and API endpoints for character operations. Character cards contain the personality, description, and metadata for AI characters that users interact with.
+
+For information about chat message storage, see Chat Storage and Persistence. For character sprite assets and expressions, see Asset and File Management.
+
+## Character Card Specification
+
+### Spec V3 Format (Current)
+
+SillyTavern supports the Character Card V3 specification. Data is embedded as JSON metadata within PNG image files using tEXt chunks. V3 takes precedence over V2 during the read process.
+
+Core Structure (V3):
+
+Sources: src/character-card-parser.js31-42 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/character-card-parser.js#L31-L42) src/character-card-parser.js64-68 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/character-card-parser.js#L64-L68)
+
+### Spec V2 and V1 (Legacy)
+
+SillyTavern maintains backwards compatibility with V2 (chara keyword in PNG) and V1 (flat JSON). When writing a card, SillyTavern generates both V2 and V3 chunks to ensure the card remains readable by older software while supporting new features.
+
+Sources: src/character-card-parser.js15-46 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/character-card-parser.js#L15-L46) src/character-card-parser.js70-74 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/character-card-parser.js#L70-L74)
+
+### Format Processing Logic
+
+The following diagram illustrates how the system bridges raw file data to the internal Character entity.
+
+Sources: src/character-card-parser.js54-78 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/character-card-parser.js#L54-L78) src/endpoints/characters.js451-462 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L451-L462)
+
+## File System Organization
+
+### Directory Structure
+
+Character data is stored in per-user directory structures defined in src/users.js.
+
+data/
+└── {user_handle}/
+    ├── characters/           # Character card PNG files
+    │   ├── character1.png
+    │   └── {character_name}/ # Character-specific assets
+    │       └── expressions/  # Expression sprites (see 8.3)
+    ├── chats/               # Chat logs per character (see 5.2)
+    └── worlds/              # World Info files (see 6.1)
+
+Sources: src/users.js71-103 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/users.js#L71-L103) src/endpoints/characters.js408-442 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L408-L442)
+
+## Character Card Reading and Caching
+
+### Caching Architecture
+
+SillyTavern employs a multi-tiered caching system to handle large character libraries efficiently, especially on mobile devices.
+
+- MemoryLimitedMap: An in-memory cache with a configurable size (default 100MB). It evicts old entries when the limit is reached.
+
+- DiskCache: A class that uses node-persist to store parsed JSON results on disk, avoiding expensive PNG metadata extraction on subsequent loads. It includes a SYNC_INTERVAL (5 minutes) for cache maintenance.
+
+Sources: src/endpoints/characters.js31-38 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L31-L38) src/endpoints/characters.js38-157 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L38-L157) src/endpoints/characters.js162-209 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L162-L209)
+
+### Lazy Loading (Shallow Characters)
+
+When performance.lazyLoadCharacters is enabled in config.yaml, the server returns "shallow" character objects to the client. These contain only essential metadata (name, avatar, tags) to populate the character list without loading full descriptions or lorebooks into memory.
+
+Sources: src/endpoints/characters.js35-37 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L35-L37) src/endpoints/characters.js371-395 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L371-L395)
+
+## Character Import Mechanisms
+
+SillyTavern supports various container formats for importing characters and their associated assets.
+
+### Import Pipeline
+
+FormatHandlerDescriptionPNGparse()Standard Tavern/SillyTavern card with embedded metadata.JSONimportFromJson()Plain JSON character definition. Supports RisuAI sprite extraction via importRisuSprites.CharXCharXParserZIP-based format containing the card, avatar, and auxiliary assets (sprites, backgrounds).BYAFByafParser"Build Your AI Friend" format. Includes scenarios and alternate icons.YAMLimportFromYaml()Simplified human-readable character definitions.
+Sources: src/endpoints/characters.js19-26 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L19-L26) src/endpoints/characters.js767-873 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L767-L873) src/endpoints/characters.js1062-1261 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L1062-L1261) src/charx.js1-15 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/charx.js#L1-L15) src/byaf.js1-10 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/byaf.js#L1-L10)
+
+### BYAF Parsing Details
+
+The ByafParser class handles the extraction of "Backyard Archive Format" files. It maps Backyard-specific macros (e.g., #{character}:) to SillyTavern macros (e.g., {{char}}:).
+
+- Lorebooks: Converts loreItems into SillyTavern CharacterBook entries via convertCharacterBook().
+
+- Greetings: Maps scenarios to alternate_greetings using formatAlternateGreetings().
+
+- Images: Extracts character icons from the ZIP buffer using getCharacterImages().
+
+Sources: src/byaf.js10-22 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/byaf.js#L10-L22) src/byaf.js30-36 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/byaf.js#L30-L36) src/byaf.js95-120 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/byaf.js#L95-L120) src/byaf.js67-87 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/byaf.js#L67-L87) src/byaf.js207-208 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/byaf.js#L207-L208)
+
+## Image Processing and Writing
+
+### applyAvatarCropResize
+
+SillyTavern standardizes character avatars to 400x600 pixels using the Jimp library.
+
+- Cropping: If the user provides crop coordinates (x, y, width, height), the image is cropped.
+
+- Resizing: The image is resized to AVATAR_WIDTH and AVATAR_HEIGHT.
+
+- Encoding: The result is encoded as a PNG.
+
+- Metadata Injection: The character JSON is base64 encoded and injected into the tEXt chunks via the write function in character-card-parser.js.
+
+Sources: src/endpoints/characters.js283-306 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L283-L306) src/character-card-parser.js15-46 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/character-card-parser.js#L15-L46) src/constants.js15 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/constants.js#L15-L15)
+
+## Recent Chats and Pinned State
+
+The welcome-screen.js module manages the display of recent and pinned character interactions on the dashboard.
+
+### PinnedChatsManager
+
+This class handles persistence of pinned status using accountStorage.
+
+- toggle(recentChat, pinned): Toggles the pinned state.
+
+- rename(recentChat, newFileName): Migrates pinned status when a chat file is renamed.
+
+- isPinned(recentChat): Checks if a chat is in the pinnedChats storage.
+
+Sources: public/scripts/welcome-screen.js83-202 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/public/scripts/welcome-screen.js#L83-L202)
+
+## API Endpoints
+
+### Character Management Routes
+
+The following routes are defined in src/endpoints/characters.js:
+
+RouteMethodFunctionDescription/api/characters/allGET(anonymous)Returns all characters for the user. Supports shallow mode./api/characters/createPOST(anonymous)Handles file uploads and new character creation./api/characters/editPOST(anonymous)Updates character fields and handles avatar re-cropping./api/characters/deletePOST(anonymous)Deletes character PNG, assets, and optionally chats./api/characters/duplicatePOST(anonymous)Clones a character using getUniqueName.
+Sources: src/endpoints/characters.js1337-1592 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L1337-L1592)
+
+### Character Export
+
+Characters are exported via POST /api/characters/export. The server:
+
+- Reads the character data.
+
+- Calls unsetPrivateFields() to remove local-only data like fav (favorite status) and chat (current chat filename).
+
+- Sends the PNG or JSON file to the client.
+
+Sources: src/endpoints/characters.js499-503 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L499-L503) src/endpoints/characters.js1263-1280 (https://github.com/SillyTavern/SillyTavern/blob/51ad27fb/src/endpoints/characters.js#L1263-L1280)
+DismissRefresh this wiki
+Enter email to refresh
+### On this page
+
+- Character Management
+- Purpose and Scope
+- Character Card Specification
+- Spec V3 Format (Current)
+- Spec V2 and V1 (Legacy)
+- Format Processing Logic
+- File System Organization
+- Directory Structure
+- Character Card Reading and Caching
+- Caching Architecture
+- Lazy Loading (Shallow Characters)
+- Character Import Mechanisms
+- Import Pipeline
+- BYAF Parsing Details
+- Image Processing and Writing
+- applyAvatarCropResize
+- Recent Chats and Pinned State
+- PinnedChatsManager
+- API Endpoints
+- Character Management Routes
+- Character Export

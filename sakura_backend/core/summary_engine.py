@@ -402,6 +402,11 @@ def _update_keyword_strength(keywords: list):
     """更新关键词强度"""
     for kw in keywords:
         _KEYWORD_STRENGTH[kw] = _KEYWORD_STRENGTH.get(kw, 0) + 1
+    # 定期清理低频关键词，防止内存膨胀
+    if len(_KEYWORD_STRENGTH) > 500:
+        to_remove = [k for k, v in _KEYWORD_STRENGTH.items() if v < 3]
+        for k in to_remove[:len(to_remove)//2]:
+            del _KEYWORD_STRENGTH[k]
 
 
 def _check_keyword_reflection_trigger() -> str | None:
@@ -495,17 +500,16 @@ def generate_deep_reflection():
         if not new_insights:
             return
 
-        # 存入 level 3 摘要
+        # 存入 level 3 摘要（使用 db 函数确保 consistency）
         now = datetime.now().isoformat()
         lifespan = random.uniform(14, 60) * random.uniform(0.8, 1.2)
         insight_text = "；".join(new_insights[:3])
 
-        with get_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO tiered_summary (level, summary, key_points, importance, remaining_days, start_time, end_time, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (3, insight_text, json.dumps(["深度反思", trigger_kw], ensure_ascii=False), 0.8, lifespan, now, now, now)
-            )
+        db.add_tiered_summary(
+            3, insight_text,
+            json.dumps(["深度反思", trigger_kw], ensure_ascii=False),
+            0.8, lifespan, now, now, None
+        )
 
         print(f"[深度反思] 生成（触发词: {trigger_kw}）: {insight_text[:80]}...")
 
@@ -553,17 +557,18 @@ def generate_reflection():
 
         reflection_text = "；".join(reflection_parts)
 
-        # 存入 level 2 摘要
+        # 存入 level 2 摘要（使用 db 函数确保 consistency）
         now = datetime.now().isoformat()
         lifespan = random.uniform(7, 30) * random.uniform(0.8, 1.2)
 
+        db.add_tiered_summary(
+            2, reflection_text,
+            json.dumps(["反思"], ensure_ascii=False),
+            0.7, lifespan, now, now, None
+        )
+        # 更新触发计数器，防止重复生成
         with get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO tiered_summary (level, summary, key_points, importance, remaining_days, start_time, end_time, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (2, reflection_text, json.dumps(["反思"], ensure_ascii=False), 0.7, lifespan, now, now, now)
-            )
-            # 更新触发计数器，防止重复生成
             cursor.execute("SELECT count FROM summary_msg_counter WHERE id = 1")
             row = cursor.fetchone()
             if row:

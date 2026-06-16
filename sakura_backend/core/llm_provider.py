@@ -148,48 +148,51 @@ class OpenAICompatibleProvider(LLMProvider):
                     full_text = ""
                     with resp:
                         tool_calls_buffer = {}
-                        for line in resp.iter_lines():
-                            if not line:
-                                continue
-                            line = line.decode("utf-8")
-                            if not line.startswith("data: "):
-                                continue
-                            line = line[6:]
-                            if line == "[DONE]":
-                                if full_text:
-                                    self._last_successful_reply = full_text
-                                if tool_calls_buffer:
-                                    yield {"type": "tool_calls", "data": list(tool_calls_buffer.values())}
-                                yield {"type": "done"}
-                                return
-                            try:
-                                chunk = json.loads(line)
-                            except json.JSONDecodeError:
-                                continue
-                            choices = chunk.get("choices", [])
-                            if not choices:
-                                continue
-                            delta = choices[0].get("delta", {})
+                        try:
+                            for line in resp.iter_lines():
+                                if not line:
+                                    continue
+                                line = line.decode("utf-8")
+                                if not line.startswith("data: "):
+                                    continue
+                                line = line[6:]
+                                if line == "[DONE]":
+                                    if full_text:
+                                        self._last_successful_reply = full_text
+                                    if tool_calls_buffer:
+                                        yield {"type": "tool_calls", "data": list(tool_calls_buffer.values())}
+                                    yield {"type": "done"}
+                                    return
+                                try:
+                                    chunk = json.loads(line)
+                                except json.JSONDecodeError:
+                                    continue
+                                choices = chunk.get("choices", [])
+                                if not choices:
+                                    continue
+                                delta = choices[0].get("delta", {})
 
-                            # tool_calls
-                            if "tool_calls" in delta:
-                                for tc in delta["tool_calls"]:
-                                    idx = tc.get("index", 0)
-                                    if idx not in tool_calls_buffer:
-                                        tool_calls_buffer[idx] = {"id": "", "function": {"name": "", "arguments": ""}}
-                                    if "id" in tc:
-                                        tool_calls_buffer[idx]["id"] = tc["id"]
-                                    if "function" in tc:
-                                        if "name" in tc["function"]:
-                                            tool_calls_buffer[idx]["function"]["name"] = tc["function"]["name"]
-                                        if "arguments" in tc["function"]:
-                                            tool_calls_buffer[idx]["function"]["arguments"] += tc["function"]["arguments"]
-                                continue
+                                # tool_calls
+                                if "tool_calls" in delta:
+                                    for tc in delta["tool_calls"]:
+                                        idx = tc.get("index", 0)
+                                        if idx not in tool_calls_buffer:
+                                            tool_calls_buffer[idx] = {"id": "", "function": {"name": "", "arguments": ""}}
+                                        if "id" in tc:
+                                            tool_calls_buffer[idx]["id"] = tc["id"]
+                                        if "function" in tc:
+                                            if "name" in tc["function"]:
+                                                tool_calls_buffer[idx]["function"]["name"] = tc["function"]["name"]
+                                            if "arguments" in tc["function"]:
+                                                tool_calls_buffer[idx]["function"]["arguments"] += tc["function"]["arguments"]
+                                    continue
 
-                            token = delta.get("content", "")
-                            if token:
-                                full_text += token
-                                yield {"type": "token", "data": token}
+                                token = delta.get("content", "")
+                                if token:
+                                    full_text += token
+                                    yield {"type": "token", "data": token}
+                        except GeneratorExit:
+                            return
 
                         # 流正常结束（无 [DONE] 标记）
                         if full_text:

@@ -229,21 +229,6 @@ class PersonaPipe(PromptPipe):
         return build_persona()
 
 
-class CharacterCardPipe(PromptPipe):
-    """当前角色卡额外设定注入（description / personality / scenario / taboos 等）"""
-    _cache_key = None
-
-    def process(self, ctx: PipelineContext) -> str | None:
-        if not ctx.is_module_enabled("character_card"):
-            return None
-        try:
-            from core.character_card import get_active_card_prompt_block
-            block = get_active_card_prompt_block()
-            return block if block else None
-        except Exception:
-            return None
-
-
 class UserSummaryPipe(PromptPipe):
     """用户摘要（Zep 方案）"""
     def process(self, ctx: PipelineContext) -> str | None:
@@ -391,8 +376,12 @@ class SchedulePipe(PromptPipe):
             try:
                 import jieba
                 query_words = set(w for w in jieba.cut(ctx.user_message) if len(w) > 1)
-            except ImportError as e:
-                silent_exc("prompt_pipeline", e)
+            except ImportError:
+                # jieba 不可用时用简单分词（2-gram）
+                msg = ctx.user_message
+                query_words = set(msg[i:i+2] for i in range(len(msg)-1) if len(msg[i:i+2].strip()) == 2)
+            if not query_words:
+                return None
             relevant = []
             for r in upcoming:
                 title_lower = r['title'].lower()
@@ -514,7 +503,7 @@ class DroppedContextPipe(PromptPipe):
         dropped = get_config("_dropped_context", "")
         if not dropped:
             return None
-        set_config("_dropped_context", "")
+        # 注意：不在 pipe 中清空，由 chat.py 在 LLM 回复成功后清空
         return dropped
 
 
@@ -560,12 +549,10 @@ def get_default_pipeline() -> PromptPipeline:
     p.register_static(ToolInstructionPipe())
 
     # 动态管道（按优先级排序）
-    p.register(ThinkingPipe())
     p.register(PersonaPipe())
-    p.register(CharacterCardPipe())
+    p.register(ThinkingPipe())
     p.register(CustomContextPipe())
     p.register(ContinuityPipe())
-    p.register(UserSummaryPipe())
     p.register(PlanTodoPipe())
     p.register(WorkMemoryPipe())
     p.register(OnboardingPipe())
@@ -582,6 +569,7 @@ def get_default_pipeline() -> PromptPipeline:
     p.register(PatternPipe())
     p.register(DroppedContextPipe())
     p.register(PendingGoalPipe())
+    p.register(UserSummaryPipe())
 
     _default_pipeline = p
     return p

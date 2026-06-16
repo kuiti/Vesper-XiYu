@@ -5,13 +5,15 @@ from .model import get_collection
 # ─── BM25 全局缓存 ───
 _bm25 = None
 _bm25_docs = None
+_bm25_hash = None  # 文档列表哈希，用于快速判断是否需要重建
 
 
 def reset_bm25_cache():
     """重置 BM25 缓存（重建向量或新消息写入后调用）"""
-    global _bm25, _bm25_docs
+    global _bm25, _bm25_docs, _bm25_hash
     _bm25 = None
     _bm25_docs = None
+    _bm25_hash = None
 
 
 def _tokenize(text):
@@ -24,18 +26,22 @@ def _tokenize(text):
 
 
 def _get_bm25(collection_name: str = None):
-    global _bm25, _bm25_docs
+    global _bm25, _bm25_docs, _bm25_hash
     try:
         col = get_collection(collection_name)
         data = col.get(include=["documents"])
         docs = data.get("documents", [])
         if not docs:
             return None
-        if _bm25_docs is None or len(_bm25_docs) != len(docs) or _bm25_docs != docs:
-            from rank_bm25 import BM25Okapi
-            tokenized = [_tokenize(d) for d in docs]
-            _bm25 = BM25Okapi(tokenized)
-            _bm25_docs = docs
+        # 使用哈希快速判断文档列表是否变化
+        current_hash = hash(tuple(docs))
+        if _bm25_hash == current_hash:
+            return _bm25
+        from rank_bm25 import BM25Okapi
+        tokenized = [_tokenize(d) for d in docs]
+        _bm25 = BM25Okapi(tokenized)
+        _bm25_docs = docs
+        _bm25_hash = current_hash
         return _bm25
     except Exception:
         return None
@@ -85,6 +91,6 @@ def _keyword_search_memories(query: str, top_k: int = 5) -> list[dict]:
                 if query_lower in key.lower() or query_lower in value.lower():
                     results.append({"key": key, "value": value, "score": 0.4, "type": "profile"})
     except Exception as e:
-        silent_exc("?", e)
+        silent_exc("keyword_search_memories", e)
 
     return results[:top_k]

@@ -93,10 +93,17 @@ def save_triplets(triplets: list, source_msg_id=None):
 
 def get_context_for_message(message: str) -> str:
     """根据用户消息获取相关的知识图谱上下文"""
-    import jieba
+    try:
+        import jieba
+    except ImportError:
+        jieba = None
 
     # 提取消息中的实体（简单分词）
-    words = list(jieba.cut(message))
+    if jieba is not None:
+        words = list(jieba.cut(message))
+    else:
+        # jieba 不可用时用简单 2-gram 替代
+        words = [message[i:i+2] for i in range(len(message)-1) if len(message[i:i+2].strip()) == 2]
     entities = [w.strip() for w in words if len(w.strip()) > 1]
 
     if not entities:

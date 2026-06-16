@@ -24,7 +24,7 @@ from core.demand_analyzer import save_demand_record, get_user_patterns, extract_
 from core.mcp_tools import OPENAI_TOOLS, call_tool
 from core.llm_provider import get_provider
 from api.chat_tasks import (
-    check_reminders, _build_depth_hint, _clean_dsml,
+    check_reminders, _clean_dsml,
     _apply_background_update, _trigger_daily_evolution,
     _calc_consecutive_days, _check_achievements,
     _maybe_surprise, _check_goal_completion, _parse_dsml_tool_calls,
@@ -44,13 +44,94 @@ from api.chat_fallback import try_fallback_reply
 
 from datetime import datetime, timedelta
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from core.retry import silent_exc
 logger = logging.getLogger(__name__)
+
+# ─── 后台任务线程池（限制并发线程数，避免线程爆炸）───
+_background_executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="bg_task")
+
+def _submit_background(func, *args, **kwargs):
+    """提交后台任务到线程池"""
+    try:
+        _background_executor.submit(func, *args, **kwargs)
+    except Exception as e:
+        silent_exc("submit_background", e)
+
+# ─── 历史消息修剪（提取为模块级函数，避免每次调用重新创建）───
+
+# 情感关键词列表
+_EMOTION_KEYWORDS = ["累", "烦", "开心", "难过", "生气", "害怕", "紧张", "兴奋", "无聊", "孤独", "焦虑"]
+
+def _trim_history(hist: list) -> list:
+    """修剪历史消息：去重、合并碎片、情感优先保留"""
+    if not hist:
+        return []
+    # 过滤天气卡片消息
+    hist = [m for m in hist if not m.get("content", "").startswith("__WEATHER_CARD__")]
+    # 去重：按 (role, content[:80]) 签名去重
+    seen = set()
+    deduped = []
+    for msg in reversed(hist):
+        sig = (msg.get("role", ""), msg.get("content", "")[:80])
+        if sig not in seen:
+            seen.add(sig)
+            deduped.append(msg)
+    deduped.reverse()
+    # 合并连续 assistant 碎片（仅限 8 分钟内相邻消息）
+    merged = []
+    for msg in deduped:
+        if (msg.get("role") == "assistant" and merged and merged[-1].get("role") == "assistant"):
+            _prev_ts = merged[-1].get("timestamp", "")
+            _this_ts = msg.get("timestamp", "")
+            _close_in_time = True
+            if _prev_ts and _this_ts:
+                try:
+                    _delta = abs((datetime.fromisoformat(_this_ts) - datetime.fromisoformat(_prev_ts)).total_seconds())
+                    _close_in_time = _delta < 480  # 8 分钟内
+                except Exception as e:
+                    silent_exc("_trim_history", e)
+            if _close_in_time:
+                merged[-1] = {**merged[-1], "content": merged[-1]["content"] + msg["content"]}
+            else:
+                merged.append(dict(msg))
+        else:
+            merged.append(dict(msg))
+    # 情感关键词优先保留
+    def _has_emotion(msg):
+        return any(kw in msg.get("content", "") for kw in _EMOTION_KEYWORDS)
+    # 最近 16 条必保留，剩余 8 条优先选有情感的（总计 24 条）
+    recent = merged[-16:]
+    older = merged[:-16]
+    if len(older) > 8:
+        emotional = [m for m in older if _has_emotion(m)]
+        non_emotional = [m for m in older if not _has_emotion(m)]
+        older = (emotional + non_emotional)[-8:]
+    # 被裁掉的早期消息 → 提取关键词注入上下文
+    dropped = merged[:-(16+8)]
+    if dropped:
+        user_msgs_in_dropped = [m["content"][:50] for m in dropped if m.get("role") == "user"]
+        if user_msgs_in_dropped:
+            try:
+                import jieba
+                from collections import Counter
+                all_words = []
+                for msg in user_msgs_in_dropped:
+                    words = [w for w in jieba.cut(msg) if len(w) > 1]
+                    all_words.extend(words)
+                top_words = [w for w, _ in Counter(all_words).most_common(8)]
+                if top_words:
+                    dropped_context = f"【更早的对话中提到过】{'、'.join(top_words)}"
+                    set_config("_dropped_context", dropped_context)
+            except Exception as e:
+                silent_exc("_trim_history_keywords", e)
+    return recent + older
 
 # 全局 WebSocket 连接追踪
 _active_websockets: dict = {}  # {conn_id: websocket}
 _active_websockets_lock = asyncio.Lock()  # 保护 _active_websockets 的并发访问
 _diary_scheduler_started = False  # 日记调度器全局单例标志
+_diary_scheduler_lock = threading.Lock()  # 保护 _diary_scheduler_started
 # _latest_empathy_strategy 已改为 per-connection 变量 _conn_empathy_strategy
 
 # 提醒规则：advance_minutes=提前多久开始提醒，repeat_interval=重复提醒间隔(分钟, None=只一次)
@@ -81,8 +162,6 @@ async def _schedule_proactive(delay_seconds: int, ws: WebSocket):
     except Exception as e:
         print(f"[主动消息] 计划消息发送失败: {e}")
 
-
-
 async def chat_websocket(websocket: WebSocket):
     conn_id = str(uuid.uuid4())
     async with _active_websockets_lock:
@@ -92,6 +171,8 @@ async def chat_websocket(websocket: WebSocket):
     tag_proactive_task = None  # <proactive:> 标签触发的定时器（与 proactive_task 分开）
     _conn_empathy_strategy = None  # per-connection 共情策略
     await websocket.accept()
+    # 限制单条消息最大 50KB
+    _MAX_WS_MSG_SIZE = 50 * 1024
     print(f"WebSocket 客户端已连接 (id={conn_id[:8]}, total={len(_active_websockets)})")
     
     # 欢迎语
@@ -122,18 +203,19 @@ async def chat_websocket(websocket: WebSocket):
         websocket, last_active, consecutive_negative, session_triggered, _conn_empathy_strategy,
     ))
     global _diary_scheduler_started
-    if not _diary_scheduler_started:
-        _diary_scheduler_started = True
-        diary_task = asyncio.create_task(diary_scheduler())
-    else:
-        diary_task = None
+    with _diary_scheduler_lock:
+        if not _diary_scheduler_started:
+            _diary_scheduler_started = True
+            diary_task = asyncio.create_task(diary_scheduler())
+        else:
+            diary_task = None
 
     # 命令处理函数从 api.chat_commands 导入
 
     try:
         while True:
             data = await websocket.receive_text()
-            print(f"收到消息: {data}")
+            print(f"收到消息: (len={len(data)})")
             try:
                 request = json.loads(data)
             except Exception as e:
@@ -141,9 +223,15 @@ async def chat_websocket(websocket: WebSocket):
                 await websocket.send_text(json.dumps({"type": "error", "content": "消息格式错误"}))
                 continue
             user_message = request.get("message", "")
+            if len(json.dumps(request, ensure_ascii=False)) > _MAX_WS_MSG_SIZE:
+                await websocket.send_text(json.dumps({"type": "error", "content": "消息过大"}))
+                continue
             if not isinstance(user_message, str):
                 user_message = str(user_message) if user_message else ""
             history = request.get("history") or []
+            # 校验 history 结构
+            if history:
+                history = [m for m in history if isinstance(m, dict) and "role" in m and "content" in m]
             _is_game_event = request.get("_gameEvent", False)
             _is_system = request.get("_system", False)
 
@@ -287,7 +375,7 @@ async def chat_websocket(websocket: WebSocket):
                         if not _is_system:
                             _tid = add_chat_message("user", user_message)
                             if _tid:
-                                threading.Thread(target=add_sentence_vectors, args=(_tid, user_message, "user"), daemon=True).start()
+                                _submit_background(add_sentence_vectors, _tid, user_message, "user")
                         add_chat_message("assistant", _clean_dsml(tease_reply))
                         await websocket.send_text(json.dumps({"type": "token", "content": tease_reply}))
                         await websocket.send_text(json.dumps({"type": "done"}))
@@ -302,7 +390,7 @@ async def chat_websocket(websocket: WebSocket):
             if not _is_system:
                 _user_msg_id = add_chat_message("user", user_message)
                 if _user_msg_id:
-                    threading.Thread(target=add_sentence_vectors, args=(_user_msg_id, user_message, "user"), daemon=True).start()
+                    _submit_background(add_sentence_vectors, _user_msg_id, user_message, "user")
             msg_count = 0  # 等 LLM 成功后再递增
 
             try:
@@ -388,7 +476,7 @@ async def chat_websocket(websocket: WebSocket):
                             sentiment_result["empathy_strategy"] = empathy_strategy
                             _conn_empathy_strategy = empathy_strategy
                     except Exception as e:
-                        silent_exc("?", e)
+                        silent_exc("chat_websocket.empathy", e)
 
                 if not _is_system:
                     print(f"[意图检测] type={intent_type}, data={intent_data}")
@@ -404,7 +492,7 @@ async def chat_websocket(websocket: WebSocket):
                     profile_context = facts_context
                 user_patterns = get_user_patterns()
                 sentence_mode = get_config("sentence_mode", "auto")
-                static_prefix, dynamic_content = build_system_prompt(
+                static_prefix, dynamic_content, depth_entries = build_system_prompt(
                     current_time_str=current_time_str,
                     emotion=emotion,
                     user_message=user_message,
@@ -413,7 +501,8 @@ async def chat_websocket(websocket: WebSocket):
                     keypoints=keypoints,
                     custom_context=profile_context,
                     user_patterns=user_patterns,
-                    sentence_mode=sentence_mode
+                    sentence_mode=sentence_mode,
+                    chat_history=history,
                 )
 
                 # ─── 可变部分注入 ───
@@ -431,7 +520,7 @@ async def chat_websocket(websocket: WebSocket):
                             dynamic_content += f"\n【待确认目标】用户提过「{goal_text}」，自然问一句要不要跟踪。确认回[/goal confirm {gid}]，拒绝回[/goal reject {gid}]。"
                             session_triggered.add("goal_asked")
                     except Exception as e:
-                        silent_exc("?", e)
+                        silent_exc("chat_websocket.goal_check", e)
                 if _is_system:
                     dynamic_content += "\n【重要】这条消息是系统通知，不是用户直接说的。用活泼、鼓励的语气回复，像朋友在旁边看你玩游戏一样。控制在15字以内，简短有力。不要追问，不要展开话题。"
 
@@ -441,74 +530,7 @@ async def chat_websocket(websocket: WebSocket):
                     {"role": "system", "content": dynamic_content}
                 ]
 
-                # 智能历史修剪：去重 + 合并碎片 + 情感优先（最近8条必保留，剩余4条选有情感的）
-                def _trim_history(hist):
-                    if not hist:
-                        return []
-                    # 过滤天气卡片消息
-                    hist = [m for m in hist if not m.get("content", "").startswith("__WEATHER_CARD__")]
-                    # 去重：按 (role, content[:80]) 签名去重
-                    seen = set()
-                    deduped = []
-                    for msg in reversed(hist):
-                        sig = (msg.get("role", ""), msg.get("content", "")[:80])
-                        if sig not in seen:
-                            seen.add(sig)
-                            deduped.append(msg)
-                    deduped.reverse()
-                    # 合并连续 assistant 碎片（仅限 5 分钟内相邻消息）
-                    merged = []
-                    for msg in deduped:
-                        if (msg.get("role") == "assistant" and merged and merged[-1].get("role") == "assistant"):
-                            # 检查时间间隔
-                            _prev_ts = merged[-1].get("timestamp", "")
-                            _this_ts = msg.get("timestamp", "")
-                            _close_in_time = True
-                            if _prev_ts and _this_ts:
-                                try:
-                                    _delta = abs((datetime.fromisoformat(_this_ts) - datetime.fromisoformat(_prev_ts)).total_seconds())
-                                    _close_in_time = _delta < 480  # 8 分钟内
-                                except Exception as e:
-                                    silent_exc("_trim_history", e)
-                            if _close_in_time:
-                                merged[-1] = {**merged[-1], "content": merged[-1]["content"] + msg["content"]}
-                            else:
-                                merged.append(dict(msg))
-                        else:
-                            merged.append(dict(msg))
-                    # 情感关键词优先保留
-                    emotion_kw = ["累", "烦", "开心", "难过", "生气", "害怕", "紧张", "兴奋", "无聊", "孤独", "焦虑"]
-                    def _has_emotion(msg):
-                        return any(kw in msg.get("content", "") for kw in emotion_kw)
-                    # 最近 16 条必保留，剩余 8 条优先选有情感的（总计 24 条）
-                    recent = merged[-16:]
-                    older = merged[:-16]
-                    if len(older) > 8:
-                        emotional = [m for m in older if _has_emotion(m)]
-                        non_emotional = [m for m in older if not _has_emotion(m)]
-                        older = (emotional + non_emotional)[-8:]
-
-                    # 被裁掉的早期消息 → 提取关键词注入上下文
-                    dropped = merged[:-(16+8)]
-                    if dropped:
-                        user_msgs_in_dropped = [m["content"][:50] for m in dropped if m.get("role") == "user"]
-                        if user_msgs_in_dropped:
-                            try:
-                                import jieba
-                                from collections import Counter
-                                all_words = []
-                                for msg in user_msgs_in_dropped:
-                                    words = [w for w in jieba.cut(msg) if len(w) > 1]
-                                    all_words.extend(words)
-                                top_words = [w for w, _ in Counter(all_words).most_common(8)]
-                                if top_words:
-                                    dropped_context = f"【更早的对话中提到过】{'、'.join(top_words)}"
-                                    set_config("_dropped_context", dropped_context)
-                            except Exception as e:
-                                silent_exc("_has_emotion", e)
-
-                    return recent + older
-
+                # 智能历史修剪：去重 + 合并碎片 + 情感优先（最近16条必保留，剩余8条选有情感的）
                 messages.extend(_trim_history(history))
 
                 # ─── 时间间隔标记（仅 system 消息，不污染用户可见内容）───
@@ -545,19 +567,21 @@ async def chat_websocket(websocket: WebSocket):
                             elif _gap > 30:
                                 _time_gapped.append({"role": "system", "content": f"{_gap_note} 隔了{int(_gap)}分钟"})
                         except Exception as e:
-                            silent_exc("?", e)
+                            silent_exc("chat_websocket.time_gap", e)
                     # 不修改消息内容，保持原样
                     _time_gapped.append(_m)
                     if _ts:
                         _prev_ts = _ts
                 messages = _time_gapped
 
-                # 深度提示注入（SillyTavern 方案）：在对话历史的深度 2-4 注入行为强化
-                if not _is_system and len(messages) > 4:
-                    depth_hint = _build_depth_hint(user_message, emotion)
-                    if depth_hint:
-                        insert_pos = max(1, len(messages) - 3)  # 距末尾 2-3 条处
-                        messages.insert(insert_pos, {"role": "system", "content": depth_hint})
+                # 深度注入：在聊天历史中按指定深度插入内容
+                if not _is_system and depth_entries:
+                    for depth, content in sorted(depth_entries, key=lambda x: x[0]):
+                        if depth <= 0:
+                            continue
+                        pos = max(2, len(messages) - depth)
+                        if pos < len(messages):
+                            messages.insert(pos, {"role": "system", "content": content})
 
                 # 保存原始消息（后续注入会覆写 user_message）
                 original_user_message = user_message
@@ -588,6 +612,18 @@ async def chat_websocket(websocket: WebSocket):
 
                 # 添加用户消息（动态上下文已包含时间信息）
                 messages.append({"role": "user", "content": user_message})
+
+                # Post-History Instructions (depth=0): 在用户消息后、生成前注入
+                if not _is_system and depth_entries:
+                    phi_entries = [c for d, c in depth_entries if d == 0]
+                    if phi_entries:
+                        messages.append({"role": "system", "content": "\n".join(phi_entries)})
+
+                # 自动关系标签指令（仅在 auto/semi-auto 模式）
+                if not _is_system:
+                    rel_mode = get_config("relationship_mode", "fast")
+                    if rel_mode in ("auto", "semi-auto"):
+                        messages.append({"role": "system", "content": "【关系反馈】回复结束时用标签标注关系变化，格式：<好感变化:±N> <信任变化:±N>，N∈[0,2]。例如：<好感变化:+1> <信任变化:0>。这些标签会被自动处理，不会显示给用户。"})
 
                 # 事实型意图用低温(0.3)减少幻觉，创意对话用高温(0.65)增加变化
                 tool_temp = 0.3 if intent_type in ("weather", "location", "search") else 0.5
@@ -732,7 +768,7 @@ async def chat_websocket(websocket: WebSocket):
                             try:
                                 result = call_tool(func_name, func_args)
                             except Exception as e:
-                                result = f"工具执行失败: {e}"
+                                result = f"工具执行失败"
                                 print(f"[工具调用] 错误: {e}")
                             print(f"[工具调用] 结果: {result[:100]}")
                             tool_results.append({
@@ -836,6 +872,25 @@ async def chat_websocket(websocket: WebSocket):
                                     if fb:
                                         add_chat_message("system", fb)
 
+                            # ─── 关系标签解析（<好感变化:±N> <信任变化:±N>）───
+                            if not _is_system:
+                                rel_mode = get_config("relationship_mode", "fast")
+                                if rel_mode in ("auto", "semi-auto"):
+                                    import re as _rel_re
+                                    _aff_match = _rel_re.search(r'<好感变化:([+-]?\d+(?:\.\d+)?)>', assistant_content)
+                                    _trust_match = _rel_re.search(r'<信任变化:([+-]?\d+(?:\.\d+)?)>', assistant_content)
+                                    if _aff_match or _trust_match:
+                                        from core.relationship import adjust_relationship
+                                        _aff_delta = float(_aff_match.group(1)) if _aff_match else 0
+                                        _trust_delta = float(_trust_match.group(1)) if _trust_match else 0
+                                        if abs(_aff_delta) > 0.001 or abs(_trust_delta) > 0.001:
+                                            adj_result = {"relationship_impact": _aff_delta, "target": "ai", "intent": "statement", "sentiment": "neutral"}
+                                            adjust_relationship(sentiment_result=adj_result)
+                                            print(f"[关系标签] 好感变化:{_aff_delta:+.1f} 信任变化:{_trust_delta:+.1f}")
+                                        # 剥离标签
+                                        assistant_content = _rel_re.sub(r'<好感变化:[+-]?\d+(?:\.\d+)?>', '', assistant_content)
+                                        assistant_content = _rel_re.sub(r'<信任变化:[+-]?\d+(?:\.\d+)?>', '', assistant_content).strip()
+
                         if not _is_system:
                             # 拆句保存，向量化也按句索引
                             sentences = fallback_split(assistant_content)
@@ -869,22 +924,22 @@ async def chat_websocket(websocket: WebSocket):
 
                     # 需求记录保存（后台线程，系统消息跳过）
                     if not _is_system and demand and demand.get("level", "UNKNOWN") not in ("LITERAL", "UNKNOWN"):
-                        threading.Thread(target=save_demand_record, args=(demand, original_user_message), daemon=True).start()
+                        _submit_background(save_demand_record, demand, original_user_message)
 
                     # 衰减 + 提及 + 三级摘要生成（后台线程，系统消息跳过）
                     if not _is_system:
-                        threading.Thread(target=run_background_tasks, args=(msg_count, original_user_message), daemon=True).start()
+                        _submit_background(run_background_tasks, msg_count, original_user_message)
                     if not _is_system:
                         # 事件状态检测（每次用户消息都跑）
                         from core.profile_builder import track_event_completion, track_plan_intent, track_in_progress, clear_completed_plans
-                        threading.Thread(target=track_event_completion, args=(original_user_message,), daemon=True).start()
-                        threading.Thread(target=track_plan_intent, args=(original_user_message,), daemon=True).start()
-                        threading.Thread(target=track_in_progress, args=(original_user_message,), daemon=True).start()
-                        threading.Thread(target=clear_completed_plans, daemon=True).start()
+                        _submit_background(track_event_completion, original_user_message)
+                        _submit_background(track_plan_intent, original_user_message)
+                        _submit_background(track_in_progress, original_user_message)
+                        _submit_background(clear_completed_plans)
                         if msg_count % 50 == 0:
-                            threading.Thread(target=extract_profile_from_messages, daemon=True).start()
+                            _submit_background(extract_profile_from_messages)
                         if msg_count % 30 == 0:
-                            threading.Thread(target=extract_atomic_facts, daemon=True).start()
+                            _submit_background(extract_atomic_facts)
                         if msg_count % 30 == 0:
                             # 知识图谱提取
                             def _extract_kg():
@@ -898,17 +953,17 @@ async def chat_websocket(websocket: WebSocket):
                                         print(f"[知识图谱] 提取了 {len(triplets)} 个三元组")
                                 except Exception as e:
                                     print(f"[知识图谱] 提取失败: {e}")
-                            threading.Thread(target=_extract_kg, daemon=True).start()
+                            _submit_background(_extract_kg)
                         if msg_count % 50 == 0:
-                            threading.Thread(target=extract_patterns_via_llm, daemon=True).start()
+                            _submit_background(extract_patterns_via_llm)
                         # 计算连续互动天数 + 检查成就
-                        threading.Thread(target=_calc_consecutive_days, args=(msg_count, websocket, loop), daemon=True).start()
+                        _submit_background(_calc_consecutive_days, msg_count, websocket, loop)
                     # 每日触发情绪自主演化（全局，不限系统消息）
-                    threading.Thread(target=_trigger_daily_evolution, daemon=True).start()
+                    _submit_background(_trigger_daily_evolution)
                     # 随机小惊喜 + 检查目标完成 + 自动记录AI背景（系统消息跳过）
                     if not _is_system:
-                        threading.Thread(target=_maybe_surprise, args=(websocket, loop), daemon=True).start()
-                        threading.Thread(target=_check_goal_completion, args=(original_user_message,), daemon=True).start()
+                        _submit_background(_maybe_surprise, websocket, loop)
+                        _submit_background(_check_goal_completion, original_user_message)
 
                 except Exception as e:
                     print(f"[API] 请求失败: {type(e).__name__}: {e}")
@@ -949,9 +1004,8 @@ async def chat_websocket(websocket: WebSocket):
         try:
             set_config("_proactive_context", "null")
         except Exception as e:
-            silent_exc("?", e)
+            silent_exc("chat_websocket.cleanup", e)
         # diary_task 是全局任务，不在此取消（由 APScheduler 管理生命周期）
-
 
 # ─── 天气定时推送调度器（已提取到 api/weather_push.py）───
 

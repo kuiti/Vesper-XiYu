@@ -149,10 +149,14 @@ def sync_memories_to_vector():
             value = r["value"]
             if not value or len(value) < 5:
                 continue
-            # 检查是否已存在
-            existing = collection.get(ids=[f"mem_{key}"])
+            # 检查是否已存在，并比较内容是否变化
+            existing = collection.get(ids=[f"mem_{key}"], include=["documents"])
             if existing and existing.get("ids"):
-                continue
+                # 内容未变化则跳过
+                old_doc = existing["documents"][0] if existing.get("documents") else ""
+                if old_doc == value:
+                    continue
+            # 内容变化或不存在，执行 upsert
             embedding = model.encode(value).tolist()
             collection.upsert(
                 ids=[f"mem_{key}"],

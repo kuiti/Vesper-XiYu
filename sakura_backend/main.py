@@ -37,9 +37,11 @@ _ALL_ROUTERS = [
     ("api.chat_manage", "router"),
     ("api.rag", "router"),
     ("api.export", "router"),
+    ("api.user_persona", "router"),
     ("api.avatar", "router"),
     ("api.countdowns", "router"),
     ("api.reminders", "router"),
+    ("api.lorebook", "router"),
     ("api.migrate", "router"),
     ("api.split_sentences", "router"),
     ("api.knowledge", "router"),
@@ -104,8 +106,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept"],
 )
 
 # ─── 认证中间件 ───

@@ -22,28 +22,6 @@ from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 
-# ─── 深度提示 ───
-
-def _build_depth_hint(user_message: str, emotion: str) -> str:
-    """构建深度提示：根据上下文动态选择行为强化提示"""
-    hints = []
-    if emotion == "negative":
-        hints.append("用户情绪不好，回复要温柔，先接住情绪再给建议。不要说教。")
-    elif emotion == "positive":
-        hints.append("用户心情不错，可以适当活跃气氛。")
-    if len(user_message) < 5:
-        hints.append("用户回复很短，你也简短回复，不要追问。")
-    elif len(user_message) > 100:
-        hints.append("用户说了很长一段，认真回应每个要点。")
-    if any(kw in user_message for kw in ["帮", "帮我", "请问", "怎么"]):
-        hints.append("用户在求助，直接给方案，不要废话。")
-    if any(kw in user_message for kw in ["开心", "哈哈", "笑"]):
-        hints.append("用户在开心，跟着一起开心就好。")
-    if not hints:
-        return ""
-    return "【提醒】" + " ".join(hints)
-
-
 # ─── DSML 清理 ───
 
 def _clean_dsml(text: str) -> str:
@@ -267,10 +245,18 @@ def _parse_dsml_tool_calls(text: str) -> list:
         for pm in re.finditer(param_pattern, body, re.DOTALL):
             pname = pm.group(1)
             pval = pm.group(2).strip()
+            # 按顺序尝试类型转换：json.loads → int → float → str
             try:
-                pval = int(pval)
-            except ValueError as e:
-                silent_exc("chat_tasks", e)
+                import json as _json
+                pval = _json.loads(pval)
+            except (ValueError, TypeError):
+                try:
+                    pval = int(pval)
+                except ValueError:
+                    try:
+                        pval = float(pval)
+                    except ValueError:
+                        pass  # 保持字符串
             args[pname] = pval
         results.append({"name": func_name, "args": args})
     return results

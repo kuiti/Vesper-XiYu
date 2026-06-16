@@ -29,7 +29,7 @@ def set_memory(key, value):
                 "INSERT INTO memory_history (memory_key, old_value, new_value, event) VALUES (?, ?, ?, ?)",
                 (key, None, value, "CREATE")
             )
-        cursor.execute("REPLACE INTO memory (key, value) VALUES (?, ?)", (key, value))
+        cursor.execute("REPLACE INTO memory (key, value, updated_at) VALUES (?, ?, ?)", (key, value, datetime.now().isoformat()))
 
 
 def delete_memory(key):

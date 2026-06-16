@@ -25,8 +25,8 @@ class ThinkingParser:
             # 清除思考段的分隔符和 DSML 工具调用
             self.buffer = self.buffer.replace("<<>>", "")
             if "DSML" in self.buffer and "invoke" in self.buffer:
-                # 检测到 DSML 工具调用，从 buffer 中移除
-                self.buffer = re.sub(r'<＜＜DSML＞＞tool_calls>.*?</＜＜DSML＞＞tool_calls>', '', self.buffer, flags=re.DOTALL)
+                # 检测到 DSML 工具调用，从 buffer 中移除（支持全角和半角）
+                self.buffer = re.sub(r'<[＜<]{2}DSML[＞>]{2}tool_calls>.*?</[＜<]{2}DSML[＞>]{2}tool_calls>', '', self.buffer, flags=re.DOTALL)
             idx = self.buffer.find(self.REPLY_MARKER)
             if idx != -1:
                 self.thinking = self.buffer[:idx]
@@ -38,9 +38,9 @@ class ThinkingParser:
             return None
         else:
             self.reply += token
-            # 清除 DSML 工具调用
+            # 清除 DSML 工具调用（支持全角和半角）
             if "DSML" in self.reply and "invoke" in self.reply:
-                self.reply = re.sub(r'<＜＜DSML＞＞tool_calls>.*?</＜＜DSML＞＞tool_calls>', '', self.reply, flags=re.DOTALL)
+                self.reply = re.sub(r'<[＜<]{2}DSML[＞>]{2}tool_calls>.*?</[＜<]{2}DSML[＞>]{2}tool_calls>', '', self.reply, flags=re.DOTALL)
                 # 重新计算 buffer 中的 reply 部分
                 marker_idx = self.buffer.find(self.REPLY_MARKER)
                 if marker_idx != -1:
@@ -57,9 +57,9 @@ class ThinkingParser:
         text = self.buffer.strip()
         if not text:
             return ""
-        # 移除 DSML 工具调用
+        # 移除 DSML 工具调用（支持全角和半角）
         if "DSML" in text:
-            text = re.sub(r'<＜＜DSML＞＞tool_calls>.*?</＜＜DSML＞＞tool_calls>', '', text, flags=re.DOTALL).strip()
+            text = re.sub(r'<[＜<]{2}DSML[＞>]{2}tool_calls>.*?</[＜<]{2}DSML[＞>]{2}tool_calls>', '', text, flags=re.DOTALL).strip()
         # 提取最后一个段落
         paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
         if paragraphs:

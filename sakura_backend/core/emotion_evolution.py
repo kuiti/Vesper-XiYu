@@ -206,7 +206,7 @@ def process_daily_evolution():
             update_trait("agreeableness", 0.01)
             print(f"[情绪演化] 今日互动 → expressiveness+0.01")
     except Exception as e:
-        silent_exc("?", e)
+        silent_exc("daily_evolution.interaction", e)
 
     # ─── 规则6: 周日反思 ───
     if datetime.now().weekday() == 6:
@@ -220,7 +220,7 @@ def process_daily_evolution():
         with get_conn() as conn:
             conn.cursor().execute("DELETE FROM emotion_log WHERE timestamp < date('now', '-90 days')")
     except Exception as e:
-        silent_exc("?", e)
+        silent_exc("daily_evolution.cleanup", e)
     print(f"[情绪演化] 每日演化完成")
 
 

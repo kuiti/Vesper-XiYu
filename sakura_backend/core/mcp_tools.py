@@ -472,7 +472,7 @@ def call_tool(name, arguments):
                         lines.append(f"{label} {r['key']}: {r['value'][:200]}")
                     return "\n".join(lines)
         except Exception as e:
-            silent_exc("?", e)
+            silent_exc("call_tool", e)
         # 降级：关键词检索
         mems = get_memory()
         query_lower = query.lower()
@@ -519,7 +519,7 @@ def call_tool(name, arguments):
             import json
             import hashlib
             from datetime import datetime
-            fact_hash = hashlib.md5(summary.encode()).hexdigest()
+            fact_hash = hashlib.sha256(summary.encode()).hexdigest()
             with get_conn() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT id FROM user_profile WHERE key = ?", (f"_fact_{fact_hash}",))

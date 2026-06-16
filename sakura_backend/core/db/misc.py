@@ -81,6 +81,8 @@ ACHIEVEMENTS = [
 
 
 def check_achievements(msg_count, consecutive_days, total_days, hour, affection, trust):
+    if hour is None:
+        hour = -1
     unlocked = []
     with get_conn() as conn:
         cursor = conn.cursor()

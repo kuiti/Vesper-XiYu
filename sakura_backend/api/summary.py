@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from core.db import (
     get_active_tiered_summaries, get_all_active_keypoints,
     get_death_archive, get_msg_counter,
@@ -50,7 +50,14 @@ async def get_archive():
 
 
 @router.post("/reset")
-async def reset_memory():
+async def reset_memory(request: Request):
+    from core.auth import _get_token
+import hmac
+    # 云端模式下需要认证
+    if _get_token():
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer ") or not hmac.compare_digest(auth_header[7:], _get_token()):
+            return {"status": "error", "message": "Unauthorized"}
     from core.db import get_conn
     with get_conn() as conn:
         cursor = conn.cursor()

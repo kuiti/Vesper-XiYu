@@ -29,6 +29,9 @@ from core.persona_data import (
 class PromptPipe(ABC):
     """提示词管道的抽象基类"""
 
+    zone: str = "dynamic"
+    """注入区域：static=静态前缀, dynamic=动态末尾, depth:N=在聊天历史倒数第N条后注入"""
+
     @abstractmethod
     def process(self, ctx: "PipelineContext") -> str | None:
         """处理管道，返回文本片段或 None（不注入）"""
@@ -53,6 +56,8 @@ class PipelineContext:
         self.proactive_note = kwargs.get("proactive_note", "")
         self.kb_title_hint = kwargs.get("kb_title_hint", "")
         self.session_triggered = kwargs.get("session_triggered", set())
+        self.chat_history = kwargs.get("chat_history", None)
+        """最近对话历史，用于深度注入计算 (list[dict])"""
         self._msg_counter = None
 
     @property
@@ -87,24 +92,39 @@ class PromptPipeline:
         """注册到动态内容（每次可能不同）"""
         self._dynamic_pipes.append(pipe)
 
-    def build(self, ctx: PipelineContext) -> tuple[str, str]:
-        """执行所有管道，返回 (static_prefix, dynamic_content)"""
+    def build(self, ctx: PipelineContext) -> tuple[str, str, list[tuple[int, str]]]:
+        """执行所有管道，返回 (static_prefix, dynamic_content, depth_entries)
+
+        depth_entries: [(depth_N, content), ...]
+            depth=0 = 生成前最后注入（PHI）
+            depth=N = 在聊天历史倒数第N条消息后注入
+        """
         # 静态部分
         static_parts = []
         for pipe in self._static_pipes:
             result = pipe.process(ctx)
             if result:
                 static_parts.append(result)
-        static_prefix = "\n".join(static_parts)
 
         # 动态部分
         dynamic_parts = []
+        depth_entries: list[tuple[int, str]] = []
         for pipe in self._dynamic_pipes:
             result = pipe.process(ctx)
             if result:
-                dynamic_parts.append(result)
+                zone = getattr(pipe, "zone", "dynamic")
+                if zone == "static":
+                    static_parts.append(result)
+                elif zone.startswith("depth:"):
+                    try:
+                        depth = int(zone.split(":", 1)[1])
+                        depth_entries.append((depth, result))
+                    except (ValueError, IndexError):
+                        dynamic_parts.append(result)
+                else:
+                    dynamic_parts.append(result)
 
-        # Token 预算
+        # Token 预算（仅对 dynamic 区域执行）
         from core.config_keys import TOKEN_BUDGET_CHARS as _BUDGET
         _total = 0
         _filtered = []
@@ -118,7 +138,7 @@ class PromptPipeline:
             _filtered.append(_p)
             _total += _plen
 
-        return static_prefix, "\n".join(_filtered) if _filtered else ""
+        return "\n".join(static_parts), "\n".join(_filtered) if _filtered else "", depth_entries
 
 
 # ─── 内置管道实现 ───
@@ -287,7 +307,8 @@ class RollingSummaryPipe(PromptPipe):
 
 
 class ContinuityPipe(PromptPipe):
-    """对话连续感"""
+    """对话连续感（注入深度 4）"""
+    zone = "depth:4"
     def process(self, ctx: PipelineContext) -> str | None:
         if not ctx.is_module_enabled("continuity"):
             return None
@@ -310,7 +331,8 @@ class EntityContextPipe(PromptPipe):
 
 
 class SummariesPipe(PromptPipe):
-    """三级摘要"""
+    """三级摘要（注入深度 5）"""
+    zone = "depth:5"
     def process(self, ctx: PipelineContext) -> str | None:
         if not ctx.is_module_enabled("summaries"):
             return None
@@ -396,7 +418,8 @@ class SchedulePipe(PromptPipe):
 
 
 class RAGPipe(PromptPipe):
-    """向量检索上下文"""
+    """向量检索上下文（注入深度 3）"""
+    zone = "depth:3"
     def process(self, ctx: PipelineContext) -> str | None:
         if not ctx.is_module_enabled("rag"):
             return None
@@ -406,12 +429,74 @@ class RAGPipe(PromptPipe):
 
 
 class KnowledgeBasePipe(PromptPipe):
-    """关键词触发知识注入（SillyTavern 世界书方案）"""
+    """关键词触发知识注入（Lorebook，注入深度 2）"""
+    zone = "depth:2"
     def process(self, ctx: PipelineContext) -> str | None:
         if not ctx.is_module_enabled("knowledge_base"):
             return None
-        from core.prompt_builder import _get_triggered_knowledge
-        return _get_triggered_knowledge(ctx.user_message)
+        if not ctx.user_message:
+            return None
+        try:
+            from core.lorebook import lorebook_manager
+            matched = lorebook_manager.match_entries(ctx.user_message)
+            if not matched:
+                return None
+            texts = [m["content"] for m in matched]
+            return "【相关知识】\n" + "\n".join(texts)
+        except Exception as _kb_exc:
+            from core.retry import silent_exc
+            silent_exc("KnowledgeBasePipe", _kb_exc)
+            return None
+
+
+class DepthHintPipe(PromptPipe):
+    """深度提示：根据上下文动态选择行为强化（注入深度 1）"""
+    zone = "depth:1"
+
+    def process(self, ctx: PipelineContext) -> str | None:
+        if not ctx.is_module_enabled("depth_hint"):
+            return None
+        hints = []
+        if ctx.emotion == "negative":
+            hints.append("用户情绪不好，回复要温柔，先接住情绪再给建议。不要说教。")
+        elif ctx.emotion == "positive":
+            hints.append("用户心情不错，可以适当活跃气氛。")
+        if len(ctx.user_message) < 5:
+            hints.append("用户回复很短，你也简短回复，不要追问。")
+        elif len(ctx.user_message) > 100:
+            hints.append("用户说了很长一段，认真回应每个要点。")
+        if any(kw in ctx.user_message for kw in ["帮", "帮我", "请问", "怎么"]):
+            hints.append("用户在求助，直接给方案，不要废话。")
+        if any(kw in ctx.user_message for kw in ["开心", "哈哈", "笑"]):
+            hints.append("用户在开心，跟着一起开心就好。")
+        if not hints:
+            return None
+        return "【提醒】" + " ".join(hints)
+
+
+class PostHistoryPipe(PromptPipe):
+    """Post-History Instructions — 生成前最后注入（最高优先级）"""
+    zone = "depth:0"
+
+    def process(self, ctx: PipelineContext) -> str | None:
+        if not ctx.is_module_enabled("post_history"):
+            return None
+        phi = get_config("post_history_instructions", "")
+        return phi if phi else None
+
+
+class UserPersonaPipe(PromptPipe):
+    """用户身份注入"""
+    zone = "dynamic"
+
+    def process(self, ctx: PipelineContext) -> str | None:
+        if not ctx.is_module_enabled("user_persona"):
+            return None
+        from core.user_persona import user_persona_manager
+        desc = user_persona_manager.get_active_description()
+        if not desc:
+            return None
+        return f"【关于我】{desc}"
 
 
 class KnowledgeGraphPipe(PromptPipe):
@@ -570,6 +655,9 @@ def get_default_pipeline() -> PromptPipeline:
     p.register(DroppedContextPipe())
     p.register(PendingGoalPipe())
     p.register(UserSummaryPipe())
+    p.register(DepthHintPipe())
+    p.register(PostHistoryPipe())
+    p.register(UserPersonaPipe())
 
     _default_pipeline = p
     return p

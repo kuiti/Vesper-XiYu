@@ -82,7 +82,7 @@ async def proactive_loop(
                         if len(_recent) >= 2 and all(r["role"] == "assistant" for r in _recent):
                             continue
                     except Exception as e:
-                        silent_exc("?", e)
+                        silent_exc("proactive_loop.recent_check", e)
 
                     # 关怀类每日上限检查
                     from api.proactive import check_care_category_limit, record_care_trigger, get_care_category

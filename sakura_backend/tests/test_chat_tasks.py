@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 
 from api.chat_tasks import (
     _clean_dsml,
-    _build_depth_hint,
     _parse_dsml_tool_calls,
     _apply_background_update,
     REMINDER_RULES,
@@ -60,52 +59,54 @@ class TestCleanDSML:
 
 
 # ═══════════════════════════════════════════════════════════════
-# _build_depth_hint — 深度提示
+# DepthHintPipe — 深度提示（替代旧的 _build_depth_hint）
 # ═══════════════════════════════════════════════════════════════
 
 
-class TestBuildDepthHint:
+class TestDepthHintPipe:
+    def pipe_result(self, msg, emotion):
+        from core.prompt_pipeline import DepthHintPipe, PipelineContext
+        pipe = DepthHintPipe()
+        ctx = PipelineContext(user_message=msg, emotion=emotion, modules_enabled={"depth_hint": True})
+        return pipe.process(ctx) or ""
+
     def test_empty_message(self):
-        result = _build_depth_hint("", "neutral")
-        # 空消息长度 < 5，应有短回复提示
+        result = self.pipe_result("", "neutral")
         assert "短" in result or result == ""
 
     def test_negative_emotion(self):
-        result = _build_depth_hint("我今天好难过啊", "negative")
+        result = self.pipe_result("我今天好难过啊", "negative")
         assert "温柔" in result
 
     def test_positive_emotion(self):
-        result = _build_depth_hint("今天天气真好", "positive")
+        result = self.pipe_result("今天天气真好", "positive")
         assert "活跃" in result
 
     def test_short_message(self):
-        result = _build_depth_hint("嗯", "neutral")
+        result = self.pipe_result("嗯", "neutral")
         assert "短" in result
 
     def test_long_message(self):
         msg = "这是一段很长很长的消息" * 10
-        result = _build_depth_hint(msg, "neutral")
+        result = self.pipe_result(msg, "neutral")
         assert "认真回应" in result
 
     def test_help_keywords(self):
         for kw in ["帮", "帮我", "请问", "怎么"]:
-            result = _build_depth_hint(f"{kw}我一下", "neutral")
+            result = self.pipe_result(f"{kw}我一下", "neutral")
             assert "方案" in result
 
     def test_happy_keywords(self):
-        result = _build_depth_hint("哈哈太好笑了", "neutral")
+        result = self.pipe_result("哈哈太好笑了", "neutral")
         assert "开心" in result
 
     def test_no_hints_neutral(self):
-        """普通中等长度消息 + 中性情绪 → 无提示。"""
-        result = _build_depth_hint("今天吃了个苹果", "neutral")
+        result = self.pipe_result("今天吃了个苹果", "neutral")
         assert result == ""
 
     def test_neutral_emotion_no_hint(self):
-        result = _build_depth_hint("随便聊聊", "neutral")
-        # 中性情绪不触发情绪提示
+        result = self.pipe_result("随便聊聊", "neutral")
         assert "温柔" not in result
-
 
 # ═══════════════════════════════════════════════════════════════
 # _parse_dsml_tool_calls — DSML 工具调用解析

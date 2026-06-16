@@ -25,6 +25,11 @@
     <div class="card"><h3>设定背景板</h3><p class="hint">记录你为 AI 设定的背景信息。</p>
       <textarea :value="aiBackground" @change="$emit('update:aiBackground', $event.target.value); $emit('save-cfg', 'ai_background', $event.target.value)" rows="5" placeholder="例如：外号：小仓" style="min-height:100px;resize:vertical"></textarea>
     </div>
+    <div class="card"><h3>角色卡扩展</h3><p class="hint">角色卡额外信息，切换角色卡后会自动填充。留空使用角色卡默认值。</p>
+      <div class="field"><label>角色简介</label><textarea :value="cardDescription" @change="$emit('update:cardDescription', $event.target.value); $emit('save-cfg', 'card_description', $event.target.value)" rows="2" placeholder="对角色的简短描述" style="resize:vertical"></textarea></div>
+      <div class="field"><label>性格描述</label><textarea :value="cardPersonality" @change="$emit('update:cardPersonality', $event.target.value); $emit('save-cfg', 'card_personality', $event.target.value)" rows="3" placeholder="角色的性格特征" style="resize:vertical"></textarea></div>
+      <div class="field"><label>当前场景</label><textarea :value="cardScenario" @change="$emit('update:cardScenario', $event.target.value); $emit('save-cfg', 'card_scenario', $event.target.value)" rows="2" placeholder="留空=自由发挥，对话时自然引导" style="resize:vertical"></textarea></div>
+    </div>
     <div class="card"><h3>关系类型</h3><p class="hint">选择你和 AI 的关系类型，会影响人设和说话风格。</p>
       <select :value="foundationType" @change="$emit('update:foundationType', $event.target.value); $emit('foundation-change')">
         <option value="空白">空白（默认）</option>
@@ -57,11 +62,13 @@ export default {
     foundationType: String, foundationTypes: { type: Object, default: () => ({}) },
     pendingFoundation: String, resetFoundationValues: Boolean,
     presetName: String, presets: { type: Object, default: () => ({}) },
+    cardDescription: String, cardPersonality: String, cardScenario: String,
   },
   emits: ['update:aiName', 'update:userName', 'update:tone', 'update:length',
           'update:recall', 'update:allowEmotion', 'update:customPrompt', 'update:aiBackground',
           'update:aiAvatarUrlLocal', 'update:userAvatarUrlLocal', 'update:foundationType',
           'update:resetFoundationValues', 'update:presetName',
+          'update:cardDescription', 'update:cardPersonality', 'update:cardScenario',
           'save-cfg', 'upload-avatar', 'upload-avatar-url', 'foundation-change',
           'confirm-foundation', 'cancel-foundation', 'save-preset', 'load-preset', 'delete-preset'],
 }

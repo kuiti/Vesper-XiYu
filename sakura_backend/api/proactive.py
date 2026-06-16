@@ -207,9 +207,9 @@ def should_proactive_trigger(
                         "style": "温和提醒，不催促"
                     }
             except Exception as e:
-                silent_exc("?", e)
+                silent_exc("proactive.negative_streak.strategy", e)
     except Exception as e:
-        silent_exc("?", e)
+        silent_exc("proactive.negative_streak", e)
 
     # ─── 触发 E: 长期目标跟进 ───
     try:
@@ -223,7 +223,7 @@ def should_proactive_trigger(
                 "style": "自然提起，不像任务清单，像朋友关心进展"
             }
     except Exception as e:
-        silent_exc("?", e)
+        silent_exc("proactive.goal_followup", e)
 
     # ─── 兜底: 空闲 >= 30 分钟 ───
     if idle_minutes >= 30 and "idle" not in session_triggered:

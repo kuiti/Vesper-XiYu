@@ -11,7 +11,7 @@ try:
     with get_conn() as _c:
         _c.execute('CREATE TABLE IF NOT EXISTS favorites (id INTEGER PRIMARY KEY AUTOINCREMENT, msg_id INTEGER UNIQUE, content TEXT, role TEXT, timestamp TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)')
 except Exception as e:
-    silent_exc("?", e)
+    silent_exc("favorites_init", e)
 
 @router.get("/")
 async def list_favorites():

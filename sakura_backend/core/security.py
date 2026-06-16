@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 import socket
+socket.setdefaulttimeout(3)
 import ipaddress
 import re
 from urllib.parse import urlparse

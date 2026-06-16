@@ -1,6 +1,27 @@
+# 允许导入/导出的表名白名单
+_TABLE_WHITELIST = frozenset({
+    "user_profile", "ai_personality_traits", "goal_tracking",
+    "emotion_daily", "proactive_flags", "proactive_response_log",
+    "chat_history", "config", "memory", "todos", "notes",
+    "countdowns", "reminders", "presets", "tiered_summary",
+    "death_archive", "entities", "knowledge_graph", "schedule",
+    "pending_goals", "empathy_feedback", "demand_patterns",
+    "sentence_index", "memory_importance", "memory_history",
+    "user_activity_stats", "habits", "favorites", "ai_diary",
+    "achievements", "emotion_log", "lorebook", "user_personas",
+})
+
+
+def _validate_table_name(table: str) -> str:
+    """白名单校验表名，不通过时抛出 ValueError"""
+    if table not in _TABLE_WHITELIST:
+        raise ValueError(f"不允许操作的表: {table}")
+    return table
+
+
 import json
 from datetime import datetime
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, BackgroundTasks, Request
 from fastapi.responses import JSONResponse
 from core.db import (
     get_conn, get_config, get_memory, get_all_chat_messages,
@@ -30,7 +51,8 @@ def _get_counter_detail():
 
 
 def _query_all(table: str) -> list:
-    """通用查询：导出某张表的全部行"""
+    """通用查询：导出某张表的全部行（表名白名单校验）"""
+    _validate_table_name(table)
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute(f"SELECT * FROM {table}")
@@ -94,8 +116,15 @@ def _collect_export_data() -> dict:
 
 
 @router.get("/export")
-async def export_all():
+async def export_all(request: Request):
     """导出全部数据为一个 JSON 文件"""
+    from core.auth import _get_token
+    import hmac
+    # 云端模式下需要认证
+    if _get_token():
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer ") or not hmac.compare_digest(auth_header[7:], _get_token()):
+            return {"status": "error", "message": "Unauthorized"}
     return JSONResponse(
         content=_collect_export_data(),
         headers={"Content-Disposition": "attachment; filename=sakura_backup.json"}
@@ -103,8 +132,15 @@ async def export_all():
 
 
 @router.post("/import")
-async def import_all(file: UploadFile = File(...), bg: BackgroundTasks = None):
+async def import_all(request: Request, file: UploadFile = File(...), bg: BackgroundTasks = None):
     """从导出的 JSON 文件恢复全部数据"""
+    from core.auth import _get_token
+
+    # 云端模式下需要认证
+    if _get_token():
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer ") or not hmac.compare_digest(auth_header[7:], _get_token()):
+            return {"status": "error", "message": "Unauthorized"}
     # 阶段1：解析和验证
     try:
         raw = await file.read()
@@ -238,6 +274,7 @@ async def import_all(file: UploadFile = File(...), bg: BackgroundTasks = None):
                 columns = list(rows[0].keys())
                 # 检查表是否存在这些列
                 try:
+                    _validate_table_name(table_name)
                     cursor.execute(f"PRAGMA table_info({table_name})")
                     actual_cols = {r[1] for r in cursor.fetchall()}
                     valid_cols = [c for c in columns if c in actual_cols]

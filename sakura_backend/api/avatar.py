@@ -82,9 +82,13 @@ async def upload_avatar_by_url(role: str, data: AvatarUrl):
     except Exception as e:
         silent_exc("avatar", e)
 
+    # DNS 重绑定防护：用解析后的 IP 替换 hostname，防止第二次解析到不同地址
+    safe_url = data.url.replace(hostname, ip, 1) if hostname else data.url
     try:
-        resp = await asyncio.to_thread(requests.get, data.url, timeout=10, stream=True)
-        resp.raise_for_status()
+        import httpx
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(safe_url, headers={"Host": hostname}, follow_redirects=True)
+            resp.raise_for_status()
     except Exception as e:
         raise HTTPException(400, f"下载图片失败: {e}")
 

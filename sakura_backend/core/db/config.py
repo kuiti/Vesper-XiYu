@@ -3,11 +3,16 @@
 import json
 import copy
 import time as _time
+import threading
 from . import get_conn
 from core.retry import silent_exc
 
+# 影响 LLM provider 缓存的配置键
+_provider_config_keys = frozenset({"llm_provider", "api_base_url", "api_model", "api_key", "api_provider"})
+
 # ========== 配置缓存 ==========
-_config_cache = {}  # {key: (value, expire_ts)}
+_config_cache = {}
+_config_cache_lock = threading.Lock()  # {key: (value, expire_ts)}
 _CONFIG_TTL = 30.0  # 30 秒缓存，平衡响应速度与 DB 压力
 _CONFIG_CACHE_MAX = 500
 
@@ -18,15 +23,14 @@ def clear_config_cache():
 
 
 def get_config(key, default=None):
-    # 内存缓存命中
-    now = _time.time()
-    cached = _config_cache.get(key)
-    if cached and cached[1] > now:
-        v = cached[0]
-        # 返回深拷贝，防止调用方修改缓存中的可变对象
-        if isinstance(v, (dict, list)):
-            return copy.deepcopy(v)
-        return v
+    with _config_cache_lock:
+        now = _time.time()
+        cached = _config_cache.get(key)
+        if cached and cached[1] > now:
+            v = cached[0]
+            if isinstance(v, (dict, list)):
+                return copy.deepcopy(v)
+            return v
 
     with get_conn() as conn:
         cursor = conn.cursor()
@@ -83,4 +87,10 @@ def set_config(key, value):
             value = str(value)
         cursor.execute("INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)", (key, value, datetime.now().isoformat()))
     # 失效缓存
+    if key in _provider_config_keys:
+        try:
+            from core.llm_provider import clear_provider_cache
+            clear_provider_cache()
+        except Exception:
+            pass
     _config_cache.pop(key, None)

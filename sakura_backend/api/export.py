@@ -6,7 +6,7 @@ import json
 router = APIRouter(prefix="/export", tags=["export"])
 
 @router.get("/chat")
-async def export_chat(format: str = "json") -> Dict[str, Any]:
+async def export_chat(format: Literal["json", "txt", "md"] = "json") -> Dict[str, Any]:
     """导出聊天记录，支持 json / txt / md 格式"""
     messages = get_all_chat_messages()
     ai_name = get_config("ai_name", "AI")

@@ -6,16 +6,23 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+import threading
+
 logger = logging.getLogger(__name__)
 
 # 全局调度器实例
 _scheduler = None
+_scheduler_lock = threading.Lock()
 
 
 def get_scheduler() -> AsyncIOScheduler:
-    """获取全局调度器（懒初始化）"""
+    """获取全局调度器（懒初始化，线程安全）"""
     global _scheduler
-    if _scheduler is None:
+    if _scheduler is not None:
+        return _scheduler
+    with _scheduler_lock:
+        if _scheduler is not None:
+            return _scheduler
         _scheduler = AsyncIOScheduler(
             job_defaults={
                 'coalesce': True,      # 错过的任务合并为一次执行

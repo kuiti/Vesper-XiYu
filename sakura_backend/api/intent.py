@@ -441,7 +441,7 @@ def _handle_weather(user_message: str) -> tuple:
                     parts.append("，".join(extras))
                 weather_text = "，".join(parts)
         except Exception as e:
-            silent_exc("?", e)
+            silent_exc("get_weather_text", e)
 
     # 3. Open-Meteo 最后兜底
     if not weather_text:

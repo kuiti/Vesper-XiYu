@@ -72,6 +72,23 @@ async def apply_character(data: dict):
 @router.post("/import/json")
 async def import_json(data: dict):
     """导入 JSON 格式角色卡"""
+    # 基本数据校验
+    if not isinstance(data, dict):
+        raise HTTPException(400, "数据必须是 JSON 对象")
+    # 检查必要字段
+    required_fields = ["name", "description"]
+    for field in required_fields:
+        if field not in data:
+            raise HTTPException(400, f"缺少必要字段: {field}")
+    # 限制字段数量，防止注入过多配置
+    allowed_fields = {"name", "description", "personality", "scenario", "first_mes",
+                      "mes_example", "system_prompt", "tags", "spec", "spec_version",
+                      "data", "metadata", "extensions"}
+    extra_fields = set(data.keys()) - allowed_fields
+    if extra_fields:
+        # 移除不允许的字段
+        for field in extra_fields:
+            del data[field]
     try:
         card = CharacterCard.from_json(json.dumps(data))
     except Exception as e:

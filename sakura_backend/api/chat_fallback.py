@@ -32,7 +32,7 @@ async def try_fallback_reply(
     try:
         from core.llm_provider import get_provider
         fallback_provider = get_provider()
-        fallback_msgs = [m for m in messages if m["role"] != "system"]
+        fallback_msgs = [m for m in messages if m["role"] == "system"] + [m for m in messages if m["role"] != "system"]
         fallback_reply = fallback_provider.chat(
             fallback_msgs,
             temperature=0.5,

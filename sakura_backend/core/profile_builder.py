@@ -168,7 +168,7 @@ def extract_atomic_facts():
             text = str(fact["text"]).strip()
             if len(text) < 5:
                 continue
-            fact_hash = hashlib.md5(text.encode()).hexdigest()
+            fact_hash = hashlib.sha256(text.encode()).hexdigest()
             category = fact.get("category", "general")
             temporality = fact.get("temporality", "permanent")
             try:
@@ -359,7 +359,7 @@ def extract_entities_from_text(text: str) -> list:
 def upsert_entity(entity_text: str, entity_type: str, memory_key: str):
     """插入或更新实体，关联到记忆"""
     import hashlib
-    entity_hash = hashlib.md5(entity_text.lower().encode()).hexdigest()
+    entity_hash = hashlib.sha256(entity_text.lower().encode()).hexdigest()
     with get_conn() as conn:
         cursor = conn.cursor()
         # 检查是否已存在
@@ -391,7 +391,7 @@ def get_entity_context(query: str, max_entities: int = 5) -> str:
     with get_conn() as conn:
         cursor = conn.cursor()
         for entity_text, entity_type in entities[:3]:  # 最多查 3 个实体
-            entity_hash = hashlib.md5(entity_text.lower().encode()).hexdigest()
+            entity_hash = hashlib.sha256(entity_text.lower().encode()).hexdigest()
             cursor.execute("SELECT linked_memories FROM entities WHERE entity_hash = ?", (entity_hash,))
             row = cursor.fetchone()
             if row and row["linked_memories"]:
@@ -438,8 +438,9 @@ def save_profile(data: dict, confidence_map: dict = None):
                         cursor.execute("REPLACE INTO user_profile (key, value, confidence, extracted_at) VALUES (?, ?, ?, ?)", (str(key), str(value), new_conf, now))
                 else:
                     cursor.execute("REPLACE INTO user_profile (key, value, confidence, extracted_at) VALUES (?, ?, ?, ?)", (str(key), str(value), new_conf, now))
-    with _profile_cache_lock:
-        _profile_cache = None
+        # 缓存失效移入锁内部，避免窗口期内读到旧缓存
+        with _profile_cache_lock:
+            _profile_cache = None
 
 
 def cleanup_expired_profile(days: int = 90):
@@ -586,7 +587,6 @@ def _save_profile_event(key: str, value: str, confidence: float = 0.9):
 
 
 def track_event_completion(user_message: str):
-    """检测用户是否完成某事件，写入 user_profile"""
     """检测用户是否完成某事件，写入 user_profile"""
     import re
     for pattern in _COMPLETION_REGEX:

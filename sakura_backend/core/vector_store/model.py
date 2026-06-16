@@ -11,6 +11,7 @@ os.makedirs(CHROMA_PATH, exist_ok=True)
 _embedding_model = None
 _model_loading = False
 _model_loaded = False
+_model_load_failed = False  # 加载失败标记，避免反复重试
 _model_lock = threading.Lock()
 _rebuild_lock = threading.Lock()
 
@@ -19,12 +20,16 @@ _client_lock = threading.Lock()
 
 
 def get_embedding_model():
-    global _embedding_model
+    global _embedding_model, _model_load_failed
     if _embedding_model is not None:
         return _embedding_model
+    if _model_load_failed:
+        return None  # 已知加载失败，不再重试
     with _model_lock:
         if _embedding_model is not None:
             return _embedding_model
+        if _model_load_failed:
+            return None
         import os
         # 设置 HuggingFace 镜像（国内用户可加速下载）
         os.environ.setdefault('HF_ENDPOINT', 'https://hf-mirror.com')
@@ -34,6 +39,7 @@ def get_embedding_model():
         except Exception as e:
             print(f'[RAG] 本地模型加载失败: {e}')
             _embedding_model = None
+            _model_load_failed = True  # 标记失败，不再重试
     return _embedding_model
 
 

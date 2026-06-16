@@ -335,41 +335,48 @@ _daily_cap_lock = threading.Lock()
 
 
 def _apply_daily_cap(key: str, delta: float) -> float:
-    """长久模式每日上限：跨天自动清零，超出上限的裁剪（单次 DB 连接）"""
+    """长久模式每日上限：跨天自动清零，超出上限的裁剪（单次 DB 连接，原子操作）"""
     with _daily_cap_lock:
         today = datetime.now().strftime("%Y-%m-%d")
         daily_key = f"_rel_daily_{key}"
         cap = DAILY_CAP_AFFECTION if key == "affection" else DAILY_CAP_TRUST
 
-        # 单次连接读取所有需要的 config
+        # 单次连接完成所有读写操作
         with get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT key, value FROM config WHERE key IN ('_rel_daily_date', '_rel_daily_affection', '_rel_daily_trust')")
             rows = {r["key"]: r["value"] for r in cursor.fetchall()}
 
-        last_date = rows.get("_rel_daily_date", "")
-        accumulated_raw = rows.get(daily_key, "0.0")
-        try:
-            accumulated = float(accumulated_raw)
-        except (ValueError, TypeError):
-            accumulated = 0.0
+            last_date = rows.get("_rel_daily_date", "")
+            accumulated_raw = rows.get(daily_key, "0.0")
+            try:
+                accumulated = float(accumulated_raw)
+            except (ValueError, TypeError):
+                accumulated = 0.0
 
-        # 跨天清零
-        if last_date != today:
-            set_config("_rel_daily_date", today)
-            set_config("_rel_daily_affection", 0)
-            set_config("_rel_daily_trust", 0)
-            accumulated = 0.0
+            # 跨天清零
+            now = datetime.now().isoformat()
+            if last_date != today:
+                cursor.execute("INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
+                              ("_rel_daily_date", today, now))
+                cursor.execute("INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
+                              ("_rel_daily_affection", "0", now))
+                cursor.execute("INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
+                              ("_rel_daily_trust", "0", now))
+                accumulated = 0.0
 
-        if delta > 0:
-            remaining = max(0.0, cap - accumulated)
-            capped = min(delta, remaining)
-        else:
-            remaining = max(-cap, -cap - accumulated)
-            capped = max(delta, remaining)
+            if delta > 0:
+                remaining = max(0.0, cap - accumulated)
+                capped = min(delta, remaining)
+            else:
+                remaining = max(-cap, -cap - accumulated)
+                capped = max(delta, remaining)
 
-        if abs(capped) > 0.001:
-            set_config(daily_key, accumulated + capped)
+            if abs(capped) > 0.001:
+                cursor.execute("INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
+                              (daily_key, str(accumulated + capped), now))
+
+            conn.commit()
 
         return capped
 
@@ -393,14 +400,14 @@ def _update_value(key: str, delta: float) -> float:
     now = datetime.now().isoformat()
     with get_conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT value FROM relationship WHERE key=?", (key,))
-        row = cursor.fetchone()
-        if row:
-            new_val = max(MIN_VALUE, min(MAX_VALUE, row["value"] + delta))
-            cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key=?", (new_val, now, key))
-        else:
+        # 原子 UPDATE（value = value + delta），消除 SELECT→UPDATE 竞态
+        cursor.execute("UPDATE relationship SET value = MAX(?, MIN(?, value + ?)), updated_at = ? WHERE key = ?",
+                       (MIN_VALUE, MAX_VALUE, delta, now, key))
+        if cursor.rowcount == 0:
+            # 表中无此 key，INSERT
             initial = INITIAL_AFFECTION if key == "affection" else INITIAL_TRUST
-            cursor.execute("INSERT INTO relationship (key, value, updated_at) VALUES (?, ?, ?)", (key, max(MIN_VALUE, min(MAX_VALUE, initial + delta)), now))
+            cursor.execute("INSERT INTO relationship (key, value, updated_at) VALUES (?, ?, ?)",
+                           (key, max(MIN_VALUE, min(MAX_VALUE, initial + delta)), now))
     invalidate_relationship_cache()
     return delta
 

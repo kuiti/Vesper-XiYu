@@ -35,7 +35,8 @@ _SETTINGS_WHITELIST = {
     "user_name", "ai_name", "api_key", "api_provider", "llm_provider", "api_base_url", "api_model",
     "tts_enabled", "tts_engine", "tts_voice", "tts_api_key", "tts_server_url",
     "tts_api_url", "stt_enabled", "auto_play_voice", "tts_clone_audio",
-    "fallback_models", "user_taboos", "card_description", "card_personality",
+    "fallback_models", "user_taboos", "post_history_instructions",
+    "card_description", "card_personality",
     "card_scenario", "card_mes_example",
 } | set(PERSONALITY_KEY_MAP.keys())
 
@@ -82,7 +83,7 @@ async def get_all_settings() -> Dict[str, Any]:
         "tts_enabled": _voice.get("tts_enabled", True),
         "tts_engine": _voice.get("tts_engine", "off"),
         "tts_voice": _voice.get("tts_voice", ""),
-        "tts_api_key": _voice.get("tts_api_key", ""),
+        "has_tts_api_key": bool(_voice.get("tts_api_key", "")),
         "tts_server_url": _voice.get("tts_server_url", ""),
         "tts_api_url": _voice.get("tts_api_url", ""),
         "stt_enabled": _voice.get("stt_enabled", True),
@@ -111,13 +112,17 @@ async def get_all_settings() -> Dict[str, Any]:
         "card_scenario": get_config("card_scenario", ""),
         "card_mes_example": get_config("card_mes_example", ""),
         "user_taboos": get_config("user_taboos", "[]"),
+        "post_history_instructions": get_config("post_history_instructions", ""),
     }
 
+class RelationshipMode(BaseModel):
+    mode: str
+
 @router.post("/relationship-mode")
-async def set_relationship_mode(data: dict):
+async def set_relationship_mode(data: RelationshipMode):
     """切换关系模式（fast / long_term）"""
     from core.relationship import switch_relationship_mode
-    return switch_relationship_mode(data.get("mode", "fast"))
+    return switch_relationship_mode(data.mode)
 
 # 需要数值范围校验的键
 _NUMERIC_KEYS = {
@@ -287,8 +292,13 @@ async def complete_onboarding():
     set_config("onboarding_completed", "true")
     return {"status": "ok"}
 
+class FullResetConfirm(BaseModel):
+    confirm: bool = False
+
 @router.post("/full-reset")
-async def full_reset():
+async def full_reset(data: FullResetConfirm = FullResetConfirm()):
+    if not data.confirm:
+        return {"status": "error", "message": "请确认重置操作"}
     """完全重置：清除所有数据，重新触发引导"""
     from core.db import get_conn, clear_chat_history, clear_config_cache
     from core.relationship import invalidate_relationship_cache

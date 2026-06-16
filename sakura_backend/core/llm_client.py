@@ -77,30 +77,20 @@ def call_llm(
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
-    # 带重试的 LLM 调用（3次，指数退避 1s/2s/4s）
+    # 调用 provider.chat()（provider 内部已有重试逻辑）
     content = None
-    max_retries = 2
-    for attempt in range(max_retries + 1):
-        try:
-            content = provider.chat(
-                messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                timeout=timeout,
-            )
-            if content:
-                break
-            logger.warning("[LLM] 第%d次返回空响应", attempt + 1)
-        except Exception as e:
-            if attempt < max_retries:
-                delay = min(1.0 * (2 ** attempt), 4.0)
-                logger.warning("[LLM] 第%d次调用失败: %s, %.1fs后重试", attempt + 1, e, delay)
-                time.sleep(delay)
-            else:
-                logger.error("[LLM] 全部%d次调用失败: %s", max_retries + 1, e)
+    try:
+        content = provider.chat(
+            messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            timeout=timeout,
+        )
+    except Exception as e:
+        logger.error("[LLM] 调用失败: %s", e)
 
     if not content:
-        return None if not json_mode else None
+        return None
 
     if not json_mode:
         return content

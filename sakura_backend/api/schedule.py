@@ -27,6 +27,17 @@ class ScheduleCreate(BaseModel):
     all_day: int = 0
     color: str = "#5390d4"
 
+    @field_validator("end_time")
+    @classmethod
+    def validate_end_time_iso(cls, v: str) -> str:
+        if v:
+            try:
+                normalized = v.replace("Z", "+00:00")
+                datetime.fromisoformat(normalized)
+            except (ValueError, TypeError):
+                raise ValueError(f"无效的 ISO 时间格式: {v}")
+        return v
+
 
 @router.get("/")
 async def list_schedule():

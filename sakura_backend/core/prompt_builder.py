@@ -123,90 +123,6 @@ def _get_scratch_context() -> str:
     return "【工作记忆】\n" + "\n".join(parts)
 
 
-# ─── 知识库（SillyTavern 世界书方案 + 时间效果）───
-# 每个条目: {keys: [触发关键词], content: 注入内容, priority: 优先级, sticky: N轮, cooldown: M轮}
-# 可通过 API 动态添加
-_KNOWLEDGE_REGISTRY = []
-_KNOWLEDGE_TIMED = {}  # {key: {"sticky_until": int, "cooldown_until": int}}
-_KNOWLEDGE_MSG_COUNT = 0
-
-
-def register_knowledge(keys: list, content: str, priority: int = 5, sticky: int = 0, cooldown: int = 0):
-    """注册一个关键词触发的知识条目
-    sticky: 触发后持续 N 轮（即使关键词不再出现）
-    cooldown: 冷却 N 轮（防止重复触发）
-    """
-    _KNOWLEDGE_REGISTRY.append({
-        "keys": [k.lower() for k in keys],
-        "content": content,
-        "priority": priority,
-        "sticky": sticky,
-        "cooldown": cooldown,
-    })
-
-
-def _get_triggered_knowledge(user_message: str, max_tokens: int = 300) -> str:
-    """根据用户消息中的关键词触发知识注入（带时间效果）"""
-    global _KNOWLEDGE_MSG_COUNT
-    if not _KNOWLEDGE_REGISTRY or not user_message:
-        return ""
-    _KNOWLEDGE_MSG_COUNT += 1
-    msg_lower = user_message.lower() if user_message else ""
-    triggered = []
-    for entry in _KNOWLEDGE_REGISTRY:
-        entry_key = "|".join(entry["keys"])
-        timed = _KNOWLEDGE_TIMED.get(entry_key, {})
-        # 检查冷却
-        if timed.get("cooldown_until", 0) > _KNOWLEDGE_MSG_COUNT:
-            continue
-        # 检查粘性（即使关键词不匹配也激活）
-        is_sticky = timed.get("sticky_until", 0) > _KNOWLEDGE_MSG_COUNT
-        # 关键词匹配
-        is_match = any(key in msg_lower for key in entry["keys"])
-        if is_match or is_sticky:
-            triggered.append(entry)
-            # 更新时间效果
-            new_timed = {}
-            if is_match and entry.get("sticky", 0) > 0:
-                new_timed["sticky_until"] = _KNOWLEDGE_MSG_COUNT + entry["sticky"]
-            if is_match and entry.get("cooldown", 0) > 0:
-                new_timed["cooldown_until"] = _KNOWLEDGE_MSG_COUNT + entry["cooldown"]
-            if new_timed:
-                _KNOWLEDGE_TIMED[entry_key] = {**timed, **new_timed}
-    if not triggered:
-        return ""
-    # 按优先级排序，取前 N 条（受令牌预算限制）
-    triggered.sort(key=lambda x: -x["priority"])
-    result = []
-    total_len = 0
-    for entry in triggered:
-        if total_len + len(entry["content"]) > max_tokens * 4:  # 粗略估算 1 token ≈ 4 字符
-            break
-        result.append(entry["content"])
-        total_len += len(entry["content"])
-    if not result:
-        return ""
-    return "【相关知识】\n" + "\n".join(result)
-
-
-# 预置知识条目
-register_knowledge(
-    keys=["生日", "birthday"],
-    content="用户提到生日时，注意记录日期，并在临近时主动提醒。生日是重要的情感节点。",
-    priority=8,
-)
-register_knowledge(
-    keys=["考试", "面试", "exam", "interview"],
-    content="用户提到考试或面试时，这是高压力事件。给予支持和鼓励，不要施加额外压力。",
-    priority=7,
-)
-register_knowledge(
-    keys=["难过", "伤心", "委屈", "哭"],
-    content="用户情绪低落时，先接住情绪（'嗯，我听到了'），不要急于给建议。陪伴比解决方案更重要。",
-    priority=9,
-)
-
-
 # ─── 人设模板（基石+禁忌+速查卡）───
 
 
@@ -250,6 +166,7 @@ def build_persona():
         allow_emotion = get_config("allow_emotion", True)
     custom_prompt = get_config("custom_system_prompt", "")
     ai_bg = get_config("ai_background", "").strip()
+    card_name = get_config("_active_character_card", "")
 
     # 计算配置 hash，内容不变时返回缓存
     config_key = f"{ai_name}|{tone}|{length_level}|{recall_past}|{allow_emotion}|{custom_prompt}|{ai_bg}|{card_name}"
@@ -302,8 +219,13 @@ def build_persona():
             _char_name = _name_match.group(1)
             if _char_name != ai_name:
                 _prompt = _prompt.replace(f"你是{_char_name}", f"你是「{ai_name}」", 1)
-                # 后续出现的角色名也替换
-                _prompt = _prompt.replace(_char_name, ai_name)
+                # 后续出现的角色名也替换（只替换引号包裹的模式，避免误伤）
+                import re
+                _prompt = re.sub(
+                    rf'(?<=「){re.escape(_char_name)}(?=」)',
+                    ai_name,
+                    _prompt
+                )
         elif not _prompt.startswith("你是"):
             _prompt = f"你是「{ai_name}」。{_prompt}"
         persona = f"{_prompt} {length_rule}。"
@@ -332,33 +254,22 @@ def build_persona():
         bg_text = "\n".join(bg_lines) if bg_lines else "（暂无）"
 
         # 根据是否有基石选择模板
-        if foundation:
-            persona = PERSONA_TEMPLATE_WITH_FOUNDATION.format(
-                foundation=foundation,
-                ai_name=ai_name,
-                user_name=user_name,
-                relationship_desc=relationship_desc,
-                tone_desc=tone_desc,
-                taboos=taboos_text,
-                length_rule=length_rule,
-                emotion_note=emotion_note,
-                recall_rule=recall_rule,
-                few_shot_examples=few_shot,
-                background_info=bg_text,
-            )
-        else:
-            persona = PERSONA_TEMPLATE_WITHOUT_FOUNDATION.format(
-                ai_name=ai_name,
-                user_name=user_name,
-                relationship_desc=relationship_desc,
-                tone_desc=tone_desc,
-                taboos=taboos_text,
-                length_rule=length_rule,
-                emotion_note=emotion_note,
-                recall_rule=recall_rule,
-                few_shot_examples=few_shot,
-                background_info=bg_text,
-            )
+        from core.persona_data import render_persona_template
+        template_name = 'default_with_foundation.j2' if foundation else 'default_without_foundation.j2'
+        persona = render_persona_template(
+            template_name,
+            foundation=foundation,
+            ai_name=ai_name,
+            user_name=user_name,
+            relationship_desc=relationship_desc,
+            tone_desc=tone_desc,
+            taboos=taboos_text,
+            length_rule=length_rule,
+            emotion_note=emotion_note,
+            recall_rule=recall_rule,
+            few_shot_examples=few_shot,
+            background_info=bg_text,
+        )
 
     # 更新缓存
     _persona_cache["hash"] = current_hash
@@ -442,14 +353,24 @@ def _get_continuity_bridge() -> str:
     if user_msgs:
         last_topic = user_msgs[-1]["content"][:60].replace("\n", " ")
     gap_desc = "几小时" if gap_minutes < 360 else f"{int(gap_minutes/60)}小时" if gap_minutes < 1440 else f"{int(gap_minutes/1440)}天"
-    parts = [f"这是你们今天第N次聊天了——不要像第一次见面一样客气。"]
+    # 查询今天聊天轮次
+    try:
+        from datetime import datetime as _dt2
+        _today = _dt2.now().strftime("%Y-%m-%d")
+        with get_conn() as _c2:
+            _c2.row_factory = None
+            _c2.execute("SELECT COUNT(DISTINCT ROUND(julianday(timestamp) * 1440 / 30)) FROM chat_history WHERE role='user' AND timestamp >= ?", (_today,))
+            _today_sessions = _c2.fetchone()[0] or 1
+    except Exception:
+        _today_sessions = 1
+    parts = [f"这是你们今天第{_today_sessions}轮对话了——保持自然的亲近感，不用刻意客气。"]
     parts.append(f"上次聊了{gap_desc}前，用户最后说的是：「{last_topic}」。")
     parts.append(f"自然承接上次的话题和情绪，像朋友之间继续聊天一样，不需要重新打招呼。")
     parts.append(f"如果用户没主动提上次的事，你也不需要刻意提——但要保持和之前一致的亲近感和态度。")
     return "【对话连续感——重要】" + " ".join(parts)
 
 
-def build_system_prompt(current_time_str, emotion="neutral", user_message="", rag_context="", summary="", keypoints=None, custom_context="", tiered_summaries=None, user_patterns=None, sentence_mode="auto", modules_enabled=None):
+def build_system_prompt(current_time_str, emotion="neutral", user_message="", rag_context="", summary="", keypoints=None, custom_context="", tiered_summaries=None, user_patterns=None, sentence_mode="auto", modules_enabled=None, chat_history=None):
     # ─── 使用 Pipeline 构建 ───
     from core.prompt_pipeline import get_default_pipeline, PipelineContext
 
@@ -465,17 +386,18 @@ def build_system_prompt(current_time_str, emotion="neutral", user_message="", ra
         current_time_str=current_time_str,
         sentence_mode=sentence_mode,
         modules_enabled=modules_enabled,
+        chat_history=chat_history,
     )
 
     pipeline = get_default_pipeline()
-    static_prefix, dynamic_content = pipeline.build(ctx)
+    static_prefix, dynamic_content, depth_entries = pipeline.build(ctx)
 
     # ─── 分隔符分句指令 ───
     if sentence_mode == "delimiter":
         dynamic_content += "\n【分隔符规则——最高优先级】你必须在每句话结束时插入 <<>>（四个字符：两个小于号两个大于号）然后再继续下一句。这不是可选的——每个自然句结尾都必须有 <<>>。示例：今天天气真好<<>>适合出门走走<<>>你想去哪？"
 
-    # 返回 (可缓存的静态前缀, 每次变化的动态内容)
-    return static_prefix, dynamic_content
+    # 返回 (可缓存的静态前缀, 每次变化的动态内容, 深度注入条目)
+    return static_prefix, dynamic_content, depth_entries
 
 
 def _get_time_behavior_hint():
@@ -577,12 +499,16 @@ class SystemPromptBuilder:
             "quirks": True,            # 随机口癖（5%）
             "patterns": True,          # 用户模式
             "dropped_context": True,   # 被裁掉的早期对话
+            "depth_hint": True,        # 深度提示
+            "post_history": True,      # 生成前指令
+            "user_persona": True,     # 用户身份
         }
 
     def build(self, current_time_str, emotion="neutral", user_message="",
               rag_context="", summary="", keypoints=None, custom_context="",
-              tiered_summaries=None, user_patterns=None, sentence_mode="auto"):
-        """构建 system prompt，返回 (static_prefix, dynamic_content)"""
+              tiered_summaries=None, user_patterns=None, sentence_mode="auto",
+              chat_history=None):
+        """构建 system prompt，返回 (static_prefix, dynamic_content, depth_entries)"""
         return build_system_prompt(
             current_time_str=current_time_str,
             emotion=emotion,
@@ -595,4 +521,5 @@ class SystemPromptBuilder:
             user_patterns=user_patterns,
             sentence_mode=sentence_mode,
             modules_enabled=self.modules_enabled,
+            chat_history=chat_history,
         )

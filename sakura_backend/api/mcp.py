@@ -2,12 +2,20 @@
 
 from fastapi import APIRouter, Request
 from core.mcp_tools import TOOLS, call_tool
+from core.auth import _get_token
+import hmac
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
 
 
 @router.post("/")
 async def mcp_endpoint(request: Request):
+    # 云端模式下需要认证
+    if _get_token():
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer ") or not hmac.compare_digest(auth_header[7:], _get_token()):
+            return {"jsonrpc": "2.0", "error": {"code": -32600, "message": "Unauthorized"}, "id": None}
+
     body = await request.json()
     if not isinstance(body, dict):
         return {"jsonrpc": "2.0", "error": {"code": -32600, "message": "Invalid Request"}, "id": None}

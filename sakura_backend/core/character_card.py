@@ -35,7 +35,6 @@ def _png_read_text_chunks(png_data: bytes) -> list[dict]:
         length = struct.unpack('>I', png_data[pos:pos+4])[0]
         chunk_type = png_data[pos+4:pos+8].decode('latin-1')
         chunk_data = png_data[pos+8:pos+8+length]
-        crc = struct.unpack('>I', png_data[pos+8+length:pos+12+length])[0]
         if chunk_type == 'tEXt':
             # tEXt 格式: keyword + null + text
             null_pos = chunk_data.find(b'\x00')
@@ -288,7 +287,7 @@ class CharacterCard:
             trust = sakura.get("trust", 30)
             set_relationship(affection, trust)
         except Exception as e:
-            silent_exc("?", e)
+            silent_exc("apply_to_current", e)
 
     def _get_bg_field(self, key: str, default=None):
         """从 ai_background JSON 中读取字段"""

@@ -42,8 +42,11 @@ async def rag_status():
 
 @router.post("/install")
 async def rag_install():
+    from core.auth import _get_token
+    if _get_token():
+        return {"ok": False, "error": "云端模式不允许远程安装依赖"}
     if _check_installed():
-        return {"ok": True, "msg": "向量引擎已安装，重启佐仓后自动加载模型"}
+        return {"ok": True, "msg": "向量引擎已安装"}
     try:
         import subprocess, sys
         r = subprocess.run(

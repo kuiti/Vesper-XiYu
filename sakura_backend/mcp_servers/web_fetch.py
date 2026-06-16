@@ -116,7 +116,7 @@ def fetch_web(url: str, max_length: int = 15000, use_cache: bool = True) -> str:
             headers=HEADERS,
             timeout=15,
             proxies={"http": PROXY, "https": PROXY} if PROXY else None,
-            verify=False,
+            verify=True,
         )
         resp.raise_for_status()
 
@@ -162,7 +162,7 @@ def search_web(query: str, max_results: int = 5) -> str:
             headers=HEADERS,
             timeout=15,
             proxies={"http": PROXY, "https": PROXY} if PROXY else None,
-            verify=False,
+            verify=True,
         )
         resp.raise_for_status()
 

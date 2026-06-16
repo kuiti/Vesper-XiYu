@@ -9,6 +9,8 @@ def clear_chat_history():
     """清空所有聊天记录、摘要、关联数据，并重建 FTS"""
     from .summary import reset_msg_counter, reset_active_memory
     with get_conn() as conn:
+        # 使用事务包裹整个操作，避免并发写入丢失索引
+        conn.execute("BEGIN IMMEDIATE")
         cursor = conn.cursor()
         # 临时禁用 FTS 触发器，避免 FTS 表损坏导致删除失败
         cursor.execute("DROP TRIGGER IF EXISTS chat_ad")
@@ -38,5 +40,6 @@ def clear_chat_history():
             INSERT INTO chat_fts(chat_fts, rowid, content) VALUES('delete', old.id, old.content);
             INSERT INTO chat_fts(rowid, content) VALUES (new.id, new.content);
         END""")
+        conn.commit()
     reset_msg_counter()
     reset_active_memory()

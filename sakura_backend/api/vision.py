@@ -8,6 +8,8 @@ router = APIRouter(prefix="/vision", tags=["vision"])
 UPLOAD_DIR = os.path.join("data", "vision")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
+_ALLOWED_VISION_MIME = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp"}
+
 
 @router.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
@@ -17,6 +19,8 @@ async def upload_image(file: UploadFile = File(...)):
     safe_name = os.path.basename(file.filename)
     if not safe_name or safe_name.startswith('.') or safe_name != file.filename:
         return {"status": "error", "message": "文件名不合法"}
+    if file.content_type and file.content_type not in _ALLOWED_VISION_MIME:
+        return {"status": "error", "message": "不支持的图片格式，仅支持 PNG/JPEG/GIF/WebP/BMP"}
     filepath = os.path.join(UPLOAD_DIR, safe_name)
     total_bytes = 0
     try:
@@ -31,7 +35,7 @@ async def upload_image(file: UploadFile = File(...)):
     except Exception as e:
         if os.path.exists(filepath):
             os.remove(filepath)
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": "图片上传失败"}
     with open(filepath, "rb") as f:
         b64 = base64.b64encode(f.read()).decode()
     return {"status": "ok", "filename": file.filename, "base64": b64,

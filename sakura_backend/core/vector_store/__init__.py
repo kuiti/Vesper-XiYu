@@ -127,7 +127,7 @@ def rebuild_all_vectors(progress_callback=None):
                 try:
                     client.delete_collection("sentence_index")
                 except Exception as e:
-                    silent_exc("?", e)
+                    silent_exc("rebuild_all_vectors.delete_sentence_index", e)
                 sent_collection = client.get_or_create_collection(
                     name="sentence_index", metadata={"hnsw:space": "cosine"}
                 )

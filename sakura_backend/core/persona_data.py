@@ -6,6 +6,38 @@ persona_data.py —— 从 prompt_builder.py 提取的静态数据常量
 """
 
 import json as _json_bg
+import os as _os
+
+
+_TEMPLATE_DIR = _os.path.join(_os.path.dirname(__file__), "prompt_templates")
+_jinja2_available = False
+_jinja2_env = None
+
+try:
+    import jinja2 as _jinja2
+    _jinja2_env = _jinja2.Environment(
+        loader=_jinja2.FileSystemLoader(_TEMPLATE_DIR),
+        autoescape=False,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    _jinja2_available = True
+except ImportError:
+    pass
+
+
+def render_persona_template(template_name: str, **kwargs) -> str:
+    """用 Jinja2 渲染人设模板。回退到 Python 字符串格式化。"""
+    if _jinja2_available and _jinja2_env:
+        try:
+            tmpl = _jinja2_env.get_template(template_name)
+            return tmpl.render(**kwargs)
+        except Exception:
+            pass
+    # 回退：使用现有的模板常量
+    if template_name == "default_with_foundation.j2":
+        return PERSONA_TEMPLATE_WITH_FOUNDATION.format(**kwargs)
+    return PERSONA_TEMPLATE_WITHOUT_FOUNDATION.format(**kwargs)
 
 
 def parse_ai_background(raw: str = None) -> dict:

@@ -1,7 +1,7 @@
 """云端同步 API —— 端到端加密备份上传/下载"""
 
 import asyncio
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 from core.db import get_config, set_config
 import json
@@ -50,7 +50,15 @@ async def sync_status():
 
 
 @router.post("/upload")
-async def upload_backup(passphrase: str = ""):
+async def upload_backup(request: Request):
+    """上传备份（passphrase 从 request body 读取，避免出现在日志中）"""
+    # 从 request body 读取 passphrase
+    try:
+        body = await request.json()
+        passphrase = body.get("passphrase", "") if isinstance(body, dict) else ""
+    except Exception:
+        passphrase = ""
+
     cfg = get_config("cloud_config", {})
     if not cfg:
         return {"status": "error", "message": "请先配置云端后端"}
@@ -90,7 +98,17 @@ async def upload_backup(passphrase: str = ""):
 
 
 @router.post("/download")
-async def download_backup(filename: str = "", passphrase: str = ""):
+async def download_backup(request: Request):
+    """下载备份（passphrase 从 request body 读取，避免出现在日志中）"""
+    # 从 request body 读取参数
+    try:
+        body = await request.json()
+        filename = body.get("filename", "") if isinstance(body, dict) else ""
+        passphrase = body.get("passphrase", "") if isinstance(body, dict) else ""
+    except Exception:
+        filename = ""
+        passphrase = ""
+
     cfg = get_config("cloud_config", {})
     if not cfg:
         return {"status": "error", "message": "请先配置云端后端"}
@@ -101,6 +119,10 @@ async def download_backup(filename: str = "", passphrase: str = ""):
 
         if not filename:
             filename = "vesper_backup_latest.enc"
+
+        # 路径遍历防护：只保留文件名部分
+        import os
+        filename = os.path.basename(filename)
 
         raw = await asyncio.to_thread(backend.download, filename)
 

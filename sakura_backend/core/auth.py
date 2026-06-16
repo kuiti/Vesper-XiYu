@@ -3,6 +3,7 @@
 import os
 import time
 import logging
+import hmac
 from fastapi import Request, WebSocket, APIRouter
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -59,20 +60,35 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         # 验证 Bearer Token
         auth_header = request.headers.get("Authorization", "")
-        if auth_header == f"Bearer {token}":
+        if hmac.compare_digest(auth_header, f"Bearer {token}"):
             return await call_next(request)
 
         return JSONResponse({"detail": "Unauthorized"}, status_code=401)
 
 
 async def verify_ws_token(websocket: WebSocket) -> bool:
-    """验证 WebSocket 连接的 Token（从 query param 读取）"""
+    """验证 WebSocket 连接的 Token。
+
+    优先从 Sec-WebSocket-Protocol header 读取（避免 Token 出现在日志/URL 中），
+    回退到 query param 兼容旧客户端。
+    """
     token = _get_token()
     if not token:
         return True  # 本地模式，不验证
 
-    ws_token = websocket.query_params.get("token", "")
-    return ws_token == token
+    # 优先从协议头读取
+    protocol_header = websocket.headers.get("sec-websocket-protocol", "")
+    if protocol_header:
+        # 协议头格式: "token-<actual_token>"
+        if protocol_header.startswith("token-"):
+            ws_token = protocol_header[6:]
+        else:
+            ws_token = protocol_header
+    else:
+        # 回退到 query param
+        ws_token = websocket.query_params.get("token", "")
+
+    return hmac.compare_digest(ws_token, token)
 
 
 @router.post("/verify")
@@ -110,7 +126,7 @@ async def verify_token(request: Request):
     correct_token = _get_token()
     if not correct_token:
         return JSONResponse({"ok": True, "message": "本地模式，无需验证"})
-    if token == correct_token:
+    if hmac.compare_digest(token, correct_token):
         return JSONResponse({"ok": True, "message": "验证成功"})
     else:
         attempts.append(now)

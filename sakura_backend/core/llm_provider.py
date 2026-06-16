@@ -16,7 +16,7 @@ import time
 import random
 import requests
 from abc import ABC, abstractmethod
-from typing import AsyncIterator, Iterator
+from typing import Iterator
 from core.db import get_config
 
 
@@ -363,45 +363,67 @@ class OllamaProvider(LLMProvider):
             **kwargs,
         }
 
-        try:
-            resp = requests.post(
-                api_url, headers=self.get_headers(), json=payload, timeout=timeout,
-            )
-            resp.raise_for_status()
-            body = resp.json()
-            return (body.get("message", {}).get("content") or "").strip() or None
-        except Exception as e:
-            print(f"[LLMProvider] ollama chat 失败: {e}")
-            return None
+        last_error = None
+        for attempt in range(3):
+            try:
+                resp = requests.post(
+                    api_url, headers=self.get_headers(), json=payload, timeout=timeout,
+                )
+                resp.raise_for_status()
+                body = resp.json()
+                return (body.get("message", {}).get("content") or "").strip() or None
+            except Exception as e:
+                last_error = e
+                if not _is_retryable_error(e):
+                    print(f"[LLMProvider] ollama 非重试错误: {e}")
+                    return None
+                if attempt < 2:
+                    delay = _exponential_backoff(attempt)
+                    print(f"[LLMProvider] ollama 重试 #{attempt+1}，{delay:.1f}s: {e}")
+                    time.sleep(delay)
+
+        print(f"[LLMProvider] ollama chat 全部失败: {last_error}")
+        return None
 
 
 # ─── 工厂函数 ───
 
+import threading
+
 _PROVIDER_CACHE = {}
+_PROVIDER_CACHE_LOCK = threading.Lock()
 
 def get_provider() -> LLMProvider:
-    """工厂方法：根据 DB config 返回对应的 Provider 实例（带缓存）"""
+    """工厂方法：根据 DB config 返回对应的 Provider 实例（带缓存，线程安全）"""
     provider_name = get_config("llm_provider", "deepseek")
 
+    # 快速路径：缓存命中
     if provider_name in _PROVIDER_CACHE:
         return _PROVIDER_CACHE[provider_name]
 
-    mapping = {
-        "deepseek": OpenAICompatibleProvider,
-        "openai": OpenAICompatibleProvider,
-        "ollama": OllamaProvider,
-        "claude": OpenAICompatibleProvider,
-    }
+    # 慢路径：创建新实例
+    with _PROVIDER_CACHE_LOCK:
+        # 双重检查
+        if provider_name in _PROVIDER_CACHE:
+            return _PROVIDER_CACHE[provider_name]
 
-    cls = mapping.get(provider_name, OpenAICompatibleProvider)
-    instance = cls()
-    _PROVIDER_CACHE[provider_name] = instance
-    return instance
+        mapping = {
+            "deepseek": OpenAICompatibleProvider,
+            "openai": OpenAICompatibleProvider,
+            "ollama": OllamaProvider,
+            "claude": OpenAICompatibleProvider,
+        }
+
+        cls = mapping.get(provider_name, OpenAICompatibleProvider)
+        instance = cls()
+        _PROVIDER_CACHE[provider_name] = instance
+        return instance
 
 
 def clear_provider_cache():
     """清除 Provider 缓存（切换模型后调用）"""
-    _PROVIDER_CACHE.clear()
+    with _PROVIDER_CACHE_LOCK:
+        _PROVIDER_CACHE.clear()
 
 
 def get_available_providers() -> list[dict]:

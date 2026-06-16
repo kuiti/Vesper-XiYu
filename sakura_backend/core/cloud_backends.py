@@ -2,6 +2,7 @@
 
 import requests
 from abc import ABC, abstractmethod
+from core.security import validate_request_url
 
 
 class CloudBackend(ABC):
@@ -54,6 +55,11 @@ class WebDAVBackend(CloudBackend):
 
 class CustomHTTPBackend(CloudBackend):
     def __init__(self, upload_url: str, download_url: str, headers: dict = None):
+        # SSRF 防护：校验 URL 安全性
+        if upload_url and not validate_request_url(upload_url):
+            raise ValueError(f"upload_url 不安全: {upload_url}")
+        if download_url and not validate_request_url(download_url):
+            raise ValueError(f"download_url 不安全: {download_url}")
         self.upload_url = upload_url
         self.download_url = download_url
         self.headers = headers or {}

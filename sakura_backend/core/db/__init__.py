@@ -257,6 +257,35 @@ def _init_db_locked():
         cursor.execute('''CREATE TABLE IF NOT EXISTS achievements (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT UNIQUE, name TEXT, description TEXT, unlocked_at TEXT)''')
         # AI日记表
         cursor.execute('''CREATE TABLE IF NOT EXISTS ai_diary (id INTEGER PRIMARY KEY AUTOINCREMENT, date TEXT UNIQUE, content TEXT, mood TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)''')
+        # 知识库表（lorebook）
+        cursor.execute("""CREATE TABLE IF NOT EXISTS lorebook (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            keys TEXT NOT NULL DEFAULT '[]',
+            content TEXT NOT NULL DEFAULT '',
+            priority INTEGER NOT NULL DEFAULT 5,
+            position TEXT NOT NULL DEFAULT 'after_persona',
+            logic TEXT NOT NULL DEFAULT 'AND_ANY',
+            group_name TEXT NOT NULL DEFAULT '',
+            probability INTEGER NOT NULL DEFAULT 100,
+            sticky INTEGER NOT NULL DEFAULT 0,
+            cooldown INTEGER NOT NULL DEFAULT 0,
+            scope TEXT NOT NULL DEFAULT 'global',
+            character_name TEXT NOT NULL DEFAULT '',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT,
+            updated_at TEXT
+        )""")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_lorebook_scope ON lorebook(scope, enabled)")
+        # 用户身份表
+        cursor.execute("""CREATE TABLE IF NOT EXISTS user_personas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL DEFAULT '',
+            description TEXT NOT NULL DEFAULT '',
+            avatar TEXT NOT NULL DEFAULT '',
+            is_default INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT,
+            updated_at TEXT
+        )""")
         # 角色卡表
         cursor.execute('''CREATE TABLE IF NOT EXISTS characters (name TEXT PRIMARY KEY, data TEXT, updated_at TEXT)''')
         # 实体存储（mem0 轻量知识图谱）
@@ -385,7 +414,19 @@ def _init_db_locked():
                            ("user_taboos", json.dumps(old_taboos, ensure_ascii=False)))
             if old_taboos:
                 print(f"[迁移] 已从 ai_background 迁移 {len(old_taboos)} 条禁忌到 user_taboos")
-        conn.commit()
+            conn.commit()
+
+        # 设置数据库文件权限（仅所有者可读写）
+        try:
+            import stat
+            if os.path.exists(DB_FILE):
+                os.chmod(DB_FILE, stat.S_IRUSR | stat.S_IWUSR)
+            data_dir = os.path.dirname(DB_FILE)
+            if os.path.exists(data_dir):
+                os.chmod(data_dir, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR)
+        except (OSError, AttributeError):
+            pass  # Windows 上可能不支持
+
         _db_initialized = True
     finally:
         conn.close()

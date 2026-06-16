@@ -29,6 +29,10 @@
         :relationship="relationship" :foundationType="foundationType" :foundationTypes="foundationTypes"
         :pendingFoundation="pendingFoundation" :resetFoundationValues="resetFoundationValues"
         :presetName="presetName" :presets="presets"
+        :cardDescription="cardDescription" :cardPersonality="cardPersonality" :cardScenario="cardScenario"
+        @update:aiName="aiName=$event" @update:userName="userName=$event"
+        @update:cardDescription="cardDescription=$event" @update:cardPersonality="cardPersonality=$event"
+        @update:cardScenario="cardScenario=$event"
         @update:aiName="aiName=$event" @update:userName="userName=$event"
         @update:tone="tone=$event" @update:length="length=$event" @update:recall="recall=$event"
         @update:allowEmotion="allowEmotion=$event" @update:customPrompt="customPrompt=$event"
@@ -179,6 +183,7 @@ export default {
       testingXiaomi: false, xiaomiTestMsg: '', xiaomiTestOk: false,
       aiName: '', userName: '', tone: '冷静', length: '短', recall: '从不', allowEmotion: true,
       customPrompt: '', aiBackground: '', presets: {}, presetName: '',
+      cardDescription: '', cardPersonality: '', cardScenario: '',
       foundationType: '空白', foundationTypes: {}, pendingFoundation: '', resetFoundationValues: false,
       chatBgImage: '', bgOpacity: 1, bgBlur: 0, bgMode: 'cover', bgUploadMsg: '',
       aiAvatarUrlLocal: '', userAvatarUrlLocal: '', chatFontSize: 14,
@@ -272,6 +277,9 @@ export default {
       this.recall = s.recall_past || '从不'; this.allowEmotion = s.allow_emotion !== false
       this.customPrompt = s.custom_system_prompt || ''
       this.aiBackground = s.ai_background || ''
+      this.cardDescription = s.card_description || ''
+      this.cardPersonality = s.card_personality || ''
+      this.cardScenario = s.card_scenario || ''
       this.bgOpacity = s.bg_opacity !== undefined ? Number(s.bg_opacity) : 1
       this.bgBlur = s.bg_blur !== undefined ? Number(s.bg_blur) : 0
       this.chatFontSize = s.chat_font_size || 14

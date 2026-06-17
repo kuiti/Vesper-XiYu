@@ -1,6 +1,5 @@
 # core/db/chat.py  |  chat_history + FTS 触发器
 
-import json
 from datetime import datetime, timedelta
 from . import get_conn
 

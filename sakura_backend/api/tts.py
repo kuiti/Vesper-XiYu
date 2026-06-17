@@ -279,8 +279,9 @@ async def upload_voice_clone(file: UploadFile = File(...)):
 
     # 清除引擎缓存
     global _engine, _engine_name
-    _engine = None
-    _engine_name = ""
+    with _engine_lock:
+        _engine = None
+        _engine_name = ""
 
     return {"status": "ok", "path": str(save_path), "size": len(content)}
 

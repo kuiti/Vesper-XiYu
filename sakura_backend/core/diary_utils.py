@@ -1,7 +1,7 @@
 # core/diary_utils.py — 日记生成共享逻辑
 """抽取自 scheduler.py 和 api/memory.py 的重复日记生成代码。"""
 from datetime import datetime
-from core.db import get_conn, get_config, save_diary_entry
+from core.db import get_conn
 from core.llm_client import call_llm
 
 

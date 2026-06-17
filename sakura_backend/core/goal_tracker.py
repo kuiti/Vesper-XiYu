@@ -4,10 +4,9 @@
 追踪状态变化，在合适时机触发主动跟进。
 """
 
-import json
 import logging
 from datetime import datetime
-from core.db import get_conn, get_config
+from core.db import get_conn
 
 logger = logging.getLogger(__name__)
 

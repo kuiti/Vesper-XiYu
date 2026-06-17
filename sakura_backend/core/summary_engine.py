@@ -280,7 +280,7 @@ def run_decay_check():
 def _generate_rolling_summary():
     """滚动摘要（SillyTavern 方案）：自动压缩近期对话为摘要"""
     try:
-        from core.db import get_recent_chat_messages, get_conn
+        from core.db import get_recent_chat_messages
         from core.llm_client import call_llm
 
         # 获取最近 30 条消息

@@ -1,6 +1,5 @@
 # core/db/misc.py  |  achievements + ai_diary + schedule + favorites + conversation_summary + documents
 
-import json
 from datetime import datetime
 from . import get_conn
 

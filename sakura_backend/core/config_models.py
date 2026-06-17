@@ -1,7 +1,6 @@
 # core/config_models.py — 配置项 pydantic 校验模型
 """所有配置项的类型定义和默认值，get_config 返回时自动校验"""
 from pydantic import BaseModel, Field
-from typing import Optional
 
 
 class PersonalityConfig(BaseModel):

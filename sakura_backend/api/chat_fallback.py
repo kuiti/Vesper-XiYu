@@ -7,7 +7,6 @@ Stage 3: 错误消息
 import asyncio
 import json
 import logging
-from datetime import datetime
 from core.db import add_chat_message
 from api.split_sentences import fallback_split
 from api.chat_tasks import _clean_dsml
@@ -28,9 +27,11 @@ async def try_fallback_reply(
     - handled=True: 已处理（websocket 已发送 token/done/error），调用方应 continue
     - handled=False: 降级也失败，调用方继续发 error
     """
+    from core.llm_provider import get_provider
+    fallback_provider = None
+
     # Stage 1: 非流式重试
     try:
-        from core.llm_provider import get_provider
         fallback_provider = get_provider()
         fallback_msgs = [m for m in messages if m["role"] == "system"] + [m for m in messages if m["role"] != "system"]
         fallback_reply = fallback_provider.chat(

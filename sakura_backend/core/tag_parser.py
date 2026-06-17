@@ -78,7 +78,7 @@ class TagExecutor:
     @staticmethod
     def _add(content: str) -> str:
         """保存记忆 —— 对应 declare_memory_intent"""
-        from core.db import get_conn, get_config
+        from core.db import get_conn
         import hashlib
 
         summary = content

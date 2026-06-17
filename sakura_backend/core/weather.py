@@ -3,7 +3,6 @@
 
 import logging
 import requests
-from datetime import datetime
 from core.db import get_config
 
 logger = logging.getLogger(__name__)

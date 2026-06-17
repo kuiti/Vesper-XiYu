@@ -2,7 +2,6 @@
 from __future__ import annotations
 import os, re, uuid, wave, tempfile, logging
 from abc import ABC, abstractmethod
-from typing import Optional
 logger = logging.getLogger(__name__)
 def _strip_markdown(text):
     text = re.sub(r'[\uff08(][^\uff09)]*[\uff09)]', '', text)

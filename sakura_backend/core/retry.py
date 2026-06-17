@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 def silent_exc(ctx: str, e: BaseException) -> None:
-    """静默记录非关键异常，统一格式，取代散落的 # silent + logger.debug 模式。"""
-    logger.debug("[%s] %s", ctx, e)
+    """静默记录非关键异常，统一格式。"""
+    logger.warning("[%s] %s", ctx, e)
 
 
 def retry_with_backoff(max_retries: int = 3, base_delay: float = 1.0, max_delay: float = 10.0,

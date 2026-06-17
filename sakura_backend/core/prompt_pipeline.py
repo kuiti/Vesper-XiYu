@@ -11,17 +11,12 @@
 
 from __future__ import annotations
 import random
-import json
-from datetime import datetime, timedelta
+import logging
+from datetime import datetime
 from abc import ABC, abstractmethod
-from core.retry import silent_exc
-from typing import Optional
 from core.db import get_config, set_config, get_conn, get_msg_counter
-from core.persona_data import (
-    LENGTH_MAP, PERSONA_TEMPLATE_WITH_FOUNDATION,
-    PERSONA_TEMPLATE_WITHOUT_FOUNDATION, TONE_DESCRIPTIONS,
-    FOUNDATION_TEMPLATES, DEFAULT_FOUNDATION, DEFAULT_TABOOS,
-)
+
+logger = logging.getLogger(__name__)
 
 
 # ─── 抽象基类 ───
@@ -65,7 +60,8 @@ class PipelineContext:
         if self._msg_counter is None:
             try:
                 self._msg_counter = get_msg_counter()
-            except Exception:
+            except Exception as e:
+                logger.warning(f"[pipeline] 消息计数获取失败: {e}")
                 self._msg_counter = 0
         return self._msg_counter
 
@@ -326,7 +322,8 @@ class EntityContextPipe(PromptPipe):
         try:
             from core.profile_builder import get_entity_context
             return get_entity_context(ctx.user_message)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[pipeline] 实体上下文获取失败: {e}")
             return None
 
 
@@ -413,7 +410,8 @@ class SchedulePipe(PromptPipe):
                 return None
             lines = [f"{r['start_time'][:10]} {r['title']}" for r in relevant]
             return f"【用户近期日程】{'，'.join(lines)}。如果话题相关可以自然提及，不要刻意提起。"
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[pipeline] 日程查询失败: {e}")
             return None
 
 
@@ -509,7 +507,8 @@ class KnowledgeGraphPipe(PromptPipe):
         try:
             from core.knowledge_graph import get_context_for_message
             return get_context_for_message(ctx.user_message)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[pipeline] 知识图谱查询失败: {e}")
             return None
 
 
@@ -607,7 +606,8 @@ class PendingGoalPipe(PromptPipe):
                 goal_text = pending[0]["goal_text"]
                 gid = pending[0]["id"]
                 return f"\n【待确认目标】用户提过「{goal_text}」，自然问一句要不要跟踪。确认回[/goal confirm {gid}]，拒绝回[/goal reject {gid}]。"
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[pipeline] 目标追踪查询失败: {e}")
             return None
 
         return None

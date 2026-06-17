@@ -1,7 +1,5 @@
 # core/db/cleanup.py  |  clear_chat_history + 批量清理函数
 
-import sqlite3
-from datetime import datetime, timedelta
 from . import get_conn
 
 

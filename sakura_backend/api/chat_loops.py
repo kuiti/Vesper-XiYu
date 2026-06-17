@@ -7,8 +7,7 @@ import threading
 from datetime import datetime, timedelta
 from fastapi import WebSocket, WebSocketDisconnect
 from core.db import (
-    get_config, set_config, add_chat_message, get_reminders,
-    log_proactive_message, get_conn, save_diary_entry,
+    get_config, set_config, add_chat_message, log_proactive_message, get_conn, save_diary_entry,
 )
 from api.chat_tasks import check_reminders
 import logging

@@ -54,14 +54,16 @@ AI_EMOTIONS = {
 
 
 _rel_cache = {"ts": 0.0, "value": None}
+_rel_cache_lock = threading.Lock()
 _REL_CACHE_TTL = 5.0  # 5 秒内复用缓存（覆盖单条消息处理周期）
 
 
 def get_relationship() -> tuple:
     """获取当前好感度和信任度，返回 (affection, trust)。5秒内缓存避免重复查询。"""
     now = time.time()
-    if _rel_cache["value"] and now - _rel_cache["ts"] < _REL_CACHE_TTL:
-        return _rel_cache["value"]
+    with _rel_cache_lock:
+        if _rel_cache["value"] and now - _rel_cache["ts"] < _REL_CACHE_TTL:
+            return _rel_cache["value"]
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT key, value FROM relationship WHERE key IN ('affection', 'trust')")
@@ -81,8 +83,9 @@ def get_relationship() -> tuple:
             data.get("trust", INITIAL_TRUST)
         )
 
-    _rel_cache["ts"] = now
-    _rel_cache["value"] = result
+    with _rel_cache_lock:
+        _rel_cache["ts"] = now
+        _rel_cache["value"] = result
     return result
 
 
@@ -103,7 +106,8 @@ def _get_foundation_defaults() -> tuple:
 
 def invalidate_relationship_cache():
     """写入后手动失效缓存，确保下次读取拿到最新值"""
-    _rel_cache["value"] = None
+    with _rel_cache_lock:
+        _rel_cache["value"] = None
 
 
 def get_ai_emotion() -> str:

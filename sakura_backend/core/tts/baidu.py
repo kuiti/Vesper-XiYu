@@ -1,5 +1,5 @@
 # core/tts/baidu.py
-import os, base64, logging
+import os, logging
 from . import BaseTTS, TTSResult, _save_audio_bytes, _get_audio_duration, _register_temp_file
 logger = logging.getLogger(__name__)
 class BaiduTTS(BaseTTS):

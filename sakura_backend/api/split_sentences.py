@@ -185,7 +185,6 @@ def fallback_split(text: str) -> list:
 def split_next(text: str) -> tuple:
     """从文本开头提取下一个完整句子，返回 (sentence, remaining_text)
     用于前端流式分句 —— DFA 状态机从前向后扫描，遇到句子边界时停止"""
-    import re
 
     S_NORMAL = 0
     S_IN_PAREN = 1

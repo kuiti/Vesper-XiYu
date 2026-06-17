@@ -1,7 +1,6 @@
 """Web Fetch MCP Server — 让 Claude Code 抓取网页内容"""
 import os
 import re
-import json
 import hashlib
 import time
 from mcp.server.fastmcp import FastMCP

@@ -1,7 +1,7 @@
 # core/knowledge_graph.py — 知识图谱：从对话中提取实体关系
 import json
 import logging
-from core.db import get_conn, add_knowledge_triplet, query_knowledge_by_entity
+from core.db import add_knowledge_triplet, query_knowledge_by_entity
 
 logger = logging.getLogger(__name__)
 

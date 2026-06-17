@@ -1,6 +1,5 @@
 """SQLite MCP Server — 让 Claude Code 直接查询佐仓数据库"""
 import sqlite3
-import sys
 import os
 from mcp.server.fastmcp import FastMCP
 

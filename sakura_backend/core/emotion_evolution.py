@@ -61,6 +61,7 @@ def _now():
 
 _traits_initialized = False
 _traits_init_lock = threading.Lock()
+_evolution_claim_lock = threading.Lock()
 
 
 def init_traits():
@@ -166,11 +167,12 @@ def _set_last_evolution_date(date_str: str):
 
 def _try_claim_evolution_date(today: str) -> bool:
     """检查当日是否已演化的缓存安全版本。"""
-    current = get_config("last_evolution_date", "")
-    if current == today:
-        return False
-    set_config("last_evolution_date", today)
-    return True
+    with _evolution_claim_lock:
+        current = get_config("last_evolution_date", "")
+        if current == today:
+            return False
+        set_config("last_evolution_date", today)
+        return True
 
 
 # ─── 每日演化主入口 ───

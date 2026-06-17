@@ -6,7 +6,7 @@ import json
 import logging
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from contextlib import contextmanager
 import os
 from core.retry import silent_exc

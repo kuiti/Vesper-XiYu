@@ -1,9 +1,8 @@
 # core/prompt_builder.py  |  v3.9.0
 from core.db import get_config, set_config, get_conn, get_msg_counter
-from core.relationship import get_relationship_hint, get_emotion_behavior_hint, get_relationship
+from core.relationship import get_relationship_hint, get_emotion_behavior_hint
 from core.persona_data import (
-    LENGTH_MAP, PERSONA_TEMPLATE_WITH_FOUNDATION,
-    PERSONA_TEMPLATE_WITHOUT_FOUNDATION, TONE_DESCRIPTIONS,
+    LENGTH_MAP, TONE_DESCRIPTIONS,
     FOUNDATION_TEMPLATES, DEFAULT_FOUNDATION, DEFAULT_TABOOS,
 )
 import logging
@@ -333,7 +332,8 @@ def _get_continuity_bridge() -> str:
                 "SELECT role, content, timestamp FROM chat_history ORDER BY id DESC LIMIT 6"
             )
             recent = list(reversed(cursor.fetchall()))
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[prompt] 连续性桥接查询失败: {e}")
         return ""
     if not recent:
         return ""
@@ -341,7 +341,8 @@ def _get_continuity_bridge() -> str:
     try:
         last_ts = _dt.fromisoformat(recent[-1]["timestamp"])
         gap_minutes = (_dt.now() - last_ts).total_seconds() / 60
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[prompt] 时间戳解析失败: {e}")
         return ""
     # 30分钟内有消息 = 活跃对话，不需要桥接
     if gap_minutes < 30:
@@ -361,7 +362,8 @@ def _get_continuity_bridge() -> str:
             _c2.row_factory = None
             _c2.execute("SELECT COUNT(DISTINCT ROUND(julianday(timestamp) * 1440 / 30)) FROM chat_history WHERE role='user' AND timestamp >= ?", (_today,))
             _today_sessions = _c2.fetchone()[0] or 1
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[prompt] 今日会话数查询失败: {e}")
         _today_sessions = 1
     parts = [f"这是你们今天第{_today_sessions}轮对话了——保持自然的亲近感，不用刻意客气。"]
     parts.append(f"上次聊了{gap_desc}前，用户最后说的是：「{last_topic}」。")
@@ -429,12 +431,14 @@ def build_dynamic_context(current_time_str, emotion="neutral", idle_minutes=0):
     # 关系状态每次都注入（重要，AI 需要知道当前该亲近还是保持距离）
     try:
         relationship_hint = get_relationship_hint()
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[prompt] 关系提示获取失败: {e}")
         relationship_hint = ""
     # 情感行为提示每 20 轮注入一次（变化慢，省 token）
     try:
         msg_count = get_msg_counter()
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[prompt] 消息计数获取失败: {e}")
         msg_count = 0
     emotion_behavior = ""
     if msg_count % 20 == 0:

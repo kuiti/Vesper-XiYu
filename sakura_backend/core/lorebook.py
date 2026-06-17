@@ -20,7 +20,6 @@ from datetime import datetime
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 from core.db import get_conn
-from core.retry import silent_exc
 
 
 # ─── 数据类 ───

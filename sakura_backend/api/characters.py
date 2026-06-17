@@ -4,7 +4,7 @@
 import json
 import os
 import tempfile
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import Response, JSONResponse
 from core.character_card import CharacterCard
 import logging

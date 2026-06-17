@@ -28,12 +28,10 @@ from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks, Request
 from fastapi.responses import JSONResponse
 from core.db import (
-    get_conn, get_config, get_memory, get_all_chat_messages,
+    get_conn, get_memory, get_all_chat_messages,
     get_todos, get_notes, get_countdowns, get_reminders, get_presets,
-    get_last_summary, set_config, set_memory, add_chat_message,
-    add_todo, add_note, add_countdown, add_reminder, save_preset,
-    add_summary, reset_active_memory, reset_msg_counter, clear_chat_history,
-    get_active_tiered_summaries, get_death_archive, get_msg_counter,
+    get_last_summary, set_config, set_memory, save_preset,
+    add_summary, reset_active_memory, reset_msg_counter, get_active_tiered_summaries, get_death_archive, get_msg_counter,
     add_tiered_summary
 )
 

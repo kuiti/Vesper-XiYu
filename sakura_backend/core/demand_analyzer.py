@@ -6,10 +6,9 @@
 - extract_patterns_via_llm() 后台用 LLM 提炼用户行为规律
 """
 
-import json
 import logging
 from datetime import datetime
-from core.db import get_conn, get_config
+from core.db import get_conn
 
 logger = logging.getLogger(__name__)
 

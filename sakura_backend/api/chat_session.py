@@ -6,17 +6,18 @@ import random
 import asyncio
 import uuid
 import threading
+import time
 from datetime import datetime
 from fastapi import WebSocket, WebSocketDisconnect
 from core.db import (
     get_config, add_chat_message, set_config, get_conn,
-    reroll_last_ai_message, reroll_from_message, get_reminders,
+    get_reminders,
     increment_msg_counter, get_active_tiered_summaries, get_all_active_keypoints,
 )
 from core.prompt_builder import build_system_prompt, build_dynamic_context
 from api.sentiment import analyze_sentiment
 from api.intent import detect_intent
-from core.profile_builder import get_profile_context, extract_atomic_facts, get_facts_context
+from core.profile_builder import get_profile_context, get_facts_context
 from core.emotion_tracker import record_emotion
 from core.relationship import adjust_relationship
 from api.greeting import (
@@ -28,12 +29,12 @@ from core.vector_store import add_message_vector, add_sentence_vectors, is_model
 from core.demand_analyzer import save_demand_record, get_user_patterns
 from api.chat_tasks import (
     check_reminders, _clean_dsml, _apply_background_update,
-    _trigger_daily_evolution, _calc_consecutive_days, _check_achievements,
+    _trigger_daily_evolution, _calc_consecutive_days,
     _maybe_surprise, _check_goal_completion, _parse_dsml_tool_calls, _build_rag_context,
 )
 from api.chat_parser import ThinkingParser
 from api.chat_commands import (
-    handle_welcome, handle_tease, handle_reroll, handle_reroll_from, handle_remind,
+    handle_welcome, handle_reroll, handle_remind,
 )
 from api.chat_loops import reminder_loop, proactive_loop, diary_scheduler
 from api.chat_fallback import try_fallback_reply
@@ -56,6 +57,8 @@ _background_thread_pool = ThreadPoolExecutor(max_workers=8)
 
 _MAX_WS_MSG_SIZE = 50 * 1024
 _MAX_WS_CONNECTIONS = 20
+_WS_RATE_LIMIT = 10  # 每窗口最大消息数
+_WS_RATE_WINDOW = 10  # 速率窗口（秒）
 
 
 
@@ -82,6 +85,7 @@ class ChatSession:
         self.tag_proactive_task = None
         self._conn_empathy_strategy = None
         self.user_message = ""
+        self._rate_timestamps: list = []
         self.history = []
         self.emotion = "neutral"
         self._is_game_event = False
@@ -124,6 +128,14 @@ class ChatSession:
                 if len(json.dumps(request, ensure_ascii=False)) > _MAX_WS_MSG_SIZE:
                     await self.ws.send_text(json.dumps({"type": "error", "content": "消息过大"}))
                     continue
+
+                # 速率限制
+                now_ts = time.time()
+                self._rate_timestamps = [t for t in self._rate_timestamps if now_ts - t < _WS_RATE_WINDOW]
+                if len(self._rate_timestamps) >= _WS_RATE_LIMIT:
+                    await self.ws.send_text(json.dumps({"type": "error", "content": "消息发送过快，请稍后"}))
+                    continue
+                self._rate_timestamps.append(now_ts)
 
                 await self._handle_request(request)
 
@@ -366,7 +378,8 @@ class ChatSession:
                 if strategy:
                     sr["empathy_strategy"] = strategy
                     self._conn_empathy_strategy = strategy
-            except Exception:
+            except Exception as e:
+                logger.warning(f"[sent] 共情策略获取失败: {e}")
                 pass
 
     async def _check_dedup(self, msg):
@@ -425,7 +438,8 @@ class ChatSession:
                 if pg:
                     dc += "\n[goal] " + pg[0]["goal_text"]
                     self.session_triggered.add("goal_asked")
-            except Exception:
+            except Exception as e:
+                logger.warning(f"[build] 目标追踪加载失败: {e}")
                 pass
         if self._is_system:
             dc += "\n[short system reply]"
@@ -700,7 +714,8 @@ class ChatSession:
         try:
             from core.knowledge_graph import extract_triples_from_text
             extract_triples_from_text(content, source="chat")
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[kg] 知识图谱提取失败: {e}")
             pass
 
     async def _fallback_reply(self):

@@ -1,5 +1,5 @@
 # core/memory_utils.py — 记忆筛选工具
-from core.db import get_conn, get_config
+from core.db import get_conn
 import random
 
 

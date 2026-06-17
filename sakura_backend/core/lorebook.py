@@ -247,7 +247,7 @@ class LorebookManager:
             if entry.logic == "REGEX":
                 try:
                     for key in entry.keys:
-                        if re.search(key, msg_lower):
+                        if re.search(key, msg_lower, re.TIMEOUT if hasattr(re, 'TIMEOUT') else 0):
                             is_match = True
                             break
                 except re.error:

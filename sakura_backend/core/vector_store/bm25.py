@@ -1,3 +1,4 @@
+import threading
 # core/vector_store/bm25.py — BM25 索引 + 关键词回退检索
 from core.retry import silent_exc
 from .model import get_collection
@@ -8,6 +9,8 @@ _bm25_docs = None
 _bm25_hash = None  # 文档列表哈希，用于快速判断是否需要重建
 
 
+
+_BM25_LOCK = threading.Lock()
 def reset_bm25_cache():
     """重置 BM25 缓存（重建向量或新消息写入后调用）"""
     global _bm25, _bm25_docs, _bm25_hash

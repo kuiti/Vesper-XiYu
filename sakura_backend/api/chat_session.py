@@ -58,6 +58,14 @@ _MAX_WS_MSG_SIZE = 50 * 1024
 _MAX_WS_CONNECTIONS = 20
 
 
+
+def _safe_task(coro):
+    """Create task with exception logging to avoid silent failures"""
+    task = asyncio.create_task(coro)
+    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+    return task
+
+
 class ChatSession:
     """封装一次 WebSocket 连接的全生命周期。"""
 
@@ -90,7 +98,7 @@ class ChatSession:
                 return
             _active_websockets[self.conn_id] = self.ws
 
-        self.reminder_task = asyncio.create_task(reminder_loop(self.ws))
+        self.reminder_task = _safe_task(reminder_loop(self.ws))
         await self.ws.accept()
         logger.info(f"WS 客户端已连接 (id={self.conn_id[:8]}, total={len(_active_websockets)})")
 
@@ -143,7 +151,7 @@ class ChatSession:
         last_active = last_chat if last_chat else datetime.now()
         self.consecutive_negative = int(get_config("_consecutive_negative", "0"))
 
-        self.proactive_task = asyncio.create_task(proactive_loop(
+        self.proactive_task = _safe_task(proactive_loop(
             self.ws, last_active, self.consecutive_negative,
             self.session_triggered, self._conn_empathy_strategy,
         ))
@@ -151,7 +159,7 @@ class ChatSession:
         with _diary_scheduler_lock:
             if not _diary_scheduler_started:
                 _diary_scheduler_started = True
-                asyncio.create_task(diary_scheduler())
+                _safe_task(diary_scheduler())
 
     async def _on_disconnect(self):
         """连接断开时清理"""
@@ -357,13 +365,13 @@ class ChatSession:
     async def _check_dedup(self, msg):
         if self._is_system:
             return ""
-        sep = "|||"
-        raw = get_config("_recent_user_msgs", "")
-        msgs = [m for m in raw.split(sep) if m] if raw else []
-        cnt = sum(1 for m in msgs if m == msg)
+        if not hasattr(self, "_recent_msgs"):
+            self._recent_msgs = []
+        cnt = sum(1 for m in self._recent_msgs if m == msg)
         note = f"(repeated {cnt+1}x)" if cnt >= 2 else ""
-        msgs.append(msg)
-        set_config("_recent_user_msgs", sep.join(msgs[-5:]))
+        self._recent_msgs.append(msg)
+        if len(self._recent_msgs) > 5:
+            self._recent_msgs = self._recent_msgs[-5:]
         return note
 
     async def _build_and_send(self, history, hours_since):
@@ -579,9 +587,7 @@ class ChatSession:
             for m in ["【思考】", "【回复】"]:
                 if m in c:
                     c = c.split(m)[-1].strip()
-            for ch in c:
-                await ws.send_text(json.dumps({"type": "token", "content": ch}))
-                await asyncio.sleep(0.02)
+            await ws.send_text(json.dumps({"type": "token", "content": c}))
         except Exception as e:
             logger.error(f"tool LLM: {e}")
             c = "processed."
@@ -619,7 +625,7 @@ class ChatSession:
                 if iv and iv >= 30:
                     if self.tag_proactive_task and not self.tag_proactive_task.done():
                         self.tag_proactive_task.cancel()
-                    self.tag_proactive_task = asyncio.create_task(_schedule_proactive(iv, ws))
+                    self.tag_proactive_task = _safe_task(_schedule_proactive(iv, ws))
 
             cleaned, fb = process_reply_tags(content, tool_calls_used=False)
             if cleaned is not None:

@@ -4,6 +4,7 @@ import re
 from collections import OrderedDict
 
 _sentiment_cache = OrderedDict()
+_SENTIMENT_CACHE_MAX = 500
 import threading as _threading  # noqa
 _sentiment_lock = _threading.Lock()
 

@@ -6,7 +6,10 @@ import time as _time
 import threading
 import sqlite3
 import json
+import logging
 from . import _shared as _s
+
+logger = logging.getLogger(__name__)
 
 
 def _read_theme():
@@ -35,7 +38,7 @@ def _write_hwnd(hwnd):
         with open(_s.HWND_FILE, "w") as f:
             f.write(str(hwnd))
     except Exception as e:
-        print(f"[启动] 写入 HWND 失败: {e}")
+        logger.warning(f"[启动] 写入 HWND 失败: {e}")
 
 
 def _set_titlebar_theme(hwnd, dark=True):
@@ -47,7 +50,7 @@ def _set_titlebar_theme(hwnd, dark=True):
             wintypes.HWND(hwnd), DWMWA_USE_IMMERSIVE_DARK_MODE,
             ctypes.byref(val), ctypes.sizeof(val))
     except Exception as e:
-        print(f"[启动] 深色标题栏设置失败: {e}")
+        logger.warning(f"[启动] 深色标题栏设置失败: {e}")
 
 
 def _set_window_icon(hwnd=None):

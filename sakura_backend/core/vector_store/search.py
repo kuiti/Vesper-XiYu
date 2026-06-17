@@ -179,7 +179,7 @@ def search_similar(query: str, top_k: int = 3, include_metadata: bool = False):
             return [(doc, dist, meta) for doc, dist, meta, _, _ in mmr_result]
         return [(doc, dist) for doc, dist, _, _, _ in mmr_result]
     except Exception as e:
-        print(f"[向量搜索] 查询失败: {e}")
+        logger.warning(f"[向量搜索] 查询失败: {e}")
         return []
 
 
@@ -195,7 +195,7 @@ def search_knowledge_similar(query, top_k=5):
         if results and results['documents'] and results['documents'][0]:
             return list(zip(results['documents'][0], results['distances'][0] if results['distances'] else []))
     except Exception as e:
-        print(f"[知识库检索] 异常: {e}")
+        logger.warning(f"[知识库检索] 异常: {e}")
     return []
 
 
@@ -239,5 +239,5 @@ def search_memories(query: str, top_k: int = 5) -> list[dict]:
             })
         return items
     except Exception as e:
-        print(f"[记忆向量] 检索失败: {e}")
+        logger.warning(f"[记忆向量] 检索失败: {e}")
         return _keyword_search_memories(query, top_k)

@@ -62,7 +62,7 @@ def delete_document_vectors(doc_id):
         if results and results['ids']:
             collection.delete(ids=results['ids'])
     except Exception as e:
-        print(f"[知识库删除] 异常: {e}")
+        logger.warning(f"[知识库删除] 异常: {e}")
 
 
 def add_profile_vectors():
@@ -100,6 +100,6 @@ def add_profile_vectors():
             )
             count += 1
         if count:
-            print(f"[记忆向量] 同步了 {count} 条 user_profile")
+            logger.info(f"[记忆向量] 同步了 {count} 条 user_profile")
     except Exception as e:
-        print(f"[记忆向量] user_profile 同步失败: {e}")
+        logger.warning(f"[记忆向量] user_profile 同步失败: {e}")

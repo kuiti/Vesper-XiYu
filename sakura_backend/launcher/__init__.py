@@ -10,6 +10,8 @@ import time as _time
 import shutil as _shutil
 import logging as _log
 
+logger = _log.getLogger(__name__)
+
 from . import _shared as _s
 from ._shared import (
     BASE_DIR, FIXED_PORTS, HWND_FILE, WM_SHOW_WINDOW, LOCK_FILE,
@@ -202,7 +204,7 @@ def run():
                 existing_port, _ = _find_existing_instance()
             if existing_port:
                 _activate_existing_window(existing_port)
-            print("[启动] 已有实例在运行，退出")
+            logger.info("[启动] 已有实例在运行，退出")
             sys.exit(0)
 
     # 0.5 频率限制
@@ -212,7 +214,7 @@ def run():
             with open(_launch_stamp_file, 'r') as f:
                 _last_ts = float(f.read().strip() or '0')
             if _time.time() - _last_ts < 2:
-                print("[启动] 启动频率过高（<2秒），跳过")
+                logger.info("[启动] 启动频率过高（<2秒），跳过")
                 sys.exit(0)
         with open(_launch_stamp_file, 'w') as f:
             f.write(str(_time.time()))
@@ -222,7 +224,7 @@ def run():
     # 1. 找端口 → 立即出窗口
     SAKURA_PORT = _find_free_port()
     _write_instance_lock(SAKURA_PORT)
-    print(f"[启动] 使用端口: {SAKURA_PORT}")
+    logger.info(f"[启动] 使用端口: {SAKURA_PORT}")
     _html = loading_html.replace('__PORT__', _json.dumps(SAKURA_PORT)).replace('__THEME__', _json.dumps(_last_theme))
 
     # 写 config.js
@@ -233,7 +235,7 @@ def run():
             with open(os.path.join(_frontend_dir, "config.js"), "w", encoding="utf-8") as f:
                 f.write(f"window.__SAKURA_CONFIG__ = {{ backendPort: {SAKURA_PORT}, theme: \"{_last_theme}\" }};")
         except OSError as e:
-            print(f"[启动] 警告：无法写入 config.js: {e}")
+            logger.warning(f"[启动] 警告：无法写入 config.js: {e}")
     else:
         _frontend_dir = os.path.join(BASE_DIR, "static")
 
@@ -261,7 +263,7 @@ def run():
                 _geo[_key] = {"setting": 1, "last_modified": str(int(_time.time() * 1000000))}
                 with open(_prefs_path, "w", encoding="utf-8") as _f:
                     _json.dump(_prefs, _f, ensure_ascii=False)
-                print(f"[启动] 已预授权地理位置权限（端口 {SAKURA_PORT}）")
+                logger.info(f"[启动] 已预授权地理位置权限（端口 {SAKURA_PORT}）")
         except Exception:
             pass
 
@@ -277,7 +279,7 @@ def run():
     except Exception as e:
         _log.error(f'Window start failed: {e}')
         import webbrowser
-        print(f"WebView2 启动失败: {e}，回退到浏览器")
+        logger.warning(f"WebView2 启动失败: {e}，回退到浏览器")
         webbrowser.open(f"http://127.0.0.1:{SAKURA_PORT}/")
         try:
             input("按 Ctrl+C 退出...")
@@ -294,7 +296,7 @@ def run():
 
     # 5. 后台：管道 + 后端
     _start_pipe_server(SAKURA_PORT)
-    print(f"[启动] 命名管道服务器已启动 (sakura_ai_{SAKURA_PORT})")
+    logger.info(f"[启动] 命名管道服务器已启动 (sakura_ai_{SAKURA_PORT})")
     threading.Thread(target=start_backend, args=(SAKURA_PORT,), daemon=True).start()
 
     # 6. 后台：系统托盘

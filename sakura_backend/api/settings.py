@@ -1,8 +1,12 @@
 # version: 5.0.0
+import logging
+
 from fastapi import APIRouter
 from core.db import get_config, set_config, get_presets, save_preset, delete_preset
 from pydantic import BaseModel
 from typing import Any, Dict
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -350,7 +354,7 @@ async def full_reset(data: FullResetConfirm = FullResetConfirm()):
             os.makedirs(chroma_path, exist_ok=True)
     except Exception as e:
         errors.append(f"chroma_db: {e}")
-        print(f"[重置] 清除向量库失败: {e}")
+        logger.warning(f"[重置] 清除向量库失败: {e}")
     # 5. 清除心路历程和其他数据
     with get_conn() as conn:
         cursor = conn.cursor()

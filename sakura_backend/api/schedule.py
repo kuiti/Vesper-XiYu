@@ -1,7 +1,11 @@
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, field_validator
 from core.db import get_conn
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/schedule", tags=["schedule"])
 
@@ -66,7 +70,7 @@ async def create_schedule(item: ScheduleCreate):
             t = datetime.fromisoformat(item.start_time)
             add_reminder(f"日程: {item.title}", t.isoformat(), level=4)
         except Exception as e:
-            print(f"[日程] 自动创建提醒失败（日程已保存）: {e}")
+            logger.warning(f"[日程] 自动创建提醒失败（日程已保存）: {e}")
     return {"status": "ok", "id": sched_id}
 
 

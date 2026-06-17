@@ -1,8 +1,12 @@
 # version: 5.0.0
+import logging
+
 from fastapi import APIRouter, BackgroundTasks
 from core.db import delete_chat_history_between, delete_chat_history_older_than, set_config, get_config, reset_active_memory
 from pydantic import BaseModel
 from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat/manage", tags=["chat"])
 
@@ -18,7 +22,7 @@ def _clear_vectors():
         from core.vector_store import rebuild_all_vectors
         rebuild_all_vectors()
     except Exception as e:
-        print(f"[向量清理] 异常: {e}")
+        logger.warning(f"[向量清理] 异常: {e}")
 
 @router.delete("/range")
 async def delete_range(range: DateRange, bg: BackgroundTasks):

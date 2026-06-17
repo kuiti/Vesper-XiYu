@@ -69,7 +69,7 @@ def call_llm(
     api_key = get_config("api_key", "")
     is_local = get_config("api_provider", "") == "ollama"
     if not api_key and not is_local and provider.name not in ("ollama",):
-        print("[LLM] API Key 未配置")
+        logger.warning("[LLM] API Key 未配置")
         return None
 
     messages = []
@@ -116,5 +116,5 @@ def call_llm(
     try:
         return json.loads(content)
     except (json.JSONDecodeError, ValueError) as e:
-        print(f"[LLM] JSON 解析失败: {e} | content={content[:200]}")
+        logger.warning(f"[LLM] JSON 解析失败: {e} | content={content[:200]}")
         return None

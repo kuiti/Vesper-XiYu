@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 def rebuild_all_vectors(progress_callback=None):
     """重建所有向量索引（安全模式：先写临时集合，成功后替换旧集合）"""
     if not _rebuild_lock.acquire(blocking=False):
-        print("[向量重建] 已有重建任务在进行中，跳过")
+        logger.warning("[向量重建] 已有重建任务在进行中，跳过")
         return
     try:
         from core.db import get_all_chat_messages
@@ -74,7 +74,7 @@ def rebuild_all_vectors(progress_callback=None):
         try:
             client.delete_collection(temp_name)
         except Exception as e:
-            print(f"[向量] 清理临时集合失败: {e}")
+            logger.warning(f"[向量] 清理临时集合失败: {e}")
         temp_collection = client.get_or_create_collection(
             name=temp_name, metadata={"hnsw:space": "cosine"}
         )
@@ -98,7 +98,7 @@ def rebuild_all_vectors(progress_callback=None):
         try:
             client.delete_collection("chat_memory")
         except Exception as e:
-            print(f"[向量] 清理旧集合失败: {e}")
+            logger.warning(f"[向量] 清理旧集合失败: {e}")
         new_collection = client.get_or_create_collection(
             name="chat_memory", metadata={"hnsw:space": "cosine"}
         )
@@ -116,7 +116,7 @@ def rebuild_all_vectors(progress_callback=None):
         try:
             client.delete_collection(temp_name)
         except Exception as e:
-            print(f"[向量] 清理临时集合失败: {e}")
+            logger.warning(f"[向量] 清理临时集合失败: {e}")
 
         # 重建 sentence_index 集合
         try:
@@ -140,11 +140,11 @@ def rebuild_all_vectors(progress_callback=None):
                         metadatas=[{"msg_id": int(sid.split('_')[1]) if '_' in sid else 0, "seq": int(sid.split('_')[2]) if sid.count('_') >= 2 else 0, "role": "assistant"}],
                         documents=[r["content"]]
                     )
-                print(f"[向量重建] sentence_index: {len(rows)} 条")
+                logger.info(f"[向量重建] sentence_index: {len(rows)} 条")
         except Exception as e:
-            print(f"[向量重建] sentence_index 失败: {e}")
+            logger.warning(f"[向量重建] sentence_index 失败: {e}")
 
-        print(f"[向量重建] 完成，共 {total} 条消息")
+        logger.info(f"[向量重建] 完成，共 {total} 条消息")
         reset_client_cache()
         reset_bm25_cache()
     finally:

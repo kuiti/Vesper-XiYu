@@ -25,7 +25,7 @@ def get_location_by_ip() -> dict:
                 if city:
                     return {"province": province, "city": city, "adcode": data.get("adcode", "")}
         except Exception as e:
-            print(f"[意图-定位] 高德异常: {e}")
+            logger.warning(f"[意图-定位] 高德异常: {e}")
     # 备用: ip-api.com
     try:
         resp = requests.get("https://ip-api.com/json/?lang=zh-CN", timeout=5)
@@ -33,7 +33,7 @@ def get_location_by_ip() -> dict:
         if data.get("status") == "success":
             return {"province": data.get("regionName", ""), "city": data.get("city", ""), "adcode": ""}
     except Exception as e:
-        print(f"[意图] 异常: {e}")
+        logger.warning(f"[意图] 异常: {e}")
     return {}
 
 def get_city_by_ip():
@@ -67,7 +67,7 @@ def get_current_weather(city: str) -> dict:
         if resp.get("status") == "1" and resp.get("lives"):
             return resp["lives"][0]
     except Exception as e:
-        print(f"[意图] 异常: {e}")
+        logger.warning(f"[意图] 异常: {e}")
     return {}
 
 # 天气相关函数统一从 core.weather 导入，不再重复定义
@@ -117,7 +117,7 @@ def web_search(query: str) -> str:
             if attempt == 0:
                 _time.sleep(2)
             else:
-                print(f"[搜索] DDG 失败: {e}")
+                logger.warning(f"[搜索] DDG 失败: {e}")
 
     # 方案2: Bing 备用
     try:
@@ -150,7 +150,7 @@ def web_search(query: str) -> str:
             if clean:
                 return "\n\n".join(clean)
     except Exception as e:
-        print(f"[搜索] Bing 备用失败: {e}")
+        logger.warning(f"[搜索] Bing 备用失败: {e}")
 
     return ""
 

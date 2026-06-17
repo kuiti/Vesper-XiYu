@@ -1,7 +1,11 @@
+import logging
+import os
+
 from fastapi import APIRouter, UploadFile, File
 from core.db import add_document, get_documents, delete_document, get_conn
 from core.vector_store import chunk_text, add_document_vectors, delete_document_vectors, is_model_ready
-import os
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -91,11 +95,11 @@ def _flush_pending_index():
             flushed.append(f"{filename}({count}条)")
         except Exception as e:
             remaining.append((doc_id, text))
-            print(f"[知识库] 补建索引失败 doc_id={doc_id}: {e}")
+            logger.warning(f"[知识库] 补建索引失败 doc_id={doc_id}: {e}")
     _pending_index.clear()
     _pending_index.extend(remaining)
     if flushed:
-        print(f"[知识库] 补建索引完成: {', '.join(flushed)}")
+        logger.info(f"[知识库] 补建索引完成: {', '.join(flushed)}")
 
 
 @router.post("/upload")
@@ -166,7 +170,7 @@ async def remove_knowledge(doc_id: int):
         try:
             os.remove(filepath)
         except Exception as e:
-            print(f"[知识库] 删除文件失败: {e}")
+            logger.warning(f"[知识库] 删除文件失败: {e}")
     delete_document(doc_id)
     delete_document_vectors(doc_id)
     return {"status": "ok"}

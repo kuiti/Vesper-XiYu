@@ -36,7 +36,7 @@ async def weather_scheduler(active_websockets: dict, active_websockets_lock: asy
             try:
                 await _push_weather(hour, active_websockets, active_websockets_lock)
             except Exception as e:
-                print(f"[天气调度] 推送异常: {e}")
+                logger.warning(f"[天气调度] 推送异常: {e}")
 
 
 async def _push_weather(push_hour: int, active_websockets: dict, active_websockets_lock: asyncio.Lock):
@@ -47,11 +47,11 @@ async def _push_weather(push_hour: int, active_websockets: dict, active_websocke
         card_data = build_weather_card_data(weather, push_hour)
         if "error" not in card_data:
             break
-        print(f"[天气调度] 第{attempt+1}次获取失败: {card_data['error']}")
+        logger.warning(f"[天气调度] 第{attempt+1}次获取失败: {card_data['error']}")
         if attempt == 0:
             await asyncio.sleep(60)  # 等 60 秒重试一次
     else:
-        print(f"[天气调度] 2次尝试均失败，本时段跳过")
+        logger.warning(f"[天气调度] 2次尝试均失败，本时段跳过")
         return
     if active_websockets:
         await _broadcast_weather(card_data, active_websockets, active_websockets_lock)
@@ -72,7 +72,7 @@ async def _broadcast_weather(card_data: dict, active_websockets: dict, active_we
             active_websockets.pop(cid, None)
     # 同时存入聊天记录
     add_chat_message("assistant", f"__WEATHER_CARD__{json.dumps(card_data, ensure_ascii=False)}")
-    print(f"[天气调度] 已广播天气到 {len(active_websockets)} 个连接")
+    logger.info(f"[天气调度] 已广播天气到 {len(active_websockets)} 个连接")
 
 
 def _write_weather_notification(card_data: dict):
@@ -80,6 +80,6 @@ def _write_weather_notification(card_data: dict):
         os.makedirs("data", exist_ok=True)
         with open(WEATHER_NOTIFICATION_FILE, "w", encoding="utf-8") as f:
             json.dump({"weather": card_data, "created_at": datetime.now().isoformat()}, f, ensure_ascii=False)
-        print(f"[天气调度] 已写入天气通知文件")
+        logger.info(f"[天气调度] 已写入天气通知文件")
     except Exception as e:
-        print(f"[天气调度] 写入文件失败: {e}")
+        logger.warning(f"[天气调度] 写入文件失败: {e}")

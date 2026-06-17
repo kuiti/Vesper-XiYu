@@ -14,10 +14,13 @@ from __future__ import annotations
 import json
 import time
 import random
+import logging
 import requests
 from abc import ABC, abstractmethod
 from typing import Iterator
 from core.db import get_config
+
+logger = logging.getLogger(__name__)
 
 
 # ─── 重试工具函数 ───
@@ -144,7 +147,7 @@ class OpenAICompatibleProvider(LLMProvider):
                     )
                     resp.raise_for_status()
                     if model_idx > 0 or attempt > 0:
-                        print(f"[LLMProvider] 流式恢复: 模型={current_model}, 尝试#{attempt+1}")
+                        logger.info(f"[LLMProvider] 流式恢复: 模型={current_model}, 尝试#{attempt+1}")
                     full_text = ""
                     with resp:
                         tool_calls_buffer = {}
@@ -205,18 +208,18 @@ class OpenAICompatibleProvider(LLMProvider):
                 except requests.exceptions.RequestException as e:
                     last_error = e
                     if not _is_retryable_error(e):
-                        print(f"[LLMProvider] 非重试错误，放弃: {e}")
+                        logger.warning(f"[LLMProvider] 非重试错误，放弃: {e}")
                         yield {"type": "error", "data": str(e)}
                         return
                     if attempt < 2:
                         delay = _exponential_backoff(attempt)
-                        print(f"[LLMProvider] 重试 #{attempt+1} ({current_model})，{delay:.1f}s: {e}")
+                        logger.warning(f"[LLMProvider] 重试 #{attempt+1} ({current_model})，{delay:.1f}s: {e}")
                         time.sleep(delay)
                     continue
 
             # 当前模型重试用尽，切下一个
             if model_idx < len(models_to_try) - 1:
-                print(f"[LLMProvider] 切备选模型: {current_model} → {models_to_try[model_idx+1]}")
+                logger.warning(f"[LLMProvider] 切备选模型: {current_model} → {models_to_try[model_idx+1]}")
                 time.sleep(1)
 
         yield {"type": "error", "data": str(last_error) if last_error else "所有模型均失败"}
@@ -260,19 +263,19 @@ class OpenAICompatibleProvider(LLMProvider):
                 except Exception as e:
                     last_error = e
                     if not _is_retryable_error(e):
-                        print(f"[LLMProvider] 非重试错误，放弃: {e}")
+                        logger.warning(f"[LLMProvider] 非重试错误，放弃: {e}")
                         return None
                     if attempt < 2:
                         delay = _exponential_backoff(attempt)
-                        print(f"[LLMProvider] 非流式重试 #{attempt+1} ({current_model})，{delay:.1f}s: {e}")
+                        logger.warning(f"[LLMProvider] 非流式重试 #{attempt+1} ({current_model})，{delay:.1f}s: {e}")
                         time.sleep(delay)
                     continue
 
             if model_idx < len(models_to_try) - 1:
-                print(f"[LLMProvider] 非流式切备选模型: {current_model} → {models_to_try[model_idx+1]}")
+                logger.warning(f"[LLMProvider] 非流式切备选模型: {current_model} → {models_to_try[model_idx+1]}")
                 time.sleep(1)
 
-        print(f"[LLMProvider] {self.name} chat 全部失败: {last_error}")
+        logger.warning(f"[LLMProvider] {self.name} chat 全部失败: {last_error}")
         return None
 
 
@@ -341,7 +344,7 @@ class OllamaProvider(LLMProvider):
                 last_error = e
                 if attempt < 2:
                     delay = _exponential_backoff(attempt)
-                    print(f"[LLMProvider] Ollama 重试 #{attempt+1}，{delay:.1f}s: {e}")
+                    logger.warning(f"[LLMProvider] Ollama 重试 #{attempt+1}，{delay:.1f}s: {e}")
                     time.sleep(delay)
                 continue
 
@@ -375,14 +378,14 @@ class OllamaProvider(LLMProvider):
             except Exception as e:
                 last_error = e
                 if not _is_retryable_error(e):
-                    print(f"[LLMProvider] ollama 非重试错误: {e}")
+                    logger.warning(f"[LLMProvider] ollama 非重试错误: {e}")
                     return None
                 if attempt < 2:
                     delay = _exponential_backoff(attempt)
-                    print(f"[LLMProvider] ollama 重试 #{attempt+1}，{delay:.1f}s: {e}")
+                    logger.warning(f"[LLMProvider] ollama 重试 #{attempt+1}，{delay:.1f}s: {e}")
                     time.sleep(delay)
 
-        print(f"[LLMProvider] ollama chat 全部失败: {last_error}")
+        logger.warning(f"[LLMProvider] ollama chat 全部失败: {last_error}")
         return None
 
 

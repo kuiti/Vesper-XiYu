@@ -82,7 +82,7 @@ def extract_profile_from_messages():
                 confidence_map[k] = conf
                 dim = v.get("dimension", "")
                 if dim:
-                    print(f"[画像] 提取: {k}={v['value']} (置信度{conf}, 维度{dim})")
+                    logger.info(f"[画像] 提取: {k}={v['value']} (置信度{conf}, 维度{dim})")
             elif isinstance(v, str):
                 clean_data[k] = v
                 confidence_map[k] = 0.7
@@ -203,7 +203,7 @@ def extract_atomic_facts():
 
     if saved > 0:
         clear_profile_cache()
-        print(f"[事实提取] 新增 {saved} 条原子事实")
+        logger.info(f"[事实提取] 新增 {saved} 条原子事实")
 
 
 def _get_existing_facts(limit=50):
@@ -278,7 +278,7 @@ def _handle_contradictions(contradictions):
                         "UPDATE user_profile SET value = ? WHERE key = ?",
                         (json.dumps(data, ensure_ascii=False), key)
                     )
-                    print(f"[事实生命周期] 标记 {action}: {fact_text[:30]}...")
+                    logger.info(f"[事实生命周期] 标记 {action}: {fact_text[:30]}...")
                     break
 
 
@@ -454,7 +454,7 @@ def cleanup_expired_profile(days: int = 90):
     with _profile_cache_lock:
         _profile_cache = None
     if deleted > 0:
-        print(f"[画像] 清理 {deleted} 条过期条目（>{days}天）")
+        logger.info(f"[画像] 清理 {deleted} 条过期条目（>{days}天）")
     return deleted
 
 

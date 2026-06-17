@@ -321,3 +321,14 @@ def _build_rag_context(user_message: str, is_system: bool) -> tuple[str, str]:
             logger.warning(f"向量检索失败: {e}")
 
     return kb_title_hint, rag_context
+
+# ─── 公开别名（供外部模块导入时使用完整函数名）───
+clean_dsml = _clean_dsml
+parse_dsml_tool_calls = _parse_dsml_tool_calls
+apply_background_update = _apply_background_update
+build_rag_context = _build_rag_context
+trigger_daily_evolution = _trigger_daily_evolution
+calc_consecutive_days = _calc_consecutive_days
+check_achievements = _check_achievements
+maybe_surprise = _maybe_surprise
+check_goal_completion = _check_goal_completion

@@ -1,7 +1,10 @@
 # core/db/emotion.py  |  emotion_daily + emotion_log + empathy_feedback + ai_personality_traits + user_activity_stats
 
+import logging
 from datetime import datetime, timedelta
 from . import get_conn
+
+logger = logging.getLogger(__name__)
 
 
 # ========== 情绪日志清理 ==========
@@ -14,7 +17,7 @@ def cleanup_emotion_log(days: int = 90):
         cursor.execute("DELETE FROM emotion_log WHERE timestamp < ?", (cutoff,))
         deleted = cursor.rowcount
     if deleted > 0:
-        print(f"[清理] 删除 {deleted} 条 {days} 天前的 emotion_log")
+        logger.info(f"[清理] 删除 {deleted} 条 {days} 天前的 emotion_log")
     return deleted
 
 

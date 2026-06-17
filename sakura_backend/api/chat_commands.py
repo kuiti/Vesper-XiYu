@@ -4,6 +4,7 @@
 import asyncio
 import json
 import re
+import logging
 from datetime import datetime, timedelta
 from fastapi import WebSocket
 from core.db import (
@@ -13,6 +14,8 @@ from core.db import (
 )
 from api.chat_tasks import _clean_dsml
 from api.greeting import generate_greeting, generate_tease, save_last_welcome
+
+logger = logging.getLogger(__name__)
 
 
 async def handle_welcome(websocket: WebSocket):
@@ -27,7 +30,7 @@ async def handle_welcome(websocket: WebSocket):
             await websocket.send_text(json.dumps({"type": "token", "content": "欢迎回来～"}))
     except Exception as e:
         await websocket.send_text(json.dumps({"type": "token", "content": "欢迎回来～（生成失败）"}))
-        print(f"[welcome] 错误: {e}")
+        logger.warning(f"[welcome] 错误: {e}")
     await websocket.send_text(json.dumps({"type": "done"}))
 
 
@@ -50,16 +53,16 @@ async def handle_tease(websocket: WebSocket):
 
 
 async def handle_reroll(websocket: WebSocket):
-    """处理 /reroll 命令，返回 (user_message, should_continue)"""
+    """处理 /reroll 命令，返回 (user_message, should_skip)"""
     try:
         last_usr = reroll_last_ai_message()
         if last_usr:
             await websocket.send_text(json.dumps({"type": "reroll_start", "content": "重新生成中..."}))
-            return last_usr, False  # user_message, don't continue
+            return last_usr, False
         else:
             await websocket.send_text(json.dumps({"type": "token", "content": "没有可以重新生成的消息"}))
             await websocket.send_text(json.dumps({"type": "done"}))
-            return None, True  # skip this message
+            return None, True
     except Exception as e:
         await websocket.send_text(json.dumps({"type": "token", "content": f"重生成出错: {e}"}))
         await websocket.send_text(json.dumps({"type": "done"}))
@@ -67,7 +70,7 @@ async def handle_reroll(websocket: WebSocket):
 
 
 async def handle_reroll_from(websocket: WebSocket, msg_id: int):
-    """处理 /reroll_from:<msg_id> 命令，返回 (user_message, should_continue)"""
+    """处理 /reroll_from:<msg_id> 命令，返回 (user_message, should_skip)"""
     try:
         last_usr = reroll_from_message(msg_id)
         if last_usr:
@@ -119,7 +122,9 @@ async def handle_remind(websocket: WebSocket, msg: str):
                     if period in ("下午", "晚上") and h < 12:
                         h += 12
                     elif period in ("上午", "早上") and h == 12:
-                        h = 0
+                        h = 12  # 上午12点=中午12点
+                    elif period in ("晚上",) and h == 12:
+                        h = 0  # 晚上12点=午夜
                     days = 2 if day_offset == "后天" else 1 if day_offset == "明天" else 0
                     target_time = now.replace(hour=h, minute=mi, second=0, microsecond=0) + timedelta(days=days)
                     if days == 0 and target_time <= now:

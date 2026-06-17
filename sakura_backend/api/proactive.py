@@ -13,6 +13,7 @@ import json
 from datetime import datetime
 from core.db import get_config, set_config, get_active_hours, get_proactive_flag, get_proactive_response_rate, get_reminders
 import logging
+import threading
 from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
@@ -253,6 +254,7 @@ _TRIGGER_TO_CATEGORY = {
 
 _care_daily_counts = {}
 _care_daily_date = ""
+_care_lock = threading.Lock()
 
 
 def _load_care_counts():
@@ -261,28 +263,31 @@ def _load_care_counts():
         raw = get_config("_care_daily_counts", "")
         if raw:
             data = json.loads(raw)
-            _care_daily_counts = data.get("counts", {})
-            _care_daily_date = data.get("date", "")
+            with _care_lock:
+                _care_daily_counts = data.get("counts", {})
+                _care_daily_date = data.get("date", "")
     except Exception as e:
-        silent_exc("_load_care_counts", e)
+        logger.warning(f"[care] 加载计数失败: {e}")
 
 
 def _save_care_counts():
     try:
-        set_config("_care_daily_counts", json.dumps({"counts": _care_daily_counts, "date": _care_daily_date}, ensure_ascii=False))
+        with _care_lock:
+            set_config("_care_daily_counts", json.dumps({"counts": _care_daily_counts, "date": _care_daily_date}, ensure_ascii=False))
     except Exception as e:
-        silent_exc("_save_care_counts", e)
+        logger.warning(f"[care] 保存计数失败: {e}")
 
 
 def _reset_care_counts_if_new_day():
     global _care_daily_counts, _care_daily_date
-    if not _care_daily_date:
-        _load_care_counts()
-    today = datetime.now().strftime("%Y-%m-%d")
-    if _care_daily_date != today:
-        _care_daily_counts = {}
-        _care_daily_date = today
-        _save_care_counts()
+    with _care_lock:
+        if not _care_daily_date:
+            _load_care_counts()
+        today = datetime.now().strftime("%Y-%m-%d")
+        if _care_daily_date != today:
+            _care_daily_counts = {}
+            _care_daily_date = today
+            _save_care_counts()
 
 
 def _resolve_care_category(trigger_type: str) -> str:
@@ -301,7 +306,8 @@ def check_care_category_limit(trigger_type: str) -> bool:
         return True
     cat_config = CARE_CATEGORIES.get(category, {})
     max_daily = cat_config.get("max_daily", 99)
-    return _care_daily_counts.get(category, 0) < max_daily
+    with _care_lock:
+        return _care_daily_counts.get(category, 0) < max_daily
 
 
 def record_care_trigger(trigger_type: str):
@@ -309,7 +315,8 @@ def record_care_trigger(trigger_type: str):
     category = _resolve_care_category(trigger_type)
     if not category:
         return
-    _care_daily_counts[category] = _care_daily_counts.get(category, 0) + 1
+    with _care_lock:
+        _care_daily_counts[category] = _care_daily_counts.get(category, 0) + 1
     _save_care_counts()
 
 
@@ -370,18 +377,21 @@ def should_heartbeat_trigger(idle_minutes: float, session_triggered: set = None)
 # ─── 安慰语去重 ───
 
 _recent_comfort_phrases: list = []
+_comfort_lock = threading.Lock()
 
 
 def record_comfort_phrase(phrase: str):
-    _recent_comfort_phrases.append(phrase)
-    if len(_recent_comfort_phrases) > 20:
-        _recent_comfort_phrases.pop(0)
+    with _comfort_lock:
+        _recent_comfort_phrases.append(phrase)
+        if len(_recent_comfort_phrases) > 20:
+            _recent_comfort_phrases.pop(0)
 
 
 def get_comfort_dedup_hint() -> str:
-    if not _recent_comfort_phrases:
-        return ""
-    lines = [f"- \"{p}\"" for p in _recent_comfort_phrases[-10:]]
+    with _comfort_lock:
+        if not _recent_comfort_phrases:
+            return ""
+        lines = [f"- \"{p}\"" for p in _recent_comfort_phrases[-10:]]
     return "你最近对用户说过这些安慰话（请换个说法，不要重复）：\n" + "\n".join(lines)
 
 

@@ -62,7 +62,12 @@ _MAX_WS_CONNECTIONS = 20
 def _safe_task(coro):
     """Create task with exception logging to avoid silent failures"""
     task = asyncio.create_task(coro)
-    task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
+    def _log_if_failed(t):
+        if not t.cancelled():
+            exc = t.exception()
+            if exc:
+                logger.warning(f"[task] 后台任务异常: {exc}")
+    task.add_done_callback(_log_if_failed)
     return task
 
 
@@ -202,6 +207,7 @@ class ChatSession:
         await self._handle_chat_message()
 
     async def _handle_feedback(self, request: dict):
+        """Handle empathy feedback from user"""
         """处理共情反馈"""
         msg_id = request.get("msg_id")
         score = request.get("score", 0)
@@ -320,6 +326,7 @@ class ChatSession:
         await self._build_and_send(history, hours_since)
 
     async def _analyze_context(self, history, hours_since):
+        """Run sentiment analysis + intent detection + empathy strategy"""
         if not self._is_system and history:
             ctx = history[-5:] if history else []
             st = asyncio.to_thread(analyze_sentiment, self.user_message, ctx)
@@ -363,6 +370,7 @@ class ChatSession:
                 pass
 
     async def _check_dedup(self, msg):
+        """Deduplicate repeated messages (per-connection cache)"""
         if self._is_system:
             return ""
         if not hasattr(self, "_recent_msgs"):
@@ -375,6 +383,7 @@ class ChatSession:
         return note
 
     async def _build_and_send(self, history, hours_since):
+        """Build system prompt, assemble messages, start LLM streaming"""
         ws = self.ws
         msg = self.user_message
         it = self.intent_type
@@ -473,6 +482,7 @@ class ChatSession:
         await self._do_stream(msgs, tt, ekw)
 
     async def _do_stream(self, messages, tool_temp, extra_kwargs):
+        """Stream LLM response, handle tool calls, fallback"""
         ws = self.ws
         full_reply = []
         queue = asyncio.Queue()
@@ -564,6 +574,7 @@ class ChatSession:
         await self._process_reply(full_reply, parser, fallback)
 
     async def _handle_tool_calls(self, messages, tc_buf):
+        """Execute tool calls and send brief confirmation"""
         ws = self.ws
         p = get_provider()
         for tc in tc_buf:
@@ -598,6 +609,7 @@ class ChatSession:
         await self._save_response(c, True)
 
     async def _process_reply(self, full_reply, parser, fallback):
+        """Parse tags, save response, trigger background tasks"""
         ws = self.ws
         if not full_reply:
             await self._fallback_reply()
@@ -667,6 +679,7 @@ class ChatSession:
             _background_thread_pool.submit(self._extract_knowledge_graph, content)
 
     async def _save_response(self, content, is_tool_response=False):
+        """Save AI response to chat_history and vector store"""
         if not content:
             return
         ss = fallback_split(content)
@@ -681,6 +694,7 @@ class ChatSession:
                 add_message_vector(f"as_{datetime.now().timestamp()}", content, {"role": "assistant"})
 
     def _extract_knowledge_graph(self, content):
+        """Background: extract triples from AI reply"""
         if not content or len(content) < 20:
             return
         try:
@@ -690,6 +704,7 @@ class ChatSession:
             pass
 
     async def _fallback_reply(self):
+        """Fallback when streaming produces no response"""
         ws = self.ws
         p = get_provider()
         with get_conn() as conn:

@@ -5,9 +5,13 @@
 """
 # version: 5.0.0
 import asyncio
+import logging
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 from core.db import get_config
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/text", tags=["text"])
 
@@ -47,7 +51,7 @@ async def split_sentences(req: SplitRequest):
         if result and isinstance(result, list) and len(result) > 0:
             return {"sentences": [s.strip() for s in result if s.strip()]}
     except Exception as e:
-        print(f"[分句API] 失败: {e}")
+        logger.warning(f"[分句API] 失败: {e}")
 
     return {"sentences": fallback_split(text)}
 

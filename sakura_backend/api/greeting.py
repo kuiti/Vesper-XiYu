@@ -220,10 +220,10 @@ def generate_greeting():
         result = call_llm(prompt=user_prompt, system=system_prompt, temperature=0.7, max_tokens=500, timeout=30)
         if result:
             break
-        print(f"[问候] 第{_attempt+1}次尝试失败 | result_type={type(result).__name__} | result_repr={repr(result)[:100]}")
+        logger.warning(f"[问候] 第{_attempt+1}次尝试失败 | result_type={type(result).__name__} | result_repr={repr(result)[:100]}")
     if result:
         return result
-    print(f"[问候] 3次尝试均失败，使用兜底问候")
+    logger.warning(f"[问候] 3次尝试均失败，使用兜底问候")
     fallbacks = {
         "early_morning": ["早啊，今天起得挺早。","早。又是新的一天。","早啊，昨晚睡得好吗。","早。今天天气不错。","早。要喝杯咖啡吗。"],
         "morning": ["上午好，今天有什么打算吗。","上午好，今天天气挺好的。","上午好呀。","上午了，开始忙了吗。","上午好，精神不错的样子。"],
@@ -308,10 +308,10 @@ def generate_tease():
         result = call_llm(prompt=user_prompt, system=system_prompt, temperature=0.8, max_tokens=200, timeout=20)
         if result:
             break
-        print(f"[调侃] 第{_attempt+1}次尝试失败 | result_type={type(result).__name__}")
+        logger.warning(f"[调侃] 第{_attempt+1}次尝试失败 | result_type={type(result).__name__}")
     if result:
         return result
-    print(f"[调侃] 3次尝试均失败，使用兜底")
+    logger.warning(f"[调侃] 3次尝试均失败，使用兜底")
     return random.choice(["你还知道回来？","终于回来了。","等你半天了。","回来啦，想你了。","可算回来了。"])
 
 
@@ -390,7 +390,7 @@ def generate_proactive(trigger_type: str, context: dict = None):
         if prefs:
             memory_context += " 用户偏好：" + "；".join(prefs[:2])
     except Exception as e:
-        print(f"[主动] 记忆读取失败: {e}")
+        logger.warning(f"[主动] 记忆读取失败: {e}")
         pass
 
     # ─── 用户情绪 ───
@@ -537,7 +537,7 @@ def generate_proactive(trigger_type: str, context: dict = None):
         result = call_llm(prompt=user_prompt, system=system_prompt, temperature=0.8, max_tokens=500, timeout=25)
         if result:
             break
-        print(f"[主动] 第{_attempt+1}次尝试失败 | result_type={type(result).__name__}")
+        logger.warning(f"[主动] 第{_attempt+1}次尝试失败 | result_type={type(result).__name__}")
     if result:
         if trigger_type in ("negative_comfort", "sustained_low_mood"):
             try:
@@ -546,7 +546,7 @@ def generate_proactive(trigger_type: str, context: dict = None):
             except Exception as e:
                 silent_exc("proactive_greeting.record_comfort", e)
         return result
-    print(f"[主动] 3次尝试均失败，使用兜底")
+    logger.warning(f"[主动] 3次尝试均失败，使用兜底")
     fallback_proactive = [
         f"嘿，「{user_name}」，在忙什么呢。",
         f"「{user_name}」，今天过得怎样。",

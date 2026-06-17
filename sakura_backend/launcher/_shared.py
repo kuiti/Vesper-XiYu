@@ -7,6 +7,9 @@ import ctypes
 import json as _json
 import time as _time
 import socket
+import logging
+
+logger = logging.getLogger(__name__)
 
 # ─── BASE_DIR 计算 ───
 if getattr(sys, 'frozen', False):
@@ -24,13 +27,13 @@ if getattr(sys, 'frozen', False):
                     else:
                         _shutil.copy2(_src, _dst)
                 except Exception as e:
-                    print(f"[启动] 复制资源失败 {_item}: {e}")
+                    logger.warning(f"[启动] 复制资源失败 {_item}: {e}")
     try:
         import certifi
         os.environ['SSL_CERT_FILE'] = certifi.where()
         os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
     except Exception as e:
-        print(f"[启动] certifi SSL 设置失败: {e}")
+        logger.warning(f"[启动] certifi SSL 设置失败: {e}")
 else:
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -55,7 +58,7 @@ if getattr(sys, 'frozen', False):
 try:
     os.chdir(BASE_DIR)
 except OSError as e:
-    print(f"[启动] 致命错误：无法切换到工作目录 {BASE_DIR}: {e}")
+    logger.warning(f"[启动] 致命错误：无法切换到工作目录 {BASE_DIR}: {e}")
     sys.exit(1)
 
 # ─── 常量 ───

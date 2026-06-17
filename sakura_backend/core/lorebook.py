@@ -247,10 +247,14 @@ class LorebookManager:
             if entry.logic == "REGEX":
                 try:
                     for key in entry.keys:
+                        if len(key) > 200:
+                            continue
                         if re.search(key, msg_lower, re.TIMEOUT if hasattr(re, 'TIMEOUT') else 0):
                             is_match = True
                             break
                 except re.error:
+                    pass
+                except Exception:
                     pass
             elif entry.logic == "AND_ALL":
                 is_match = all(key in msg_lower for key in entry.keys)

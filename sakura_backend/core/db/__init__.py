@@ -3,12 +3,15 @@
 
 import sqlite3
 import json
+import logging
 import threading
 import time
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 import os
 from core.retry import silent_exc
+
+logger = logging.getLogger(__name__)
 
 # 确保 data 目录存在
 os.makedirs("data", exist_ok=True)
@@ -386,7 +389,7 @@ def _init_db_locked():
             try:
                 cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}")
                 conn.commit()
-                print(f"[迁移] {table}.{col} 列已添加")
+                logger.info(f"[迁移] {table}.{col} 列已添加")
             except sqlite3.OperationalError:
                 pass  # 列已存在
 
@@ -413,7 +416,7 @@ def _init_db_locked():
             cursor.execute("INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)",
                            ("user_taboos", json.dumps(old_taboos, ensure_ascii=False)))
             if old_taboos:
-                print(f"[迁移] 已从 ai_background 迁移 {len(old_taboos)} 条禁忌到 user_taboos")
+                logger.info(f"[迁移] 已从 ai_background 迁移 {len(old_taboos)} 条禁忌到 user_taboos")
             conn.commit()
 
         # 设置数据库文件权限（仅所有者可读写）

@@ -43,9 +43,9 @@ def add_sentence_vectors(msg_id: int, text: str, role: str = "user"):
                         )
                         importance = calculate_importance(sentence, role)
                         set_memory_importance(existing_id, importance, now)
-                        print(f"[去重] 更新: {existing_doc[:30]} → {sentence[:30]}")
+                        logger.info(f"[去重] 更新: {existing_doc[:30]} → {sentence[:30]}")
                     else:
-                        print(f"[去重] 跳过: {sentence[:30]} (已有更长版本)")
+                        logger.info(f"[去重] 跳过: {sentence[:30]} (已有更长版本)")
                     continue
 
                 cursor.execute("INSERT INTO sentence_index (msg_id, seq, content, created_at) VALUES (?, ?, ?, ?)",
@@ -59,7 +59,7 @@ def add_sentence_vectors(msg_id: int, text: str, role: str = "user"):
                     documents=[sentence]
                 )
     except Exception as e:
-        print(f"[句子索引] 写入失败: {e}")
+        logger.warning(f"[句子索引] 写入失败: {e}")
     # 新消息写入后刷新 BM25 缓存
     reset_bm25_cache()
 
@@ -106,7 +106,7 @@ def add_memory_vector(key: str, value: str, meta: dict = None) -> bool:
         )
         return True
     except Exception as e:
-        print(f"[记忆向量] 写入失败: key={key} {e}")
+        logger.warning(f"[记忆向量] 写入失败: key={key} {e}")
         return False
 
 
@@ -119,7 +119,7 @@ def delete_message_vectors(msg_id):
         main = get_collection()
         main.delete(ids=[str(msg_id)])
     except Exception as e:
-        print(f"[向量删除] chat_memory: {e}")
+        logger.warning(f"[向量删除] chat_memory: {e}")
     try:
         # 句子索引集合：按 msg_id 过滤删除
         sent = get_collection("sentence_index")
@@ -127,7 +127,7 @@ def delete_message_vectors(msg_id):
         if results and results['ids']:
             sent.delete(ids=results['ids'])
     except Exception as e:
-        print(f"[向量删除] sentence_index: {e}")
+        logger.warning(f"[向量删除] sentence_index: {e}")
 
 
 def sync_memories_to_vector():
@@ -166,9 +166,9 @@ def sync_memories_to_vector():
             )
             count += 1
         if count:
-            print(f"[记忆向量] 同步了 {count} 条 memory")
+            logger.info(f"[记忆向量] 同步了 {count} 条 memory")
         # user_profile
         from .knowledge import add_profile_vectors
         add_profile_vectors()
     except Exception as e:
-        print(f"[记忆向量] 同步失败: {e}")
+        logger.warning(f"[记忆向量] 同步失败: {e}")

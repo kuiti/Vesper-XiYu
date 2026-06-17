@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 # 允许导入/导出的表名白名单
 _TABLE_WHITELIST = frozenset({
     "user_profile", "ai_personality_traits", "goal_tracking",
@@ -291,12 +295,12 @@ async def import_all(request: Request, file: UploadFile = File(...), bg: Backgro
                             vals = [row.get(c) for c in valid_cols]
                             cursor.execute(f"INSERT INTO {table_name} ({col_str}) VALUES ({placeholders})", vals)
                         except Exception as e:
-                            print(f"[导入] {table_name} 跳过一行: {e}")
+                            logger.info(f"[导入] {table_name} 跳过一行: {e}")
                 except Exception as e:
-                    print(f"[导入] {table_name} 失败: {e}")
+                    logger.warning(f"[导入] {table_name} 失败: {e}")
 
     except Exception as e:
-        print(f"[导入] 恢复数据异常: {e}")
+        logger.warning(f"[导入] 恢复数据异常: {e}")
         return {"status": "error", "message": f"导入过程中出错: {e}，部分数据可能未恢复"}
 
     # 通知前端需要重建向量库

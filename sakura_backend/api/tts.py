@@ -5,6 +5,7 @@ import time
 import asyncio
 import tempfile
 import logging
+import threading
 from core.retry import silent_exc
 from pathlib import Path
 
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/tts", tags=["tts"])
 
 AUDIO_TTL = 600  # 清理 10 分钟前的临时音频
 _lock = asyncio.Lock()
+_engine_lock = threading.Lock()
 
 # 当前引擎实例（懒加载）
 _engine: BaseTTS = None
@@ -58,10 +60,11 @@ def _get_engine() -> BaseTTS:
     """获取当前 TTS 引擎（懒加载，配置变更时自动切换）。"""
     global _engine, _engine_name
     name = _get_engine_name()
-    if name != _engine_name or _engine is None:
-        config = _get_engine_config()
-        _engine = _create_engine(name, config)
-        _engine_name = name
+    with _engine_lock:
+        if name != _engine_name or _engine is None:
+            config = _get_engine_config()
+            _engine = _create_engine(name, config)
+            _engine_name = name
     return _engine
 
 

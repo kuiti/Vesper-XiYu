@@ -20,7 +20,21 @@ MAX_VALUE = 100
 
 # 初始值（新关系：友好但不过分亲近，有成长空间）
 INITIAL_AFFECTION = 30   # AI 对用户的初始好感
-INITIAL_TRUST = 30       # AI 对用户的初始信任
+INITIAL_TRUST = 30
+
+# ─── 关系乘数常量（替代魔术数字）───
+# 正向增长乘数（正值区间）：初期慢热→中后期加速→近上限减速
+POS_GROWTH_MULTIPLIERS = [0.30, 0.45, 0.60, 0.75, 0.85, 1.00, 1.10, 1.15, 1.20, 1.05]
+# 正向增长乘数（负值区间）：越负越难回升
+NEG_RECOVERY_MULTIPLIERS = [0.60, 0.45, 0.35, 0.25, 0.15, 0.08]
+# 负向增长乘数（正值区间）
+NEG_DECAY_MULTIPLIERS = [1.00, 0.95, 0.90, 0.85, 0.80, 0.75, 0.70, 0.65, 0.60, 0.55]
+# 负向增长乘数（负值区间）：触底保护
+NEG_BOTTOM_MULTIPLIERS = [0.50, 0.40, 0.30, 0.20, 0.10]
+# 好感增长受信任影响
+AFFECTION_TRUST_MULTIPLIERS = [1.8, 1.5, 1.2, 1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15]
+# 信任增长受好感影响
+TRUST_AFFECTION_MULTIPLIERS = [1.8, 1.5, 1.2, 1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15]       # AI 对用户的初始信任
 
 # AI 情绪状态枚举（由好感度+信任度综合决定，支持负数）
 AI_EMOTIONS = {
@@ -686,7 +700,7 @@ def get_relationship_hint() -> str:
         if trait_parts:
             trait_hint = "。" + "，".join(trait_parts) + "。"
     except Exception as e:
-        print(f"[关系] 读取性格特征失败: {e}")
+        logger.warning(f"[关系] 读取性格特征失败: {e}")
         pass
 
     return f"【关系状态】好感:{affection:.0f} 信任:{trust:.0f}。{behavior}。语气{tone}。{emotion_hint}{trait_hint}"
@@ -723,4 +737,4 @@ def set_relationship_by_foundation(foundation_type: str):
         cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key='affection'", (affection, now))
         cursor.execute("UPDATE relationship SET value=?, updated_at=? WHERE key='trust'", (trust, now))
     invalidate_relationship_cache()
-    print(f"[关系] 根据基石类型 '{foundation_type}' 设置初始值: 好感={affection}, 信任={trust}")
+    logger.info(f"[关系] 根据基石类型 '{foundation_type}' 设置初始值: 好感={affection}, 信任={trust}")

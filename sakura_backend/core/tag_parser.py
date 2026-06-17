@@ -184,7 +184,7 @@ def process_reply_tags(ai_reply: str, tool_calls_used: bool = False) -> tuple:
 
     # 执行标签
     results = TagExecutor.execute_all(tags)
-    print(f"[TagParser] 执行了 {len(results)} 个标签: {[r['type'] for r in results]}")
+    logger.info(f"[TagParser] 执行了 {len(results)} 个标签: {[r['type'] for r in results]}")
 
     # 收集非空反馈
     feedback_list = [r["feedback"] for r in results if r.get("feedback")]

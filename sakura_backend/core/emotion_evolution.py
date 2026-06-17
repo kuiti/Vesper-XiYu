@@ -7,6 +7,7 @@
 from datetime import datetime, timedelta
 from core.db import get_conn, get_config, set_config
 import logging
+import threading
 from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,7 @@ def _now():
 
 
 _traits_initialized = False
+_traits_init_lock = threading.Lock()
 
 
 def init_traits():
@@ -66,7 +68,10 @@ def init_traits():
     global _traits_initialized
     if _traits_initialized:
         return
-    _traits_initialized = True
+    with _traits_init_lock:
+        if _traits_initialized:
+            return
+        _traits_initialized = True
     now = _now()
     with get_conn() as conn:
         cursor = conn.cursor()
@@ -178,7 +183,7 @@ def process_daily_evolution():
     if not _try_claim_evolution_date(today):
         return
 
-    print(f"[情绪演化] 开始每日演化检查 ({today})")
+    logger.info(f"[情绪演化] 开始每日演化检查 ({today})")
 
     # 获取距上次互动的小时数
     hours_since = _get_hours_since_last_interaction()
@@ -204,7 +209,7 @@ def process_daily_evolution():
         today_trend = get_emotion_trend(1)
         if today_trend and today_trend[0]["total_messages"] > 0:
             update_trait("agreeableness", 0.01)
-            print(f"[情绪演化] 今日互动 → expressiveness+0.01")
+            logger.info(f"[情绪演化] 今日互动 → expressiveness+0.01")
     except Exception as e:
         silent_exc("daily_evolution.interaction", e)
 
@@ -221,7 +226,7 @@ def process_daily_evolution():
             conn.cursor().execute("DELETE FROM emotion_log WHERE timestamp < date('now', '-90 days')")
     except Exception as e:
         silent_exc("daily_evolution.cleanup", e)
-    print(f"[情绪演化] 每日演化完成")
+    logger.info(f"[情绪演化] 每日演化完成")
 
 
 # ─── 演化规则 ───
@@ -234,7 +239,7 @@ def _get_hours_since_last_interaction() -> float | None:
             last = datetime.fromisoformat(last_str)
             return (datetime.now() - last).total_seconds() / 3600
     except Exception as e:
-        print(f"[情绪演化] 读取上次互动时间失败: {e}")
+        logger.warning(f"[情绪演化] 读取上次互动时间失败: {e}")
         pass
     return None
 
@@ -261,14 +266,14 @@ def _check_sustained_low_mood():
         if not existing or existing != datetime.now().strftime("%Y-%m-%d"):
             set_proactive_flag("sustained_low_mood", datetime.now().strftime("%Y-%m-%d"))
             set_proactive_flag("low_mood_consecutive_days", str(consecutive_negative))
-            print(f"[情绪演化] 检测到持续低落 {consecutive_negative} 天，写入主动触发标记")
+            logger.info(f"[情绪演化] 检测到持续低落 {consecutive_negative} 天，写入主动触发标记")
     else:
         # 情绪恢复，清除标记
         existing = get_proactive_flag("sustained_low_mood")
         if existing:
             set_proactive_flag("sustained_low_mood", "")
             set_proactive_flag("low_mood_consecutive_days", "")
-            print(f"[情绪演化] 情绪已恢复，清除持续低落标记")
+            logger.info(f"[情绪演化] 情绪已恢复，清除持续低落标记")
 
 
 def _get_last_decay_date() -> str | None:
@@ -315,7 +320,7 @@ def _rule_silence_decay(hours_since: float | None):
     if days > 7:
         update_trait("conscientiousness", -0.05)
 
-    print(f"[情绪演化] 沉默衰减: {int(days)}天(增量{effective_days}天) → affection{affection_loss:+.1f} trust{trust_loss:+.1f}")
+    logger.info(f"[情绪演化] 沉默衰减: {int(days)}天(增量{effective_days}天) → affection{affection_loss:+.1f} trust{trust_loss:+.1f}")
 
 
 def _rule_cold_adaptation():
@@ -336,7 +341,7 @@ def _rule_cold_adaptation():
             f"用户{negative_days}天情绪负面（占比{neg_ratio:.0%}），AI进入自我保护状态，乐观度-0.05",
             0, 0
         )
-        print(f"[情绪演化] 冷淡适应: 负面占比{neg_ratio:.0%} → optimism-0.05")
+        logger.info(f"[情绪演化] 冷淡适应: 负面占比{neg_ratio:.0%} → optimism-0.05")
 
 
 def _rule_habitual_closeness():
@@ -354,7 +359,7 @@ def _rule_habitual_closeness():
             f"近{len(trend)}天有{active_days}天互动，习惯成自然，信任+0.05",
             0, 0.05
         )
-        print(f"[情绪演化] 习惯亲近: {active_days}/{len(trend)}天有互动 → trust+0.05")
+        logger.info(f"[情绪演化] 习惯亲近: {active_days}/{len(trend)}天有互动 → trust+0.05")
 
 
 def _rule_interaction_quality():
@@ -373,20 +378,20 @@ def _rule_interaction_quality():
         update_trait("openness", 0.03)
         update_trait("extraversion", 0.02)
         update_trait("neuroticism", -0.01)
-        print(f"[情绪演化] 正面互动占比{positive_ratio:.0%} → openness+0.03 extraversion+0.02 neuroticism-0.01")
+        logger.info(f"[情绪演化] 正面互动占比{positive_ratio:.0%} → openness+0.03 extraversion+0.02 neuroticism-0.01")
 
     # 负面互动多 → 提升 neuroticism
     negative_days = sum(1 for d in trend if d["score"] < -3)
     negative_ratio = negative_days / total_days if total_days > 0 else 0
     if negative_ratio > 0.4:
         update_trait("neuroticism", 0.02)
-        print(f"[情绪演化] 负面互动占比{negative_ratio:.0%} → neuroticism+0.02")
+        logger.info(f"[情绪演化] 负面互动占比{negative_ratio:.0%} → neuroticism+0.02")
 
     # 用户发消息多 → 提升 agreeableness
     avg_msgs = sum(d["total_messages"] for d in trend) / total_days
     if avg_msgs > 5:
         update_trait("agreeableness", 0.02)
-        print(f"[情绪演化] 日均{avg_msgs:.0f}条消息 → expressiveness+0.02")
+        logger.info(f"[情绪演化] 日均{avg_msgs:.0f}条消息 → expressiveness+0.02")
 
 
 def _rule_weekly_reflection():
@@ -423,7 +428,7 @@ def _rule_weekly_reflection():
     if adjust_log:
         summary = f"周日反思：本周{'正面为主' if positive_days >= 4 else '负面为主' if negative_days >= 4 else '平稳'}，" + "，".join(adjust_log)
         _log_evolution_event("weekly_reflection", summary, 0, 0)
-        print(f"[情绪演化] 周日反思: {summary}")
+        logger.info(f"[情绪演化] 周日反思: {summary}")
 
 
 # ─── 前端数据接口 ───

@@ -3,9 +3,12 @@ import json
 import random
 import threading
 import traceback
+import logging
 from datetime import datetime
 from core import db
 from core.db import get_config
+
+logger = logging.getLogger(__name__)
 
 # ========== 常量 ==========
 TIER_THRESHOLDS = {1: 10, 2: 50, 3: 100}
@@ -192,7 +195,7 @@ def generate_summary_for_tier(level, messages, existing_summaries=None):
         if not isinstance(key_points, list):
             key_points = []
         return {"summary": summary, "importance": importance, "key_points": key_points}
-    print(f"[摘要] Level {level} 生成失败")
+    logger.warning(f"[摘要] Level {level} 生成失败")
     return {"summary": "", "importance": 0.5, "key_points": []}
 
 
@@ -214,13 +217,13 @@ def run_summary_pipeline(msg_count, user_message="", topic_relevant=True):
         else:  # level 3
             existing = db.get_tiered_summaries_by_level(2)
             if not existing:
-                print(f"[摘要] Level 3 跳过：尚无 Level 2 摘要")
+                logger.info(f"[摘要] Level 3 跳过：尚无 Level 2 摘要")
                 db.set_last_trigger_at(level, msg_count)
                 continue
             msgs = db.get_messages_since_last_tiered_summary(limit=10)
             # 话题关联度检测（已在锁外预计算）
             if not topic_relevant:
-                print(f"[摘要] Level 3 跳过：话题关联度不足")
+                logger.info(f"[摘要] Level 3 跳过：话题关联度不足")
                 db.set_last_trigger_at(level, msg_count)
                 continue
 
@@ -244,14 +247,14 @@ def run_summary_pipeline(msg_count, user_message="", topic_relevant=True):
             source_ids
         )
         db.set_last_trigger_at(level, msg_count)
-        print(f"[摘要] Level {level} 生成成功，寿命 {lifespan:.1f} 天，重要性 {result['importance']}")
+        logger.info(f"[摘要] Level {level} 生成成功，寿命 {lifespan:.1f} 天，重要性 {result['importance']}")
 
         # 扫描新 key_points 中的目标/计划
         try:
             from core.goal_tracker import ingest_keypoints
             ingest_keypoints(result.get("key_points", []))
         except Exception as e:
-            print(f"[GoalTracker] 扫描异常: {e}")
+            logger.warning(f"[GoalTracker] 扫描异常: {e}")
 
 
 def run_decay_check():
@@ -270,7 +273,7 @@ def run_decay_check():
     archived = db.archive_expired_summaries()
     db.set_config("_last_decay_date", today)
     if archived > 0:
-        print(f"[衰减] 已归档 {archived} 条过期摘要，减少 {days} 天")
+        logger.info(f"[衰减] 已归档 {archived} 条过期摘要，减少 {days} 天")
     return days
 
 
@@ -312,10 +315,10 @@ def _generate_rolling_summary():
         result = call_llm(prompt=prompt, temperature=0.3, max_tokens=200, timeout=20)
         if result and len(result) > 20:
             db.set_config("_rolling_summary", result.strip())
-            print(f"[滚动摘要] 更新: {result[:60]}...")
+            logger.info(f"[滚动摘要] 更新: {result[:60]}...")
 
     except Exception as e:
-        print(f"[滚动摘要] 生成失败: {e}")
+        logger.warning(f"[滚动摘要] 生成失败: {e}")
 
 
 def run_background_tasks(msg_count, user_message):
@@ -326,14 +329,14 @@ def run_background_tasks(msg_count, user_message):
 
     # Step 1: 衰减 + 提及 + 摘要生成
     if not _summary_lock.acquire(timeout=10):
-        print("[后台任务] 等待超时，本次跳过")
+        logger.warning("[后台任务] 等待超时，本次跳过")
         return
     try:
         run_decay_check()
         process_mentions(user_message)
         run_summary_pipeline(msg_count, user_message, topic_relevant)
     except Exception as e:
-        print(f"[后台任务] 摘要异常: {e}")
+        logger.warning(f"[后台任务] 摘要异常: {e}")
         traceback.print_exc()
     finally:
         _summary_lock.release()
@@ -344,7 +347,7 @@ def run_background_tasks(msg_count, user_message):
             try:
                 _generate_rolling_summary()
             except Exception as e:
-                print(f"[后台任务] 滚动摘要异常: {e}")
+                logger.warning(f"[后台任务] 滚动摘要异常: {e}")
             finally:
                 _summary_lock.release()
 
@@ -357,7 +360,7 @@ def run_background_tasks(msg_count, user_message):
             if msg_count % 50 == 0:
                 generate_deep_reflection()
         except Exception as e:
-            print(f"[后台任务] 反思异常: {e}")
+            logger.warning(f"[后台任务] 反思异常: {e}")
         finally:
             _summary_lock.release()
 
@@ -514,10 +517,10 @@ def generate_deep_reflection():
             0.8, lifespan, now, now, None
         )
 
-        print(f"[深度反思] 生成（触发词: {trigger_kw}）: {insight_text[:80]}...")
+        logger.info(f"[深度反思] 生成（触发词: {trigger_kw}）: {insight_text[:80]}...")
 
     except Exception as e:
-        print(f"[深度反思] 生成失败: {e}")
+        logger.warning(f"[深度反思] 生成失败: {e}")
 
 
 def generate_reflection():
@@ -577,7 +580,7 @@ def generate_reflection():
             if row:
                 db.set_last_trigger_at(2, row["count"])
 
-        print(f"[反思] 生成: {reflection_text[:80]}...")
+        logger.info(f"[反思] 生成: {reflection_text[:80]}...")
 
     except Exception as e:
-        print(f"[反思] 生成失败: {e}")
+        logger.warning(f"[反思] 生成失败: {e}")

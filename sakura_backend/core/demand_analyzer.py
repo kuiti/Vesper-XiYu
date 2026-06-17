@@ -7,8 +7,11 @@
 """
 
 import json
+import logging
 from datetime import datetime
 from core.db import get_conn, get_config
+
+logger = logging.getLogger(__name__)
 
 
 def save_demand_record(demand: dict, user_message: str):
@@ -104,4 +107,4 @@ def extract_patterns_via_llm():
                     "UPDATE demand_patterns SET latent_need=? WHERE trigger_context=?",
                     (latent, trigger)
                 )
-    print(f"[需求模式提炼] 完成，更新了 {len(patterns)} 条模式")
+    logger.info(f"[需求模式提炼] 完成，更新了 {len(patterns)} 条模式")

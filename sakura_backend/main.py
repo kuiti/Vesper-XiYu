@@ -79,12 +79,12 @@ async def lifespan(app):
     from core.scheduler import start_scheduler, setup_default_jobs, shutdown_scheduler
     start_scheduler()
     setup_default_jobs()
-    print("[启动] APScheduler 调度器已启动")
+    logger.info("[启动] APScheduler 调度器已启动")
 
     yield
 
     shutdown_scheduler()
-    print("[启动] APScheduler 调度器已关闭")
+    logger.info("[启动] APScheduler 调度器已关闭")
 
 
 app = FastAPI(title="佐仓后端 API", version="1.0.0", lifespan=lifespan)
@@ -114,9 +114,9 @@ app.add_middleware(
 from core.auth import AuthMiddleware, router as auth_router
 if os.environ.get("SAKURA_API_TOKEN"):
     app.add_middleware(AuthMiddleware)
-    print("[启动] 云端模式：已启用 Token 认证")
+    logger.info("[启动] 云端模式：已启用 Token 认证")
 else:
-    print("[启动] 本地模式：Token 认证未启用")
+    logger.info("[启动] 本地模式：Token 认证未启用")
 app.include_router(auth_router)  # /auth/verify 始终可用
 
 os.makedirs("data/avatars", exist_ok=True)
@@ -129,7 +129,7 @@ for mod_name, attr in _ALL_ROUTERS:
         mod = importlib.import_module(mod_name)
         app.include_router(getattr(mod, attr))
     except Exception as e:
-        print(f"[启动] 加载路由 {mod_name} 失败: {e}")
+        logger.warning(f"[启动] 加载路由 {mod_name} 失败: {e}")
 
 _startup_stage = "ready"
 
@@ -195,7 +195,7 @@ if HAS_FRONTEND:
     if os.path.isdir(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
     else:
-        print(f"[启动] 警告: assets 目录不存在 ({assets_dir})，前端静态资源将不可用")
+        logger.warning(f"[启动] 警告: assets 目录不存在 ({assets_dir})，前端静态资源将不可用")
 
 
 @app.websocket("/ws/chat")
@@ -226,5 +226,5 @@ if __name__ == "__main__":
     os.makedirs("data", exist_ok=True)
     with open("data/port.txt", "w") as f:
         f.write(str(port))
-    print(f"[启动] 后端地址: {host}:{port}")
+    logger.info(f"[启动] 后端地址: {host}:{port}")
     uvicorn.run(app, host=host, port=port)

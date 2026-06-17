@@ -129,15 +129,15 @@ async def _weather_push_job(hour: int):
             if "error" not in card_data:
                 # 通过 WebSocket 推送（需要获取所有活跃连接）
                 # 这里只记录日志，实际推送由 main.py 的 WebSocket 处理
-                print(f"[天气调度] {hour}:00 推送成功: {card_data.get('weather', '')} {card_data.get('temp', '')}°C")
+                logger.info(f"[天气调度] {hour}:00 推送成功: {card_data.get('weather', '')} {card_data.get('temp', '')}°C")
                 break
-            print(f"[天气调度] 第{attempt+1}次获取失败: {card_data['error']}")
+            logger.warning(f"[天气调度] 第{attempt+1}次获取失败: {card_data['error']}")
             if attempt == 0:
                 await asyncio.sleep(60)
         else:
-            print(f"[天气调度] 2次尝试均失败，本时段跳过")
+            logger.warning(f"[天气调度] 2次尝试均失败，本时段跳过")
     except Exception as e:
-        print(f"[天气调度] 推送异常: {e}")
+        logger.warning(f"[天气调度] 推送异常: {e}")
 
 
 async def _diary_generate_job():
@@ -153,7 +153,7 @@ async def _diary_generate_job():
 
         msg_count, today_msgs, yest_row = get_today_messages()
         if msg_count < 3:
-            print(f"[AI日记] 今日消息不足3条({msg_count})，跳过")
+            logger.info(f"[AI日记] 今日消息不足3条({msg_count})，跳过")
             return
 
         all_text = " ".join(r["content"] for r in today_msgs)
@@ -164,11 +164,11 @@ async def _diary_generate_job():
 
         if result:
             save_diary_entry(today, result, detected_mood)
-            print(f"[AI日记] 已生成 {today} 心情:{detected_mood} ({len(result)}字)")
+            logger.info(f"[AI日记] 已生成 {today} 心情:{detected_mood} ({len(result)}字)")
         else:
-            print(f"[AI日记] 生成结果为空，跳过")
+            logger.warning(f"[AI日记] 生成结果为空，跳过")
     except Exception as e:
-        print(f"[AI日记] 自动生成失败: {e}")
+        logger.warning(f"[AI日记] 自动生成失败: {e}")
 
 
 def setup_default_jobs():
@@ -195,7 +195,7 @@ def setup_default_jobs():
             from core.db import cleanup_emotion_log
             cleanup_emotion_log(90)
         except Exception as e:
-            print(f"[清理] emotion_log 清理失败: {e}")
+            logger.warning(f"[清理] emotion_log 清理失败: {e}")
         try:
             from core.db import get_conn
             from datetime import datetime, timedelta
@@ -203,7 +203,7 @@ def setup_default_jobs():
             with get_conn() as conn:
                 conn.cursor().execute("DELETE FROM proactive_response_log WHERE timestamp < ?", (cutoff,))
         except Exception as e:
-            print(f"[清理] proactive_response_log 清理失败: {e}")
+            logger.warning(f"[清理] proactive_response_log 清理失败: {e}")
     add_cron_job(_cleanup_job, hour=4, day_of_week="sun", job_id="cleanup_emotion_log")
 
-    print("[调度器] 已设置默认任务: 天气(7/12/19点) + 日记(23点)")
+    logger.info("[调度器] 已设置默认任务: 天气(7/12/19点) + 日记(23点)")

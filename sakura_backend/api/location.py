@@ -1,8 +1,12 @@
 import asyncio
+import logging
+
 import requests
 from fastapi import APIRouter, HTTPException, Request
 from core.db import get_config
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/location", tags=["location"])
 
@@ -92,7 +96,7 @@ async def get_location_by_ip(request: Request):
                 if city:
                     return {"province": province, "city": city, "adcode": data.get("adcode", "")}
         except Exception as e:
-            print(f"[定位] 异常: {e}")
+            logger.warning(f"[定位] 异常: {e}")
 
     # 备用: ip-api.com（用客户端 IP）
     try:
@@ -105,7 +109,7 @@ async def get_location_by_ip(request: Request):
         if data.get("status") == "success":
             return {"province": data.get("regionName", ""), "city": data.get("city", ""), "adcode": ""}
     except Exception as e:
-        print(f"[定位] ip-api 异常: {e}")
+        logger.warning(f"[定位] ip-api 异常: {e}")
 
     return {"province": "", "city": "", "adcode": ""}
 

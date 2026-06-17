@@ -14,9 +14,10 @@ _BM25_LOCK = threading.Lock()
 def reset_bm25_cache():
     """重置 BM25 缓存（重建向量或新消息写入后调用）"""
     global _bm25, _bm25_docs, _bm25_hash
-    _bm25 = None
-    _bm25_docs = None
-    _bm25_hash = None
+    with _BM25_LOCK:
+        _bm25 = None
+        _bm25_docs = None
+        _bm25_hash = None
 
 
 def _tokenize(text):
@@ -36,16 +37,18 @@ def _get_bm25(collection_name: str = None):
         docs = data.get("documents", [])
         if not docs:
             return None
-        # 使用哈希快速判断文档列表是否变化
         current_hash = hash(tuple(docs))
-        if _bm25_hash == current_hash:
-            return _bm25
+        with _BM25_LOCK:
+            if _bm25_hash == current_hash:
+                return _bm25
         from rank_bm25 import BM25Okapi
         tokenized = [_tokenize(d) for d in docs]
-        _bm25 = BM25Okapi(tokenized)
-        _bm25_docs = docs
-        _bm25_hash = current_hash
-        return _bm25
+        new_bm25 = BM25Okapi(tokenized)
+        with _BM25_LOCK:
+            _bm25 = new_bm25
+            _bm25_docs = docs
+            _bm25_hash = current_hash
+        return new_bm25
     except Exception:
         return None
 

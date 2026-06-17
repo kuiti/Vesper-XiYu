@@ -1,9 +1,12 @@
 # core/weather.py — 天气服务模块
 """可复用的天气获取与格式化，供 intent.py 和天气关怀调度器共用"""
 
+import logging
 import requests
 from datetime import datetime
 from core.db import get_config
+
+logger = logging.getLogger(__name__)
 
 # WMO 天气代码映射
 WMO_WEATHER = {
@@ -34,7 +37,7 @@ def get_city_coords(city: str) -> dict:
             return {"lat": r["latitude"], "lng": r["longitude"],
                     "name": r.get("name", city), "country": r.get("country", "")}
     except Exception as e:
-        print(f"[天气] 坐标获取异常: {e}")
+        logger.warning(f"[天气] 坐标获取异常: {e}")
     return {}
 
 
@@ -54,7 +57,7 @@ def get_openmeteo_weather(lat: float, lng: float) -> dict:
         resp.raise_for_status()
         data = resp.json()
         if data.get("error"):
-            print(f"[天气] API 错误: {data.get('reason', '未知')}")
+            logger.warning(f"[天气] API 错误: {data.get('reason', '未知')}")
             return {"error": data.get("reason", "未知API错误")}
         current = data.get("current", {})
         daily_data = data.get("daily", {})
@@ -186,7 +189,7 @@ def get_weather_for_city(city: str = None) -> dict:
                     "precipitation": 0, "daily": [],
                 }
     except Exception as e:
-        print(f"[天气] 高德异常: {e}")
+        logger.warning(f"[天气] 高德异常: {e}")
 
     # 2. wttr.in（免费无 Key，比 Open-Meteo 稳定）
     w = get_wttr_weather(city)

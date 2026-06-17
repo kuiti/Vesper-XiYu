@@ -2,7 +2,10 @@
 import os
 import json as _json
 import ctypes
+import logging
 from . import _shared as _s
+
+logger = logging.getLogger(__name__)
 
 
 def _check_instance_lock():
@@ -48,4 +51,4 @@ def _write_instance_lock(port):
         with open(_s.LOCK_FILE, "w", encoding="utf-8") as f:
             _json.dump({"pid": os.getpid(), "port": port}, f)
     except Exception as e:
-        print(f"[启动] 写入锁文件失败: {e}")
+        logger.warning(f"[启动] 写入锁文件失败: {e}")

@@ -5,8 +5,11 @@
 """
 
 import json
+import logging
 from datetime import datetime
 from core.db import get_conn, get_config
+
+logger = logging.getLogger(__name__)
 
 
 def _call_llm(prompt: str, max_tokens: int = 300, json_mode: bool = False):
@@ -60,7 +63,7 @@ def ingest_keypoints(key_points: list):
                     (text, category, now)
                 )
         if goals:
-            print(f"[GoalTracker] 录入 {len(goals)} 个目标: {[g.get('text', '')[:30] for g in goals]}")
+            logger.info(f"[GoalTracker] 录入 {len(goals)} 个目标: {[g.get('text', '')[:30] for g in goals]}")
 
 
 def get_pending_goals(limit: int = 3) -> list:
@@ -160,15 +163,15 @@ def check_goal_completion(user_message: str) -> list:
         for gid in completed:
             try:
                 cursor.execute("UPDATE goal_tracking SET status='done' WHERE id=?", (int(gid),))
-                print(f"[GoalTracker] 目标 #{gid} 标记为完成")
+                logger.info(f"[GoalTracker] 目标 #{gid} 标记为完成")
             except (ValueError, TypeError):
-                print(f"[GoalTracker] 无效目标 ID: {gid}")
+                logger.warning(f"[GoalTracker] 无效目标 ID: {gid}")
         for gid in abandoned:
             try:
                 cursor.execute("UPDATE goal_tracking SET status='abandoned' WHERE id=?", (int(gid),))
-                print(f"[GoalTracker] 目标 #{gid} 标记为放弃")
+                logger.info(f"[GoalTracker] 目标 #{gid} 标记为放弃")
             except (ValueError, TypeError):
-                print(f"[GoalTracker] 无效目标 ID: {gid}")
+                logger.warning(f"[GoalTracker] 无效目标 ID: {gid}")
 
     return completed + abandoned
 

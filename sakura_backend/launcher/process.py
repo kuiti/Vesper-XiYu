@@ -4,7 +4,10 @@ import sys
 import threading
 import socket
 import time as _time
+import logging
 from . import _shared as _s
+
+logger = logging.getLogger(__name__)
 
 
 def _kill_zombie_processes():
@@ -48,9 +51,9 @@ def _kill_zombie_processes():
                     killed.append(f"端口{port}(PID:{pid})")
                     break
         except Exception as e:
-            print(f"[启动] 清理端口{port}失败: {e}")
+            logger.warning(f"[启动] 清理端口{port}失败: {e}")
     if killed:
-        print(f"[启动] 已清理僵尸进程: {', '.join(killed)}")
+        logger.info(f"[启动] 已清理僵尸进程: {', '.join(killed)}")
 
 
 def _find_existing_instance():
@@ -88,14 +91,14 @@ def _activate_existing_window(port):
         _, resp = win32file.ReadFile(handle, 4096)
         win32file.CloseHandle(handle)
         if resp.decode('utf-8', errors='ignore').strip() == 'ok':
-            print(f"[启动] 已通过管道激活端口 {port} 的窗口")
+            logger.info(f"[启动] 已通过管道激活端口 {port} 的窗口")
             return
     except Exception:
         pass
     # 管道失败，回退浏览器
     import webbrowser
     webbrowser.open(f"http://127.0.0.1:{port}/")
-    print(f"[启动] 浏览器打开 http://127.0.0.1:{port}/")
+    logger.info(f"[启动] 浏览器打开 http://127.0.0.1:{port}/")
 
 
 def _start_pipe_server(port):
@@ -128,7 +131,7 @@ def _start_pipe_server(port):
                     resp = b'pong'
                 win32file.WriteFile(pipe, resp)
             except Exception as e:
-                print(f"[管道] 异常: {e}")
+                logger.warning(f"[管道] 异常: {e}")
                 _time.sleep(1)
             finally:
                 if pipe:
@@ -153,10 +156,10 @@ def _find_free_port():
 
 def start_backend(port):
     import uvicorn
-    print(f"[后端] 开始在端口 {port} 启动...")
+    logger.info(f"[后端] 开始在端口 {port} 启动...")
     try:
         from main import app  # 延迟导入，不阻塞主线程
-        print(f"[后端] main 导入成功")
+        logger.info(f"[后端] main 导入成功")
         os.makedirs("data", exist_ok=True)
         config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
         server = uvicorn.Server(config)

@@ -37,7 +37,7 @@ def get_embedding_model():
         try:
             _embedding_model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
         except Exception as e:
-            print(f'[RAG] 本地模型加载失败: {e}')
+            logger.warning(f'[RAG] 本地模型加载失败: {e}')
             _embedding_model = None
             _model_load_failed = True  # 标记失败，不再重试
     return _embedding_model
@@ -56,9 +56,9 @@ def ensure_model_loaded_async():
         try:
             get_embedding_model()  # 触发加载
             _model_loaded = True
-            print("RAG 模型加载完成")
+            logger.info("RAG 模型加载完成")
         except Exception as e:
-            print(f"RAG 模型加载失败: {e}")
+            logger.warning(f"RAG 模型加载失败: {e}")
         finally:
             _model_loading = False
 
@@ -87,4 +87,5 @@ def get_collection(collection_name="chat_memory"):
 def reset_client_cache():
     """重置 ChromaDB 客户端缓存（重建向量后调用）"""
     global _client_cache
-    _client_cache = None
+    with _client_lock:
+        _client_cache = None

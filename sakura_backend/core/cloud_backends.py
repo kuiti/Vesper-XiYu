@@ -1,8 +1,11 @@
 """可插拔云端后端 —— WebDAV / S3 / 自定义 HTTP"""
 
 import requests
+import logging
 from abc import ABC, abstractmethod
 from core.security import validate_request_url
+
+logger = logging.getLogger(__name__)
 
 
 class CloudBackend(ABC):
@@ -21,6 +24,8 @@ class CloudBackend(ABC):
 
 class WebDAVBackend(CloudBackend):
     def __init__(self, url: str, username: str = "", password: str = ""):
+        if not validate_request_url(url):
+            raise ValueError(f"WebDAV URL 未通过安全校验: {url}")
         self.url = url.rstrip("/")
         self.auth = (username, password) if username else None
 
@@ -30,7 +35,7 @@ class WebDAVBackend(CloudBackend):
             r = requests.put(f"{self.url}/{quote(path, safe='/')}", data=data, auth=self.auth, timeout=30)
             return r.status_code in (200, 201, 204)
         except Exception as e:
-            print(f"[WebDAV] 上传失败: {e}")
+            logger.warning(f"[WebDAV] 上传失败: {e}")
             return False
 
     def download(self, path: str) -> bytes:
@@ -40,7 +45,7 @@ class WebDAVBackend(CloudBackend):
             r.raise_for_status()
             return r.content
         except Exception as e:
-            print(f"[WebDAV] 下载失败: {e}")
+            logger.warning(f"[WebDAV] 下载失败: {e}")
             raise
 
     def status(self) -> dict:
@@ -71,7 +76,7 @@ class CustomHTTPBackend(CloudBackend):
             r = requests.post(self.upload_url, data=data, headers=hdrs, timeout=30)
             return r.status_code == 200
         except Exception as e:
-            print(f"[HTTP] 上传失败: {e}")
+            logger.warning(f"[HTTP] 上传失败: {e}")
             return False
 
     def download(self, path: str) -> bytes:
@@ -80,7 +85,7 @@ class CustomHTTPBackend(CloudBackend):
             r.raise_for_status()
             return r.content
         except Exception as e:
-            print(f"[HTTP] 下载失败: {e}")
+            logger.warning(f"[HTTP] 下载失败: {e}")
             raise
 
     def status(self) -> dict:

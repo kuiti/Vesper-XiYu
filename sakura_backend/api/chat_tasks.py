@@ -141,7 +141,7 @@ def _trigger_daily_evolution():
         from core.emotion_evolution import process_daily_evolution
         process_daily_evolution()
     except Exception as e:
-        print(f"[情绪演化] 触发异常: {e}")
+        logger.warning(f"[情绪演化] 触发异常: {e}")
 
 
 # ─── 连续天数 + 成就 ───
@@ -168,7 +168,7 @@ def _calc_consecutive_days(msg_count, ws, loop):
                 break
         _check_achievements(msg_count, consec, ws, loop)
     except Exception as e:
-        print(f"[连续天数] 计算失败: {e}")
+        logger.warning(f"[连续天数] 计算失败: {e}")
 
 
 def _check_achievements(msg_count, consecutive_days, ws, loop):
@@ -191,7 +191,7 @@ def _check_achievements(msg_count, consecutive_days, ws, loop):
                 except Exception as e:
                     silent_exc("_check_achievements", e)
     except Exception as e:
-        print(f"[成就] 检查失败: {e}")
+        logger.warning(f"[成就] 检查失败: {e}")
 
 
 # ─── 小惊喜 ───
@@ -218,7 +218,7 @@ def _maybe_surprise(ws, loop):
                     ws.send_text(json.dumps({"type": "surprise", "content": result})), loop
                 )
     except Exception as e:
-        print(f"[惊喜] 生成失败: {e}")
+        logger.warning(f"[惊喜] 生成失败: {e}")
 
 
 # ─── 目标完成检查 ───
@@ -228,7 +228,7 @@ def _check_goal_completion(user_message: str):
         from core.goal_tracker import check_goal_completion
         check_goal_completion(user_message)
     except Exception as e:
-        print(f"[目标检测] 异常: {e}")
+        logger.warning(f"[目标检测] 异常: {e}")
 
 
 # ─── DSML 工具调用解析 ───
@@ -318,6 +318,6 @@ def _build_rag_context(user_message: str, is_system: bool) -> tuple[str, str]:
                     kb_context = "【知识库参考】\n" + "\n".join(kb_lines)
                     rag_context = (rag_context + "\n" + kb_context) if rag_context else kb_context
         except Exception as e:
-            print(f"向量检索失败: {e}")
+            logger.warning(f"向量检索失败: {e}")
 
     return kb_title_hint, rag_context

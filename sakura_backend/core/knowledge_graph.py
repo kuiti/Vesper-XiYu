@@ -76,6 +76,17 @@ def extract_triplets_from_messages(messages: list, llm_call_func=None) -> list:
         return []
 
 
+def extract_triples_from_text(text: str, source: str = "chat") -> list:
+    """从单条文本中提取三元组（便捷包装）"""
+    if not text or len(text) < 20:
+        return []
+    messages = [{"role": "assistant", "content": text}]
+    triplets = extract_triplets_from_messages(messages)
+    if triplets:
+        save_triplets(triplets)
+    return triplets
+
+
 def save_triplets(triplets: list, source_msg_id=None):
     """保存三元组到数据库"""
     for t in triplets:

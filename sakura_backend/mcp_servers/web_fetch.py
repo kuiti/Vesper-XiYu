@@ -104,6 +104,10 @@ def fetch_web(url: str, max_length: int = 15000, use_cache: bool = True) -> str:
     """
     import requests
 
+    from core.security import validate_request_url
+    if not validate_request_url(url):
+        return f"[拒绝] URL 未通过安全校验: {url}"
+
     # 检查缓存
     if use_cache:
         cached = _get_cached(url)

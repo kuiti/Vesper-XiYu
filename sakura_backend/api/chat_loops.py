@@ -27,7 +27,7 @@ async def reminder_loop(websocket: WebSocket):
             except WebSocketDisconnect:
                 raise
             except Exception as e:
-                print(f"[提醒循环] 异常: {e}")
+                logger.warning(f"[提醒循环] 异常: {e}")
     except asyncio.CancelledError:
         raise
     except WebSocketDisconnect:
@@ -128,7 +128,7 @@ async def proactive_loop(
             except WebSocketDisconnect:
                 raise
             except Exception as e:
-                print(f"[主动消息循环] 异常: {e}")
+                logger.warning(f"[主动消息循环] 异常: {e}")
     except asyncio.CancelledError:
         raise
     except WebSocketDisconnect:
@@ -170,7 +170,7 @@ async def diary_scheduler():
             if result:
                 mood = "温暖"
                 save_diary_entry(today, result, mood)
-                print(f"[AI日记] 已自动生成 {today}")
+                logger.info(f"[AI日记] 已自动生成 {today}")
         except Exception as e:
-            print(f"[AI日记] 自动生成失败: {e}")
+            logger.error(f"[AI日记] 自动生成失败: {e}")
         last_generated = today

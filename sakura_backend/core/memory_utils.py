@@ -16,7 +16,7 @@ def get_safe_memories(limit: int = 3) -> list:
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT key, value FROM memory ORDER BY updated_at DESC"
+            "SELECT key, value FROM memory ORDER BY updated_at DESC LIMIT 200"
         )
         rows = [dict(r) for r in cursor.fetchall()]
 

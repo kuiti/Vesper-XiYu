@@ -84,6 +84,8 @@ class ChatSession:
         self.proactive_task = None
         self.tag_proactive_task = None
         self._conn_empathy_strategy = None
+        self._session_start = datetime.now().isoformat()
+        self._session_msg_count = 0
         self.user_message = ""
         self._rate_timestamps: list = []
         self.history = []
@@ -185,6 +187,19 @@ class ChatSession:
         for t in [self.reminder_task, self.proactive_task, self.tag_proactive_task]:
             if t and not t.done():
                 t.cancel()
+
+        # 保存情景记忆（会话快照）
+        if self._session_msg_count >= 3:
+            try:
+                from core.episodic_memory import save_episode
+                from core.db import get_recent_chat_messages
+                end_time = datetime.now().isoformat()
+                messages = get_recent_chat_messages(self._session_msg_count + 10)
+                if messages:
+                    save_episode(self._session_start, end_time, messages)
+            except Exception as e:
+                logger.warning(f"[情景] 保存失败: {e}")
+
         logger.info(f"WS 断开 (id={self.conn_id[:8]}, remaining={len(_active_websockets)})")
 
     # ════════════════════════════════════════════
@@ -231,6 +246,17 @@ class ChatSession:
                     "INSERT INTO empathy_feedback (msg_id, score, created_at) VALUES (?, ?, ?)",
                     (msg_id, score, datetime.now().isoformat()),
                 )
+                # 负面反馈时保存到反馈记忆
+                if score == -1:
+                    c = conn.cursor()
+                    c.execute("SELECT content FROM chat_history WHERE id = ?", (int(msg_id),))
+                    row = c.fetchone()
+                    if row and row["content"]:
+                        from core.feedback_memory import save_behavior_feedback
+                        save_behavior_feedback(
+                            f"用户不喜欢这样的回复: {row['content'][:80]}",
+                            category="behavior", source="empathy_feedback"
+                        )
             ai_name = get_config("ai_name", "佐仓")
             reply = random.choice(["谢谢认可～", "好的，我下次注意"]) if score == 1 \
                 else random.choice(["好的，我下次注意", "收到，会改进的"])
@@ -272,6 +298,17 @@ class ChatSession:
             await self._handle_goal_reject()
             return
 
+        if msg.startswith("/feedback"):
+            content = msg[len("/feedback"):].strip()
+            if content:
+                from core.feedback_memory import save_behavior_feedback
+                save_behavior_feedback(content, category="behavior", source="feedback_command")
+                await ws.send_text(json.dumps({"type": "token", "content": "收到，我记住了。"}))
+                await ws.send_text(json.dumps({"type": "done"}))
+            else:
+                await ws.send_text(json.dumps({"type": "error", "content": "用法: /feedback <你想让我改进的地方>"}))
+            return
+
         # 其他命令统一路由到正常对话
         await self._handle_chat_message()
 
@@ -309,6 +346,7 @@ class ChatSession:
         msg = self.user_message
         history = self.history
         hours_since = get_time_gap_hours()
+        self._session_msg_count += 1
 
         tease_kws = ["我回来了", "回来了", "好久不见", "我回来啦", "回来啦"]
         if any(kw in msg for kw in tease_kws):
@@ -460,7 +498,7 @@ class ChatSession:
             for depth, c in sorted(de, key=lambda x: x[0]):
                 if depth > 0:
                     pos = max(2, len(msgs) - depth)
-                    if pos < len(msgs):
+                    if pos <= len(msgs):
                         msgs.insert(pos, {"role": "system", "content": c})
 
         dc2 = build_dynamic_context(ts, self.emotion)

@@ -1,5 +1,4 @@
 # core/vector_store/memory.py — 记忆向量操作：句子/消息/记忆的向量写入与删除
-import warnings
 from datetime import datetime
 import logging
 from .model import is_model_ready, get_embedding_model, get_collection
@@ -81,7 +80,7 @@ def add_message_vector(msg_id: str, text: str, metadata: dict = None):
             documents=[text]
         )
     except Exception as e:
-        warnings.warn(f"向量索引失败（{msg_id}）：{str(e)}")
+        logger.warning(f"向量索引失败（{msg_id}）：{str(e)}")
     # 新消息写入后刷新 BM25 缓存
     reset_bm25_cache()
 

@@ -19,7 +19,7 @@ from .utils import (
 
 from .bm25 import (
     _tokenize as _tokenize,
-    _get_bm25 as _get_bm25,
+    get_bm25 as get_bm25,
     _update_access_batch as _update_access_batch,
     _keyword_search_memories as _keyword_search_memories,
     reset_bm25_cache,

@@ -26,10 +26,11 @@ def _read_theme():
             val = row[0]
             try:
                 return json.loads(val)
-            except Exception:
+            except Exception as e:
+                logger.warning(f"[launcher] 解析主题 JSON 失败: {e}")
                 return val.strip("'\"")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[launcher] 读取主题数据库失败: {e}")
     return "dark"
 
 
@@ -92,8 +93,8 @@ def _set_window_icon(hwnd=None):
         # 在窗口上直接设置 AppUserModelID（任务栏图标关联）
         try:
             _set_window_appid(h, "Sakura.Zuocang")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[launcher] 设置窗口 AppUserModelID 失败: {e}")
 
 
 def _set_window_appid(hwnd, appid):
@@ -109,8 +110,8 @@ def _set_window_appid(hwnd, appid):
         if hr >= 0 and pps:
             # Too complex, skip for now
             pass
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[launcher] 设置窗口属性商店失败: {e}")
 
 
 def _find_and_set_dark():
@@ -203,8 +204,8 @@ def _on_closing():
             from core.db import get_config
             if get_config("show_tray_notification", True):
                 _show_toast("佐仓", "佐仓已最小化到托盘")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[launcher] 显示托盘通知失败: {e}")
     return False
 
 
@@ -214,8 +215,8 @@ def _show_toast(title, body, duration="short"):
         from core.db import get_config
         if not get_config("use_system_notification", False):
             return
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[launcher] 读取通知配置失败: {e}")
     if _s._has_winotify is None:
         try:
             from winotify import Notification
@@ -227,10 +228,10 @@ def _show_toast(title, body, duration="short"):
             from winotify import Notification
             Notification(app_id="佐仓", title=title, msg=body, duration=duration).show()
             return
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[launcher] winotify 通知发送失败: {e}")
     if _s._tray_icon:
         try:
             _s._tray_icon.notify(body, title)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[launcher] pystray 通知发送失败: {e}")

@@ -178,16 +178,24 @@ class ChatRulePipe(PromptPipe):
 
 
 class IdentityPipe(PromptPipe):
-    """身份信息"""
+    """身份信息 + 行为规则"""
     def process(self, ctx: PipelineContext) -> str:
         ai_name = get_config("ai_name", "佐仓")
         user_name = get_config("user_name", "用户")
-        return f"""【身份】你的名字是「{ai_name}」。正在和你对话的用户叫「{user_name}」。
+        parts = [f"""【身份】你的名字是「{ai_name}」。正在和你对话的用户叫「{user_name}」。
 - 用他的名字称呼他
 - 人设描述中出现其他名字是角色背景，不要在对话中自称那个名字
 - 用户自我介绍时记住他的名字，不要复述用户的话当自我介绍
 - 用户给你取外号时（比如叫你"小{ai_name[0]}""阿{ai_name[0]}"等），自然接受，不要纠正，可以说"叫什么都行~"之类的
-- 你可以根据用户的名字、你们的对话内容，自然地给用户取一个亲昵的外号，但不要强制——等关系近了自然地叫出来"""
+- 你可以根据用户的名字、你们的对话内容，自然地给用户取一个亲昵的外号，但不要强制——等关系近了自然地叫出来"""]
+        try:
+            from core.feedback_memory import get_behavior_rules
+            rules = get_behavior_rules(max_rules=3)
+            if rules:
+                parts.append(rules)
+        except Exception:
+            pass
+        return "\n\n".join(parts)
 
 
 class ToolInstructionPipe(PromptPipe):
@@ -246,14 +254,24 @@ class PersonaPipe(PromptPipe):
 
 
 class UserSummaryPipe(PromptPipe):
-    """用户摘要（Zep 方案）"""
+    """用户摘要 + 记忆索引（Zep 方案 + 类型化注入）"""
     def process(self, ctx: PipelineContext) -> str | None:
         if not ctx.is_module_enabled("user_summary"):
             return None
-        if ctx.msg_counter % 20 != 0:
-            return None
-        from core.prompt_builder import _get_user_summary
-        return _get_user_summary()
+        parts = []
+        # 对话开始时注入记忆索引（一次性的简短总览）
+        if ctx.msg_counter == 0:
+            from core.prompt_builder import _get_memory_index
+            idx = _get_memory_index()
+            if idx:
+                parts.append(idx)
+        # 每 20 条注入详细用户摘要
+        if ctx.msg_counter % 20 == 0:
+            from core.prompt_builder import _get_user_summary
+            summary = _get_user_summary()
+            if summary:
+                parts.append(summary)
+        return "\n\n".join(parts) if parts else None
 
 
 class PlanTodoPipe(PromptPipe):
@@ -302,6 +320,22 @@ class RollingSummaryPipe(PromptPipe):
         return f"【我记得】{rolling_summary}"
 
 
+class EpisodicMemoryPipe(PromptPipe):
+    """情景记忆注入（每 10 条消息注入一次近期情景）"""
+    zone = "dynamic"
+    def process(self, ctx: PipelineContext) -> str | None:
+        if not ctx.is_module_enabled("episodic_memory"):
+            return None
+        if ctx.msg_counter % 10 != 0:
+            return None
+        try:
+            from core.episodic_memory import get_episode_context
+            context = get_episode_context(query=ctx.user_message, limit=3)
+            return context if context else None
+        except Exception:
+            return None
+
+
 class ContinuityPipe(PromptPipe):
     """对话连续感（注入深度 4）"""
     zone = "depth:4"
@@ -324,6 +358,21 @@ class EntityContextPipe(PromptPipe):
             return get_entity_context(ctx.user_message)
         except Exception as e:
             logger.warning(f"[pipeline] 实体上下文获取失败: {e}")
+            return None
+
+
+class FactsContextPipe(PromptPipe):
+    """原子事实注入（每 15 条消息，按类型标注注入）"""
+    zone = "depth:3"
+    def process(self, ctx: PipelineContext) -> str | None:
+        if not ctx.is_module_enabled("facts_context"):
+            return None
+        if ctx.msg_counter % 15 != 0:
+            return None
+        try:
+            from core.profile_builder import get_facts_context
+            return get_facts_context(max_facts=10)
+        except Exception:
             return None
 
 
@@ -642,7 +691,9 @@ def get_default_pipeline() -> PromptPipeline:
     p.register(WorkMemoryPipe())
     p.register(OnboardingPipe())
     p.register(RollingSummaryPipe())
+    p.register(EpisodicMemoryPipe())
     p.register(EntityContextPipe())
+    p.register(FactsContextPipe())
     p.register(SummariesPipe())
     p.register(SchedulePipe())
     p.register(RAGPipe())

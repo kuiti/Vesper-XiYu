@@ -46,8 +46,8 @@ try:
     os.environ['CURL_CA_BUNDLE'] = _cacert
     os.environ['PIP_CERT'] = _cacert
     os.environ['SSL_CERT_DIR'] = os.path.dirname(_cacert)
-except Exception:
-    pass
+except Exception as e:
+    logger.warning(f"[launcher] SSL 证书配置失败: {e}")
 
 # 打包后如果在 dist/ 子目录，回溯到项目根目录以共用 data/
 if getattr(sys, 'frozen', False):

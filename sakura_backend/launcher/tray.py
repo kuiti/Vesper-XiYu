@@ -5,6 +5,11 @@ import ctypes
 from . import _shared as _s
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def _create_tray_icon_image():
     """加载 sakura.ico 作为托盘图标"""
     from PIL import Image
@@ -32,21 +37,21 @@ def _on_tray_show(icon, item):
             if hwnd and ctypes.windll.user32.IsWindow(hwnd):
                 ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
                 ctypes.windll.user32.SetForegroundWindow(hwnd)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[launcher] 读取 HWND 文件失败: {e}")
 
 
 def _on_tray_quit(icon, item):
     """退出程序"""
     try:
         icon.stop()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[launcher] 停止托盘图标失败: {e}")
     try:
         if _s._window:
             _s._window.destroy()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[launcher] 销毁窗口失败: {e}")
     for f in [os.path.join("frontend", "config.js"),
               os.path.join("data", "port.txt"), _s.HWND_FILE, _s.LOCK_FILE]:
         try:

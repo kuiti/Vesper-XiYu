@@ -2,11 +2,10 @@
 import json
 import random
 import threading
-import traceback
 import logging
 from datetime import datetime
 from core import db
-from core.db import get_config
+from core.db import get_config, set_config
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +37,15 @@ def cosine_sim(a, b):
     dot = sum(x * y for x, y in zip(a, b))
     norm = (sum(x * x for x in a) ** 0.5) * (sum(x * x for x in b) ** 0.5)
     return dot / norm if norm else 0.0
+
+
+def _segment_keywords(text: str) -> set:
+    """分词用于关键词匹配（优先 jieba，降级为 2-gram）。"""
+    try:
+        import jieba
+        return {w for w in jieba.cut(text) if len(w.strip()) > 1}
+    except ImportError:
+        return {text[i:i+2] for i in range(len(text) - 1)}
 
 
 def calculate_lifespan(level, importance):
@@ -109,9 +117,21 @@ def check_summary_mentions(user_message):
         for kp in kps:
             if not isinstance(kp, str):
                 continue
-            if len(kp) >= 2 and kp in user_message:
+            if len(kp) < 2:
+                continue
+            # 精确子串匹配
+            if kp in user_message:
                 keyword_hits.append(s)
                 break
+            # 词语重叠率匹配（向量模型不可用时的降级方案）
+            kp_words = _segment_keywords(kp)
+            msg_words = _segment_keywords(user_message)
+            if kp_words and msg_words:
+                overlap = len(kp_words & msg_words)
+                union = len(kp_words | msg_words)
+                if union > 0 and overlap / union >= 0.4:
+                    keyword_hits.append(s)
+                    break
 
     # 第二步：向量余弦相似度（精筛）
     try:
@@ -228,6 +248,7 @@ def run_summary_pipeline(msg_count, user_message="", topic_relevant=True):
                 continue
 
         if not msgs:
+            db.set_last_trigger_at(level, msg_count)
             continue
 
         result = generate_summary_for_tier(level, msgs, existing)
@@ -293,7 +314,7 @@ def _generate_rolling_summary():
         new_msgs = messages[-20:]
 
         conversation = "\n".join([
-            f"{'用户' if m['role'] == 'user' else 'AI'}: {m['content'][:100]}"
+            f"{'用户' if m['role'] == 'user' else 'AI'}: {m['content'][:300]}"
             for m in new_msgs
         ])
 
@@ -337,7 +358,6 @@ def run_background_tasks(msg_count, user_message):
         run_summary_pipeline(msg_count, user_message, topic_relevant)
     except Exception as e:
         logger.warning(f"[后台任务] 摘要异常: {e}")
-        traceback.print_exc()
     finally:
         _summary_lock.release()
 
@@ -364,6 +384,16 @@ def run_background_tasks(msg_count, user_message):
         finally:
             _summary_lock.release()
 
+    # Step 4: 记忆巩固（每 100 条消息触发一次）
+    if msg_count % 100 == 0 and msg_count > 0:
+        try:
+            from core.memory_consolidation import consolidate_memories
+            result = consolidate_memories()
+            if result["consolidated"] > 0:
+                logger.info(f"[巩固] {result['report']}")
+        except Exception as e:
+            logger.warning(f"[后台任务] 记忆巩固异常: {e}")
+
 
 # ========== 反思机制（Stanford Generative Agents）==========
 _REFLECTION_PROMPT = """分析以下用户最近的对话，生成一段反思摘要。
@@ -389,6 +419,31 @@ _KEYWORD_STRENGTH_LOCK = threading.Lock()  # 线程安全锁
 _KW_REFLECT_THRESHOLD = 10  # 关键词累积次数达到阈值时触发专题反思
 
 
+def _load_keyword_strength():
+    """从 DB 加载关键词强度（启动时调用）"""
+    global _KEYWORD_STRENGTH
+    try:
+        raw = get_config("_keyword_strength", "")
+        if raw:
+            _KEYWORD_STRENGTH = json.loads(raw)
+    except Exception as e:
+        logger.warning(f"[kw] 加载关键词强度失败: {e}")
+
+
+def _save_keyword_strength():
+    """持久化关键词强度到 DB"""
+    try:
+        with _KEYWORD_STRENGTH_LOCK:
+            data = dict(_KEYWORD_STRENGTH)
+            set_config("_keyword_strength", json.dumps(data, ensure_ascii=False))
+    except Exception as e:
+        logger.warning(f"[kw] 保存关键词强度失败: {e}")
+
+
+# 启动时加载
+_load_keyword_strength()
+
+
 def _extract_keywords(text: str) -> list:
     """提取文本关键词（简易版，用 jieba）"""
     try:
@@ -402,8 +457,14 @@ def _extract_keywords(text: str) -> list:
         return []
 
 
+_KW_SAVE_COUNTER = 0
+
+
 def _update_keyword_strength(keywords: list):
     """更新关键词强度（线程安全）"""
+    global _KW_SAVE_COUNTER
+    global _KW_SAVE_COUNTER
+    need_save = False
     with _KEYWORD_STRENGTH_LOCK:
         for kw in keywords:
             _KEYWORD_STRENGTH[kw] = _KEYWORD_STRENGTH.get(kw, 0) + 1
@@ -412,6 +473,12 @@ def _update_keyword_strength(keywords: list):
             to_remove = [k for k, v in _KEYWORD_STRENGTH.items() if v < 3]
             for k in to_remove[:len(to_remove)//2]:
                 del _KEYWORD_STRENGTH[k]
+        _KW_SAVE_COUNTER += 1
+        if _KW_SAVE_COUNTER >= 5:
+            _KW_SAVE_COUNTER = 0
+            need_save = True
+    if need_save:
+        _save_keyword_strength()
 
 
 def _check_keyword_reflection_trigger() -> str | None:
@@ -420,6 +487,11 @@ def _check_keyword_reflection_trigger() -> str | None:
         for kw, count in list(_KEYWORD_STRENGTH.items()):
             if count >= _KW_REFLECT_THRESHOLD:
                 _KEYWORD_STRENGTH[kw] = 0  # 重置
+                # 持久化重置，避免重启后重复触发
+                try:
+                    set_config("_keyword_strength", json.dumps(dict(_KEYWORD_STRENGTH), ensure_ascii=False))
+                except Exception:
+                    pass
                 return kw
     return None
 
@@ -454,7 +526,15 @@ def generate_deep_reflection():
             existing_reflections = cursor.fetchall()
 
         if len(existing_reflections) < 2:
-            return  # 反思太少，不生成深度反思
+            # L2 不足时，尝试从 L1 聚合（防饿死），排除 L3 自身
+            with get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT summary, level FROM tiered_summary WHERE remaining_days > 0 AND level < 3 ORDER BY created_at DESC LIMIT 10"
+                )
+                existing_reflections = cursor.fetchall()
+            if len(existing_reflections) < 2:
+                return
 
         # 检查是否有关键词触发
         trigger_kw = _check_keyword_reflection_trigger()
@@ -474,8 +554,8 @@ def generate_deep_reflection():
 
         content = "\n".join(content_parts)
 
-        # 调用 LLM 生成深度洞察
-        prompt = _DEEP_REFLECTION_PROMPT.format(content=content)
+        # 调用 LLM 生成深度洞察（用 replace 避免用户消息中的 {} 破坏 format）
+        prompt = _DEEP_REFLECTION_PROMPT.replace("{content}", content)
         result = call_llm(prompt=prompt, temperature=0.3, max_tokens=300, timeout=30)
         if not result:
             return
@@ -513,7 +593,7 @@ def generate_deep_reflection():
 
         db.add_tiered_summary(
             3, insight_text,
-            json.dumps(["深度反思", trigger_kw], ensure_ascii=False),
+            ["深度反思", trigger_kw],
             0.8, lifespan, now, now, None
         )
 
@@ -540,7 +620,7 @@ def generate_reflection():
         content = "\n".join([f"用户: {m['content']}" for m in user_messages[-30:]])
 
         # 调用 LLM 生成反思
-        prompt = _REFLECTION_PROMPT.format(content=content)
+        prompt = _REFLECTION_PROMPT.replace("{content}", content)
         result = call_llm(prompt=prompt, temperature=0.3, max_tokens=300, timeout=30)
 
         if not result:
@@ -569,7 +649,7 @@ def generate_reflection():
 
         db.add_tiered_summary(
             2, reflection_text,
-            json.dumps(["反思"], ensure_ascii=False),
+            ["反思"],
             0.7, lifespan, now, now, None
         )
         # 更新触发计数器，防止重复生成

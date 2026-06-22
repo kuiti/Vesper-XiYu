@@ -11,47 +11,147 @@ logger = logging.getLogger(__name__)
 
 
 
-# ─── 用户摘要指令（Zep 方案）───
-# 定义关于用户的关键问题，从已有画像和事实中提取答案
+# ─── 用户摘要指令（Zep 方案 + 类型化注入）───
 
+_CATEGORY_LABELS = {
+    "personal": "基本信息",
+    "preference": "偏好",
+    "event": "事件",
+    "work": "工作/学习",
+    "social": "社交",
+}
 
 
 def _get_user_summary() -> str:
-    """从画像和事实中生成用户摘要（Zep 方案）"""
-    # 收集画像
-    profile_items = {}
+    """从画像和事实中生成按类型分组的用户摘要。不同类型用不同标题头，帮助 AI 区分哪些是永久事实、哪些需要跟进。"""
     import json as _json
-    facts = []
+    profile_items = {}
+    grouped_facts = {}  # category -> [(text, created_at, temporality)]
+
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT key, value, confidence FROM user_profile WHERE confidence >= 0.55 AND key NOT LIKE '_fact_%'")
         for r in cursor.fetchall():
             profile_items[r["key"]] = r["value"]
-        cursor.execute("SELECT value FROM user_profile WHERE key LIKE '_fact_%' ORDER BY extracted_at DESC LIMIT 20")
+        cursor.execute("SELECT value FROM user_profile WHERE key LIKE '_fact_%' ORDER BY extracted_at DESC LIMIT 40")
         for r in cursor.fetchall():
             try:
                 d = _json.loads(r["value"])
-                if d.get("importance", 0) >= 5:
-                    facts.append(d["text"])
-            except Exception as e:
-                silent_exc("_get_user_summary", e)
-    if not profile_items and not facts:
+                if d.get("importance", 0) >= 4 and d.get("status") == "active":
+                    cat = d.get("category", "general")
+                    grouped_facts.setdefault(cat, []).append((
+                        d["text"], d.get("created_at", ""), d.get("temporality", "permanent")
+                    ))
+            except Exception:
+                pass
+
+    if not profile_items and not grouped_facts:
         return ""
+
     lines = []
+    # 画像信息
     if profile_items:
         KEY_FIXES = {"层城市": "城市"}
+        items = []
         for k, v in list(profile_items.items())[:8]:
             k_clean = KEY_FIXES.get(k, k)
-            lines.append(f"📝 {k_clean}：{v}")
-    if facts:
-        for f in facts[:5]:
-            lines.append(f"📝 {f}")
+            items.append(f"  {k_clean}：{v}")
+        if items:
+            lines.append("【基本信息】")
+            lines.extend(items)
+
+    # 原子事实按类型分组
+    for cat in ("personal", "preference", "work", "social", "event", "general"):
+        entries = grouped_facts.get(cat)
+        if not entries:
+            continue
+        label = _CATEGORY_LABELS.get(cat, "其他")
+        from datetime import datetime as _dt
+        now = _dt.now()
+        cat_lines = []
+        for text, created_at, temporality in entries[:5]:
+            # 时效性筛选 + 渐变衰减
+            prefix = ""
+            if created_at and temporality in ("event", "temporary"):
+                try:
+                    days = (now - _dt.fromisoformat(created_at)).days
+                    if temporality == "event" and days > 30:
+                        continue
+                    if temporality == "temporary" and days > 7:
+                        continue
+                    if days > 0:
+                        prefix = f" [{days}天前]"
+                    else:
+                        prefix = " [今天]"
+                    # 超过 7 天的事件简略显示
+                    if days > 7:
+                        text = text[:40] + ("..." if len(text) > 40 else "")
+                except Exception:
+                    pass
+            cat_lines.append(f"  {prefix} {text}")
+        if cat_lines:
+            lines.append(f"【{label}】")
+            lines.extend(cat_lines)
+
+    return ("【我记得的你】\n" + "\n".join(lines)
+            + "\n（自然地提起这些——像朋友记得对方的事。如果当前话题不相关，不提也行。）")
+
+
+def _get_memory_index() -> str:
+    """生成轻量记忆索引（5-8 行），让 AI 对话开始时快速了解自己知道什么。
+
+    类似 MEMORY.md 的索引结构：一行一条，标注类型。
+    不从零注入所有细节，而是给 AI 一个"目录"让它知道有什么可用。
+    """
+    import json as _json
+    lines = []
+
+    # 1. 基本信息（画像中最核心的 2-3 条）
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT key, value FROM user_profile WHERE confidence >= 0.7 AND key NOT LIKE '_fact_%' AND key NOT LIKE '_%'")
+        profile = {r["key"]: r["value"] for r in cursor.fetchall()}
+    key_items = []
+    for k in ("name", "city", "occupation", "age"):
+        if k in profile:
+            key_items.append(f"{k}：{profile[k]}")
+    if key_items:
+        lines.append(f"[基本信息] {'/'.join(key_items[:3])}")
+
+    # 2. 偏好（preference 类事实的简短摘要）
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM user_profile WHERE key LIKE '_fact_%' ORDER BY extracted_at DESC LIMIT 30")
+        prefs = []
+        events = []
+        for r in cursor.fetchall():
+            try:
+                d = _json.loads(r["value"])
+                if d.get("status") == "active" and d.get("importance", 0) >= 5:
+                    if d.get("category") == "preference":
+                        prefs.append(d["text"][:30])
+                    elif d.get("category") == "event" and d.get("temporality") != "temporary":
+                        events.append(f"{d['text'][:30]}")
+            except Exception:
+                pass
+    if prefs:
+        lines.append(f"[偏好] {'/'.join(prefs[:3])}")
+    if events:
+        lines.append(f"[事件] {'/'.join(events[:2])}")
+
+    # 3. 最近情景（最近一次 episode 的摘要）
+    try:
+        from core.episodic_memory import get_recent_episodes
+        recent = get_recent_episodes(limit=1)
+        if recent and recent[0].get("topic_summary"):
+            lines.append(f"[最近] {recent[0]['topic_summary'][:40]}")
+    except Exception:
+        pass
+
     if not lines:
         return ""
-    return "【我记得关于你的事】\n" + "\n".join(lines) + "\n（自然地提起这些——像朋友记得对方的事一样，不用搞成汇报。如果用户当前话题跟这些没关系，不提也行。）"
 
-
-def _get_plan_todo_context() -> str:
+    return "【我知道的】\n- " + "\n- ".join(lines)
     """获取计划/待办上下文（LobeChat 方案）"""
     parts = []
     # 从工作记忆获取当前目标

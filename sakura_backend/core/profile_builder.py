@@ -78,7 +78,10 @@ def extract_profile_from_messages():
         for k, v in data.items():
             if isinstance(v, dict) and "value" in v:
                 clean_data[k] = str(v["value"])
-                conf = max(0.0, min(1.0, float(v.get("confidence", 0.7))))
+                try:
+                    conf = max(0.0, min(1.0, float(v.get("confidence", 0.7))))
+                except (ValueError, TypeError):
+                    conf = 0.7
                 confidence_map[k] = conf
                 dim = v.get("dimension", "")
                 if dim:
@@ -248,13 +251,21 @@ def _get_existing_facts_with_status(limit=50):
     return facts
 
 
+def _segment_text(text: str) -> list:
+    """简易中文分词（优先 jieba，降级为字符）"""
+    try:
+        import jieba
+        return [w for w in jieba.cut(text) if len(w.strip()) > 0]
+    except ImportError:
+        return list(text)
+
+
 def _handle_contradictions(contradictions):
     """处理矛盾标记：将旧事实标记为 completed 或 superseded"""
     if not contradictions:
         return
     with get_conn() as conn:
         cursor = conn.cursor()
-        # 获取所有事实
         cursor.execute("SELECT key, value FROM user_profile WHERE key LIKE '_fact_%'")
         rows = cursor.fetchall()
         facts_map = {}
@@ -263,16 +274,22 @@ def _handle_contradictions(contradictions):
                 d = json.loads(r["value"])
                 facts_map[d.get("text", "")] = (r["key"], d)
             except (json.JSONDecodeError, TypeError) as e:
-                silent_exc("profile_builder", e)
+                logger.warning(f"[profile] 事实解析失败: {e}")
 
         for contra in contradictions:
             old_text = contra.get("old_text", "")
             action = contra.get("action", "superseded")
             if not old_text or action not in ("completed", "superseded"):
                 continue
-            # 模糊匹配：检查旧事实文本是否包含在已有事实中
+            # 用分词重叠率匹配（比字符集 Jaccard 对短中文更准确）
+            old_words = set(_segment_text(old_text))
             for fact_text, (key, data) in facts_map.items():
-                if old_text in fact_text or fact_text in old_text:
+                if not fact_text:
+                    continue
+                fact_words = set(_segment_text(fact_text))
+                overlap = len(old_words & fact_words)
+                union = len(old_words | fact_words)
+                if union > 0 and overlap / union >= 0.5:
                     data["status"] = action
                     cursor.execute(
                         "UPDATE user_profile SET value = ? WHERE key = ?",
@@ -282,16 +299,30 @@ def _handle_contradictions(contradictions):
                     break
 
 
-def get_facts_context(max_facts=15):
-    """获取原子事实上下文，用于注入 system prompt（只显示活跃事实）"""
+def get_facts_context(max_facts=12):
+    """获取原子事实上下文，按类型标注注入，带时效性门控。
+
+    时效性规则：
+    - temporality=event 超过 30 天 → 不自动注入
+    - temporality=temporary 超过 7 天 → 不自动注入
+    - 超过时效的仍可通过 vector search 检索到
+    """
+    from datetime import datetime as _dt
+    now = _dt.now()
+
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT value FROM user_profile WHERE key LIKE '_fact_%' ORDER BY extracted_at DESC LIMIT ?",
-            (max_facts * 3,)  # 多取一些，因为要过滤
+            (max_facts * 3,)
         )
         rows = cursor.fetchall()
-    facts = []
+
+    cat_labels = {
+        "personal": "基本信息", "preference": "偏好",
+        "event": "事件", "work": "工作/学习", "social": "社交",
+    }
+    by_cat = {}  # category -> [(text_with_time, importance)]
     for r in rows:
         try:
             d = json.loads(r["value"])
@@ -300,27 +331,44 @@ def get_facts_context(max_facts=15):
             status = d.get("status", "active")
             temporality = d.get("temporality", "permanent")
             created_at = d.get("created_at", "")
-            # 只注入 active 状态的事实
-            if text and importance >= 4 and status == "active":
-                # event 类事实附带时间信息
-                if temporality == "event" and created_at:
-                    try:
-                        from datetime import datetime as _dt
-                        created = _dt.fromisoformat(created_at)
-                        days_ago = (_dt.now() - created).days
-                        if days_ago > 0:
-                            text = f"【{days_ago}天前】{text}"
-                    except Exception as e:
-                        silent_exc("get_facts_context", e)
-                facts.append((importance, text))
-        except (json.JSONDecodeError, TypeError) as e:
-            silent_exc("profile_builder", e)
-    # 按重要性排序，取 top N
-    facts.sort(key=lambda x: -x[0])
-    selected = [f[1] for f in facts[:max_facts]]
-    if not selected:
+            category = d.get("category", "general")
+            if not (text and importance >= 4 and status == "active"):
+                continue
+            # 时效性门控
+            if created_at and temporality in ("event", "temporary"):
+                try:
+                    days = (now - _dt.fromisoformat(created_at)).days
+                    if (temporality == "event" and days > 30) or (temporality == "temporary" and days > 7):
+                        continue
+                    if days > 0:
+                        text = f"[{days}天前] {text}"
+                    else:
+                        text = f"[今天] {text}"
+                except Exception:
+                    pass
+            by_cat.setdefault(category, []).append((text, importance))
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if not by_cat:
         return ""
-    return "【已知事实】\n" + "\n".join(f"- {f}" for f in selected)
+
+    lines = []
+    # 先输出 personal，再按重要性排序输出其他类型
+    for cat in ("personal", "preference", "work", "social", "event", "general"):
+        entries = by_cat.get(cat)
+        if not entries:
+            continue
+        label = cat_labels.get(cat, "其他")
+        entries.sort(key=lambda x: -x[1])
+        cat_lines = []
+        for text, _ in entries[:4]:
+            cat_lines.append(f"- {text}")
+        if cat_lines:
+            lines.append(f"【{label}】")
+            lines.extend(cat_lines)
+
+    return "\n".join(lines[:max_facts * 2])
 
 
 # ─── 实体存储（mem0 轻量知识图谱）───
@@ -443,13 +491,24 @@ def save_profile(data: dict, confidence_map: dict = None):
             _profile_cache = None
 
 
+_CORE_PROFILE_KEYS = {
+    "name", "gender", "age", "city", "birthday", "occupation",
+    "personality", "hobby", "zodiac", "mbti",
+}
+
+
 def cleanup_expired_profile(days: int = 90):
     global _profile_cache
     from datetime import datetime, timedelta
     cutoff = (datetime.now() - timedelta(days=days)).isoformat()
     with get_conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM user_profile WHERE extracted_at < ?", (cutoff,))
+        # 保护核心身份字段、原子事实、高置信度条目
+        cursor.execute(
+            "DELETE FROM user_profile WHERE extracted_at < ? "
+            "AND key NOT IN ({}) AND key NOT LIKE '_fact_%'".format(",".join("?" * len(_CORE_PROFILE_KEYS))),
+            [cutoff, *_CORE_PROFILE_KEYS],
+        )
         deleted = cursor.rowcount
     with _profile_cache_lock:
         _profile_cache = None

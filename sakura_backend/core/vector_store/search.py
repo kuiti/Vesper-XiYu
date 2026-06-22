@@ -4,8 +4,7 @@ import logging
 from datetime import datetime
 from core.retry import silent_exc
 from .model import is_model_ready, get_embedding_model, get_collection
-from . import bm25 as _bm25_mod
-from .bm25 import _get_bm25, _tokenize, _update_access_batch, _keyword_search_memories
+from .bm25 import get_bm25, _tokenize, _update_access_batch, _keyword_search_memories
 
 logger = logging.getLogger(__name__)
 
@@ -32,55 +31,43 @@ def _check_duplicate(collection, embedding, sentence, threshold=0.85):
 
 
 def _mmr_select(query_emb: list, candidates_with_emb: list, top_k: int, lambda_mult: float = 0.7) -> list:
-    """MMR (Maximal Marginal Relevance) 多样性选择。
-    确保返回结果既相关又多样，避免返回 5 条都是同一话题的记忆。
-
-    Args:
-        query_emb: 查询向量
-        candidates_with_emb: [(doc, dist, meta, hybrid_score, embedding), ...]
-        top_k: 返回数量
-        lambda_mult: 0.0=最大多样性, 1.0=最大相关性 (默认 0.7 平衡)
-    """
+    """MMR (Maximal Marginal Relevance) numpy 向量化选择。"""
     if len(candidates_with_emb) <= top_k:
         return candidates_with_emb
 
     import numpy as np
-    query_vec = np.array(query_emb)
+    query_vec = np.array(query_emb).reshape(1, -1)
 
-    # 预计算所有候选与查询的余弦相似度
-    def cosine_sim(a, b):
-        a, b = np.array(a), np.array(b)
-        norm = np.linalg.norm(a) * np.linalg.norm(b)
-        return float(np.dot(a, b) / norm) if norm > 0 else 0.0
+    n = len(candidates_with_emb)
+    hybrid_scores = np.array([c[3] for c in candidates_with_emb])
+    all_embs = np.array([c[4] for c in candidates_with_emb])
+
+    norms = np.linalg.norm(all_embs, axis=1, keepdims=True)
+    norms[norms == 0] = 1
+    all_embs_norm = all_embs / norms
 
     selected = []
-    remaining = list(range(len(candidates_with_emb)))
+    remaining = list(range(n))
 
-    for _ in range(top_k):
+    for _ in range(min(top_k, n)):
         if not remaining:
             break
-        best_idx = -1
-        best_score = -float('inf')
-        for idx in remaining:
-            _, _, _, hybrid, emb = candidates_with_emb[idx]
-            # 与查询的相似度（用 hybrid_score 代替原始余弦）
-            relevance = hybrid
-            # 与已选结果的最大相似度
-            max_sim = 0.0
-            if selected and emb:
-                for sel_idx in selected:
-                    sel_emb = candidates_with_emb[sel_idx][4]
-                    if sel_emb:
-                        sim = cosine_sim(emb, sel_emb)
-                        max_sim = max(max_sim, sim)
-            # MMR 分数
-            mmr_score = lambda_mult * relevance - (1 - lambda_mult) * max_sim
-            if mmr_score > best_score:
-                best_score = mmr_score
-                best_idx = idx
-        if best_idx >= 0:
-            selected.append(best_idx)
-            remaining.remove(best_idx)
+        rem_idx = np.array(remaining)
+        rem_embs = all_embs_norm[rem_idx]
+        rel = hybrid_scores[rem_idx]
+
+        if selected:
+            sel_embs = all_embs_norm[np.array(selected)]
+            sim_matrix = np.dot(rem_embs, sel_embs.T)
+            max_sim = np.max(sim_matrix, axis=1)
+        else:
+            max_sim = np.zeros(len(rem_idx))
+
+        mmr = lambda_mult * rel - (1 - lambda_mult) * max_sim
+        best_pos = int(np.argmax(mmr))
+        best_global = remaining[best_pos]
+        selected.append(best_global)
+        remaining.pop(best_pos)
 
     return [candidates_with_emb[i] for i in selected]
 
@@ -116,24 +103,37 @@ def search_similar(query: str, top_k: int = 3, include_metadata: bool = False):
         candidates = list(zip(docs, distances, metadatas, embeddings))
 
         # 三因子混合排序（相似度 + BM25 + 时效性 + 重要性）
-        from core.db import get_all_memory_importance
+        from core.db import get_conn
         now = datetime.now()
-        importance_map = get_all_memory_importance()
+        # 只查候选 id 的重要性（替代全表加载）
+        candidate_sids = []
+        for _, _, meta, _ in candidates:
+            if meta and meta.get("msg_id"):
+                candidate_sids.append(f"s_{meta['msg_id']}_{meta.get('seq', 0)}")
+        importance_map = {}
+        if candidate_sids:
+            try:
+                with get_conn() as conn:
+                    cursor = conn.cursor()
+                    placeholders = ",".join("?" * len(candidate_sids))
+                    cursor.execute(
+                        f"SELECT id, importance, created_at FROM memory_importance WHERE id IN ({placeholders})",
+                        candidate_sids
+                    )
+                    for r in cursor.fetchall():
+                        importance_map[r["id"]] = {"importance": r["importance"], "created_at": r["created_at"]}
+            except Exception:
+                pass
 
-        bm25 = _get_bm25(_search_collection)
+        bm25, bm25_doc_to_idx, _ = get_bm25(_search_collection)
         if bm25:
             tokenized_query = _tokenize(query)
             bm25_scores = bm25.get_scores(tokenized_query)
             bm25_max = max(bm25_scores) if len(bm25_scores) > 0 and max(bm25_scores) > 0 else 1
-            # 预构建 doc->idx 映射，避免 O(n) 线性查找
-            _doc_to_idx = {}
-            if _bm25_mod._bm25_docs:
-                for _i, _d in enumerate(_bm25_mod._bm25_docs):
-                    _doc_to_idx[_d] = _i
             scored = []
             for doc, dist, meta, emb in candidates:
-                cos_score = 1.0 - dist  # ChromaDB cosine space: dist = 1 - cos_sim
-                idx = _doc_to_idx.get(doc, -1)
+                cos_score = 1.0 - dist
+                idx = bm25_doc_to_idx.get(doc, -1) if bm25_doc_to_idx else -1
                 bm25_norm = (bm25_scores[idx] / bm25_max) if idx >= 0 and idx < len(bm25_scores) else 0
 
                 # 时效性分数（指数衰减）
@@ -145,7 +145,7 @@ def search_similar(query: str, top_k: int = 3, include_metadata: bool = False):
                     if created_at:
                         try:
                             created = datetime.fromisoformat(created_at)
-                            hours_since = (now - created).total_seconds() / 3600
+                            hours_since = max(0, (now - created).total_seconds() / 3600)
                             recency_score = math.exp(-0.001 * hours_since)
                         except Exception:
                             recency_score = 1.0

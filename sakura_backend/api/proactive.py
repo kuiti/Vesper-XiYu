@@ -258,22 +258,24 @@ _care_lock = threading.Lock()
 
 
 def _load_care_counts():
+    """从 DB 加载关怀计数（调用时不应持有 _care_lock）"""
     global _care_daily_counts, _care_daily_date
     try:
         raw = get_config("_care_daily_counts", "")
         if raw:
             data = json.loads(raw)
-            with _care_lock:
-                _care_daily_counts = data.get("counts", {})
-                _care_daily_date = data.get("date", "")
+            _care_daily_counts = data.get("counts", {})
+            _care_daily_date = data.get("date", "")
     except Exception as e:
         logger.warning(f"[care] 加载计数失败: {e}")
 
 
 def _save_care_counts():
+    """保存关怀计数到 DB"""
     try:
         with _care_lock:
-            set_config("_care_daily_counts", json.dumps({"counts": _care_daily_counts, "date": _care_daily_date}, ensure_ascii=False))
+            data = json.dumps({"counts": _care_daily_counts, "date": _care_daily_date}, ensure_ascii=False)
+        set_config("_care_daily_counts", data)
     except Exception as e:
         logger.warning(f"[care] 保存计数失败: {e}")
 
@@ -282,12 +284,22 @@ def _reset_care_counts_if_new_day():
     global _care_daily_counts, _care_daily_date
     with _care_lock:
         if not _care_daily_date:
-            _load_care_counts()
+            # 内联加载，避免锁内调用 _load_care_counts 再次加锁
+            try:
+                raw = get_config("_care_daily_counts", "")
+                if raw:
+                    data = json.loads(raw)
+                    _care_daily_counts = data.get("counts", {})
+                    _care_daily_date = data.get("date", "")
+            except Exception as e:
+                logger.warning(f"[care] 加载计数失败: {e}")
         today = datetime.now().strftime("%Y-%m-%d")
         if _care_daily_date != today:
             _care_daily_counts = {}
             _care_daily_date = today
-            _save_care_counts()
+    # 锁外保存
+    if _care_daily_date == today:
+        _save_care_counts()
 
 
 def _resolve_care_category(trigger_type: str) -> str:

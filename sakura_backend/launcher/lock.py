@@ -21,7 +21,8 @@ def _check_instance_lock():
             return port, pid
         # 僵尸锁（进程已死），清理
         os.remove(_s.LOCK_FILE)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[launcher] 读取锁文件失败: {e}")
         try:
             os.remove(_s.LOCK_FILE)
         except OSError:

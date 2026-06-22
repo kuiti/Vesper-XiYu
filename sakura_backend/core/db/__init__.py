@@ -321,6 +321,67 @@ def _init_db_locked():
         )""")
         # 收藏消息表
         cursor.execute('''CREATE TABLE IF NOT EXISTS favorites (id INTEGER PRIMARY KEY AUTOINCREMENT, msg_id INTEGER, content TEXT, role TEXT, timestamp TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP)''')
+        # 情景记忆表（记录每次对话会话的完整上下文快照）
+        cursor.execute("""CREATE TABLE IF NOT EXISTS episodes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            start_time TEXT,
+            end_time TEXT,
+            emotion_summary TEXT,
+            topic_summary TEXT,
+            key_events TEXT,
+            user_message_count INTEGER DEFAULT 0,
+            ai_message_count INTEGER DEFAULT 0,
+            importance REAL DEFAULT 0.5,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )""")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_episodes_time ON episodes(start_time)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_episodes_importance ON episodes(importance DESC)")
+        # 情景记忆 FTS5 全文搜索
+        cursor.execute("""CREATE VIRTUAL TABLE IF NOT EXISTS episodes_fts USING fts5(
+            topic_summary, emotion_summary, key_events, content='episodes', content_rowid='id'
+        )""")
+        # 迁移旧数据到 FTS
+        try:
+            cursor.execute("INSERT INTO episodes_fts(episodes_fts) VALUES('optimize')")
+        except Exception:
+            cursor.execute("DROP TABLE IF EXISTS episodes_fts")
+            cursor.execute("""CREATE VIRTUAL TABLE episodes_fts USING fts5(
+                topic_summary, emotion_summary, key_events, content='episodes', content_rowid='id'
+            )""")
+            cursor.execute("""INSERT INTO episodes_fts(rowid, topic_summary, emotion_summary, key_events)
+                SELECT id, topic_summary, emotion_summary, key_events FROM episodes""")
+        # FTS5 同步触发器
+        cursor.execute("""CREATE TRIGGER IF NOT EXISTS episodes_ai AFTER INSERT ON episodes BEGIN
+            INSERT INTO episodes_fts(rowid, topic_summary, emotion_summary, key_events)
+            VALUES (new.id, new.topic_summary, new.emotion_summary, new.key_events);
+        END""")
+        cursor.execute("""CREATE TRIGGER IF NOT EXISTS episodes_ad AFTER DELETE ON episodes BEGIN
+            INSERT INTO episodes_fts(episodes_fts, rowid, topic_summary, emotion_summary, key_events)
+            VALUES('delete', old.id, old.topic_summary, old.emotion_summary, old.key_events);
+        END""")
+        cursor.execute("""CREATE TRIGGER IF NOT EXISTS episodes_au AFTER UPDATE ON episodes BEGIN
+            INSERT INTO episodes_fts(episodes_fts, rowid, topic_summary, emotion_summary, key_events)
+            VALUES('delete', old.id, old.topic_summary, old.emotion_summary, old.key_events);
+            INSERT INTO episodes_fts(rowid, topic_summary, emotion_summary, key_events)
+            VALUES (new.id, new.topic_summary, new.emotion_summary, new.key_events);
+        END""")
+        # 记忆巩固日志
+        cursor.execute("""CREATE TABLE IF NOT EXISTS consolidation_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            consolidated_at TEXT,
+            source_count INTEGER,
+            target_count INTEGER,
+            details TEXT
+        )""")
+        # 反馈记忆（用户对 AI 行为的反馈）
+        cursor.execute("""CREATE TABLE IF NOT EXISTS feedback_memory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content TEXT,
+            category TEXT DEFAULT 'behavior',
+            source TEXT DEFAULT 'feedback_command',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            active INTEGER DEFAULT 1
+        )""")
         # FTS5 全文搜索（无内容模式：触发器手动同步，支持单条删除）
         cursor.execute("""CREATE VIRTUAL TABLE IF NOT EXISTS chat_fts USING fts5(
             content, content_rowid='id'

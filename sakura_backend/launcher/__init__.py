@@ -41,15 +41,15 @@ if os.path.exists(_webview_default):
                  "blob_storage", "IndexedDB", "shared_proto_db"]:
         try:
             _shutil.rmtree(os.path.join(_webview_default, _sub))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[launcher] 清理 WebView2 缓存失败 {_sub}: {e}")
     for _f in ["History", "History-journal", "Favicons", "Top Sites",
                "Visited Links", "Login Data", "Login Data For Account",
                "Web Data", "Web Data-journal"]:
         try:
             os.remove(os.path.join(_webview_default, _f))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[launcher] 清理 WebView2 文件失败 {_f}: {e}")
 
 os.environ["WEBVIEW2_USER_DATA_FOLDER"] = _webview_cache
 
@@ -182,8 +182,8 @@ def _ensure_geo_prefs():
         if _granted:
             with open(_prefs_path, "w", encoding="utf-8") as _f:
                 _json.dump(_prefs, _f, ensure_ascii=False)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[launcher] 更新地理位置偏好失败: {e}")
 
 
 def run():
@@ -218,8 +218,8 @@ def run():
                 sys.exit(0)
         with open(_launch_stamp_file, 'w') as f:
             f.write(str(_time.time()))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[launcher] 写入启动频率记录失败: {e}")
 
     # 1. 找端口 → 立即出窗口
     SAKURA_PORT = _find_free_port()
@@ -242,8 +242,8 @@ def run():
     # 1.5 AppUserModelID
     try:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Sakura.Zuocang")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[launcher] 设置 AppUserModelID 失败: {e}")
 
     # 1.6 地理位置预授权
     _ensure_geo_prefs()
@@ -264,8 +264,8 @@ def run():
                 with open(_prefs_path, "w", encoding="utf-8") as _f:
                     _json.dump(_prefs, _f, ensure_ascii=False)
                 logger.info(f"[启动] 已预授权地理位置权限（端口 {SAKURA_PORT}）")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[launcher] 更新地理位置端口配置失败: {e}")
 
     # 2. 创建窗口
     import webview

@@ -32,8 +32,8 @@ def _kill_zombie_processes():
             with urllib.request.urlopen(req, timeout=2) as resp:
                 if resp.status == 200:
                     continue  # 活的实例，跳过
-        except Exception:
-            pass  # 无响应，是僵尸
+        except Exception as e:
+            logger.warning(f"[launcher] 僵尸检测 HTTP 检查失败 端口{port}: {e}")
         # 查找占用端口的 PID 并杀掉
         try:
             result = subprocess.run(
@@ -93,8 +93,8 @@ def _activate_existing_window(port):
         if resp.decode('utf-8', errors='ignore').strip() == 'ok':
             logger.info(f"[启动] 已通过管道激活端口 {port} 的窗口")
             return
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[launcher] 命名管道激活失败: {e}")
     # 管道失败，回退浏览器
     import webbrowser
     webbrowser.open(f"http://127.0.0.1:{port}/")
@@ -137,8 +137,8 @@ def _start_pipe_server(port):
                 if pipe:
                     try:
                         win32file.CloseHandle(pipe)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"[launcher] 关闭管道句柄失败: {e}")
 
     t = threading.Thread(target=_serve, daemon=True)
     t.start()
@@ -170,6 +170,6 @@ def start_backend(port):
         try:
             with open(os.path.join("data", "startup_error.txt"), "w", encoding="utf-8") as f:
                 f.write(f"{type(e).__name__}: {e}")
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[launcher] 写入启动错误日志失败: {e}")
         raise

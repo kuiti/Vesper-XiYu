@@ -228,7 +228,6 @@ class TestGetFactsContext:
         mock_conn.return_value.__exit__ = MagicMock(return_value=False)
         result = get_facts_context()
         assert "用户喜欢猫" in result
-        assert "已知事实" in result
 
     @patch("core.profile_builder.get_conn")
     def test_inactive_fact_excluded(self, mock_conn):

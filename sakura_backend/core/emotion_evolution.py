@@ -309,6 +309,7 @@ def _rule_silence_decay(hours_since: float | None):
 
     _update_relationship_value("affection", affection_loss)
     _update_relationship_value("trust", trust_loss)
+
     _log_evolution_event(
         "time_decay",
         f"用户沉默{int(days)}天，好感-{abs(affection_loss):.1f}，信任-{abs(trust_loss):.1f}",

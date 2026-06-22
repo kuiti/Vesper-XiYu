@@ -2,7 +2,10 @@
 import os
 import json as _json
 import time as _time
+import logging
 from . import _shared as _s
+
+logger = logging.getLogger(__name__)
 
 
 def _poll_weather_notifications():
@@ -50,5 +53,5 @@ def _poll_weather_notifications():
                         os.remove(_s.WEATHER_NOTIFICATION_FILE)
                     except OSError:
                         pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[launcher] 天气通知轮询异常: {e}")

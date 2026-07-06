@@ -42,7 +42,7 @@ venv\Scripts\activate.bat
 ### 3. 安装依赖
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-cloud.txt
 ```
 
 ### 4. 获取 API Key
@@ -83,7 +83,7 @@ python launcher.py
 
 ### 情感与关系系统
 
-- **9 种情绪状态**：狂喜 / 开心 / 满足 / 平静 / 谨慎 / 冷漠 / 烦躁 / 受伤 / 不信任
+- **12 种情绪状态**：狂喜 / 开心 / 满足 / 平静 / 谨慎 / 冷漠 / 烦躁 / 受伤 / 不信任 / 敌意 / 被背叛 / 怨恨
 - **双轨关系**：好感度（-100~100） + 信任度（-100~100），默认 30
 - **性格演化**：5+ 条每日演化规则，根据对话内容持续调整
 - **情感趋势**：14 天情绪分数曲线
@@ -132,7 +132,7 @@ python launcher.py
 ├── launcher.py              # 桌面启动器（系统托盘 + WebView2）
 ├── main.py                  # FastAPI 入口
 ├── Vesper.spec              # PyInstaller 打包配置
-├── requirements.txt         # Python 依赖
+├── requirements-cloud.txt   # Python 依赖（云端部署，无 GUI 库）
 ├── api/                     # API 路由
 │   ├── chat_session.py      # WebSocket 流式聊天（核心）
 │   ├── characters.py        # 角色卡管理

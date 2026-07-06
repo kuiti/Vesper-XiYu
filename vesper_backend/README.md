@@ -131,30 +131,97 @@ python launcher.py
 ```
 ├── launcher.py              # 桌面启动器（系统托盘 + WebView2）
 ├── main.py                  # FastAPI 入口
+├── cloud_server.py          # 云端部署入口（无 GUI）
+├── config.json              # 默认配置
 ├── Vesper.spec              # PyInstaller 打包配置
-├── requirements-cloud.txt   # Python 依赖（云端部署，无 GUI 库）
+├── requirements-cloud.txt   # Python 依赖
+├── pytest.ini               # 测试配置
 ├── api/                     # API 路由
 │   ├── chat_session.py      # WebSocket 流式聊天（核心）
 │   ├── characters.py        # 角色卡管理
-│   ├── greeting.py          # 智能问候
+│   ├── greeting.py          # 智能问候 + 主动交互
 │   ├── sentiment.py         # 情感分析
-│   ├── proactive.py         # 主动交互引擎
-│   └── ...
+│   ├── proactive.py         # 主动触发引擎
+│   ├── emotion.py           # 情感趋势 API
+│   ├── relationship.py      # 关系系统 API
+│   ├── memory.py            # 记忆管理 API
+│   ├── knowledge.py         # 知识库 CRUD
+│   ├── settings.py          # 设置 API
+│   └── ...                  # 50+ 端点模块
 ├── core/                    # 核心引擎
-│   ├── db/                  # SQLite 连接管理 + schema
-│   ├── llm_client.py        # 统一 LLM 调用
+│   ├── db/                  # SQLite 连接管理 + schema（主库+角色库）
+│   │   ├── __init__.py      # 建表、迁移、get_chat_conn
+│   │   ├── chat.py          # 聊天记录 CRUD + FTS5
+│   │   ├── config.py        # 配置读写（per-character）
+│   │   ├── entity.py        # 实体+知识图谱+记忆重要性
+│   │   ├── emotion.py       # 情绪日志+活跃统计
+│   │   ├── memory.py        # memory 表 CRUD
+│   │   ├── misc.py          # 文档管理
+│   │   ├── summary.py       # 摘要表 CRUD
+│   │   ├── tools.py         # 工具调用记录
+│   │   ├── cleanup.py       # 数据清理
+│   │   └── goal.py          # 目标表
+│   ├── llm_client.py        # 统一 LLM API 调用
+│   ├── llm_provider.py      # 多后端抽象层（OpenAI/Ollama/DeepSeek/Azure）
 │   ├── prompt_pipeline.py   # 33 管道提示词引擎
 │   ├── prompt_builder.py    # 系统提示词构建
-│   ├── emotion_evolution.py # 情绪演化（per-character）
-│   ├── relationship.py      # 好感度/信任度
-│   ├── memory_provider.py   # 统一记忆接口
-│   ├── character_card.py    # 角色卡引擎
-│   ├── vector_store/        # ChromaDB + BM25
-│   ├── knowledge_graph.py   # 知识图谱
-│   └── ...
-├── frontend/                # Vue 3 前端构建产物
+│   ├── memory_provider.py   # 统一记忆接口 + TempMemory
+│   ├── emotion_evolution.py # 情绪演化 + OCEAN 人格
+│   ├── relationship.py      # 好感度/信任度 + 里程碑
+│   ├── character_card.py    # 角色卡引擎（V2/V3）
+│   ├── vector_store/        # ChromaDB + BM25 语义检索
+│   │   ├── model.py         # embedding 模型加载
+│   │   ├── search.py        # 混合搜索 + MMR
+│   │   ├── knowledge.py     # 文档分块 + 向量化
+│   │   ├── memory.py        # 记忆向量管理
+│   │   ├── bm25.py          # BM25 中文关键词索引
+│   │   └── utils.py         # 工具函数
+│   ├── knowledge_graph.py   # 实体关系三元组提取
+│   ├── consistency_checker.py # 三层回复一致性检查
+│   ├── correction_memory.py # 纠错记忆
+│   ├── feedback_memory.py   # 行为反馈
+│   ├── scheduler.py         # APScheduler 定时任务
+│   ├── episodic_memory.py   # 情景记忆管理
+│   ├── summary_engine.py    # 三级生命周期摘要
+│   ├── tag_parser.py        # DSML 标签解析
+│   ├── mcp_tools.py         # MCP 工具注册表
+│   ├── security.py          # SQL 注入/路径穿越防护
+│   ├── retry.py             # 异常安全辅助
+│   ├── lorebook.py          # lorebook 管理
+│   ├── profile_builder.py   # 用户画像构建
+│   ├── conclusion_engine.py # 用户行为结论分析
+│   ├── mention_tracker.py   # 提及权重追踪
+│   ├── easter_eggs.py       # 彩蛋检测
+│   ├── shared_memory.py     # 共同经历检测
+│   ├── memory_curation.py   # 记忆整理
+│   ├── memory_consolidation.py # 记忆合并
+│   ├── goal_tracker.py      # 目标追踪
+│   ├── quick_reply.py       # 快捷回复
+│   ├── token_counter.py     # token 计数
+│   ├── story_arc.py         # 故事弧
+│   ├── plugin_loader.py     # 插件加载器
+│   ├── user_persona.py      # 用户分身管理
+│   ├── tts/                 # TTS 适配器（多引擎）
+│   └── ...                  # 80+ 核心模块
+├── launcher/                # 桌面启动器模块
+│   ├── __init__.py          # 启动逻辑（单实例+WebView2+系统托盘）
+│   ├── process.py           # 进程管理
+│   ├── window.py            # 窗口管理
+│   ├── tray.py              # 系统托盘
+│   ├── lock.py              # 互斥锁
+│   ├── weather.py           # 天气推送
+│   └── _shared.py           # 共享变量
+├── frontend/                # Vue 3 前端构建产物（当前 UI）
 ├── frontend_old/            # 旧版前端
-└── data/                    # 运行后自动创建
+├── static/                  # 静态资源（备用前端）
+├── mcp_servers/             # MCP 服务器
+│   ├── sqlite_server.py     # 数据库 MCP
+│   ├── screen_server.py     # 截图 MCP
+│   └── web_fetch.py         # 网页抓取 MCP
+├── plugins/                 # 插件目录
+│   └── example.py           # 插件示例
+├── tests/                   # pytest 测试（366+ 测试用例）
+└── data/                    # 运行后自动创建（DB/向量/日志）
 ```
 
 ---

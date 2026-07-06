@@ -1,0 +1,6 @@
+{
+  "tests/test_parser.py::TestDSMLFiltering::test_dsml_filtered_in_thinking_state": true,
+  "tests/test_parser.py::TestDSMLFiltering::test_dsml_filtered_in_reply_state": true,
+  "tests/test_parser.py::TestExtractReplyFromBuffer::test_dsml_removed_from_buffer": true,
+  "tests/test_integration.py::TestCharacterCardLifecycle::test_create_and_load": true
+}

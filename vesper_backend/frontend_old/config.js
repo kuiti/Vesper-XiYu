@@ -1,0 +1,1 @@
+window.__VESPER_CONFIG__ = { backendPort: 8060, theme: "sakura" };

@@ -1,0 +1,17 @@
+{
+  "name": "夕语",
+  "short_name": "夕语",
+  "description": "Vesper - AI Companion",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#060a10",
+  "theme_color": "#060a10",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}

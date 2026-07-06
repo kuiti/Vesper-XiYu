@@ -1,0 +1,364 @@
+/* ─── Theme System ───
+   Switch via: document.documentElement.setAttribute('data-theme', name)
+   Default (dark) is :root — no attribute needed.
+*/
+
+/* ========== dark (default) ========== */
+:root, [data-theme="dark"] {
+  --bg-app: #111214;
+  --bg-sidebar: #1a1b1e;
+  --bg-chat: #0e0f11;
+  --bg-glass: rgba(26, 27, 30, 0.8);
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-press: rgba(255, 255, 255, 0.07);
+  --bg-active: rgba(114, 137, 254, 0.1);
+
+  --accent: #7289fe;
+  --accent-hover: #8b9bff;
+  --accent-gradient: linear-gradient(135deg, #7289fe, #9b7bfd);
+  --accent-glow: rgba(114, 137, 254, 0.3);
+  --accent-soft: rgba(114, 137, 254, 0.08);
+  --accent-secondary: #9b7bfd;
+
+  --msg-self: linear-gradient(135deg, #7289fe, #9b7bfd);
+  --msg-other: rgba(255, 255, 255, 0.06);
+  --msg-other-border: rgba(255, 255, 255, 0.08);
+
+  --text: #e4e6eb;
+  --text-link: #7289fe;
+  --text-secondary: #b0b3b8;
+  --text-muted: #6c6f78;
+  --text-tertiary: #484a52;
+
+  --danger: #ed4956;
+  --success: #43b581;
+  --warning: #faa61a;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --divider: rgba(255, 255, 255, 0.04);
+}
+
+/* ========== light ========== */
+[data-theme="light"] {
+  --bg-app: #f5f0e8;
+  --bg-sidebar: #ebe3d8;
+  --bg-chat: #f5f0e8;
+  --bg-glass: rgba(235, 227, 216, 0.85);
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-press: rgba(0, 0, 0, 0.07);
+  --bg-active: rgba(201, 113, 122, 0.1);
+
+  --accent: #c9717a;
+  --accent-hover: #d48a92;
+  --accent-gradient: linear-gradient(135deg, #c9717a, #d4a090);
+  --accent-glow: rgba(201, 113, 122, 0.25);
+  --accent-soft: rgba(201, 113, 122, 0.08);
+  --accent-secondary: #d4a090;
+
+  --msg-self: linear-gradient(135deg, #c9717a, #d4a090);
+  --msg-other: #faf7f0;
+  --msg-other-border: #d8cfc4;
+
+  --text: #3d3228;
+  --text-link: #c9717a;
+  --text-secondary: #8c7b6e;
+  --text-muted: #a8988a;
+  --text-tertiary: #c4b8ac;
+
+  --danger: #c9707a;
+  --success: #5ba88a;
+  --warning: #d4a050;
+
+  --border: #d8cfc4;
+  --border-strong: #c4b8ac;
+  --divider: #e2d9ce;
+}
+
+/* ========== vesper (紫罗兰 — 夕语品牌) ========== */
+[data-theme="vesper"] {
+  --bg-app: #13101c;
+  --bg-sidebar: #1c1828;
+  --bg-chat: #0f0d18;
+  --bg-glass: rgba(28, 24, 40, 0.8);
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-press: rgba(255, 255, 255, 0.07);
+  --bg-active: rgba(155, 143, 184, 0.1);
+
+  --accent: #9b8fb8;
+  --accent-hover: #b5a8d0;
+  --accent-gradient: linear-gradient(135deg, #9b8fb8, #c4b8e8);
+  --accent-glow: rgba(155, 143, 184, 0.3);
+  --accent-soft: rgba(155, 143, 184, 0.08);
+  --accent-secondary: #c4b8e8;
+
+  --msg-self: linear-gradient(135deg, #675b88, #9b8fb8);
+  --msg-other: rgba(255, 255, 255, 0.04);
+  --msg-other-border: rgba(255, 255, 255, 0.06);
+
+  --text: #e0d8f0;
+  --text-link: #9b8fb8;
+  --text-secondary: #8a7ab0;
+  --text-muted: #5c4e78;
+  --text-tertiary: #3c3058;
+
+  --danger: #b8809b;
+  --success: #6ab89b;
+  --warning: #c4a050;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --divider: rgba(255, 255, 255, 0.04);
+}
+
+/* ========== sakura (樱花 — 粉绿) ========== */
+[data-theme="sakura"] {
+  --bg-app: #1c141a;
+  --bg-sidebar: #261c22;
+  --bg-chat: #181016;
+  --bg-glass: rgba(38, 28, 34, 0.8);
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-press: rgba(255, 255, 255, 0.07);
+  --bg-active: rgba(232, 146, 155, 0.1);
+
+  --accent: #e8929b;
+  --accent-hover: #f0a8b0;
+  --accent-gradient: linear-gradient(135deg, #e8929b, #8fbc8f);
+  --accent-glow: rgba(232, 146, 155, 0.3);
+  --accent-soft: rgba(232, 146, 155, 0.08);
+  --accent-secondary: #8fbc8f;
+
+  --msg-self: linear-gradient(135deg, #e8929b, #8fbc8f);
+  --msg-other: rgba(255, 255, 255, 0.04);
+  --msg-other-border: rgba(255, 255, 255, 0.06);
+
+  --text: #f0d8e0;
+  --text-link: #e8929b;
+  --text-secondary: #b8959e;
+  --text-muted: #7a5a68;
+  --text-tertiary: #4a3040;
+
+  --danger: #c9708a;
+  --success: #8fbc8f;
+  --warning: #d4a060;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --divider: rgba(255, 255, 255, 0.04);
+}
+
+/* ========== ocean (深海 — Tokyo Night) ========== */
+[data-theme="ocean"] {
+  --bg-app: #1a1b26;
+  --bg-sidebar: #16161e;
+  --bg-chat: #15161e;
+  --bg-glass: rgba(22, 22, 30, 0.8);
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-press: rgba(255, 255, 255, 0.07);
+  --bg-active: rgba(122, 162, 247, 0.1);
+
+  --accent: #7aa2f7;
+  --accent-hover: #9cb8fa;
+  --accent-gradient: linear-gradient(135deg, #7aa2f7, #bb9af7);
+  --accent-glow: rgba(122, 162, 247, 0.3);
+  --accent-soft: rgba(122, 162, 247, 0.08);
+  --accent-secondary: #bb9af7;
+
+  --msg-self: linear-gradient(135deg, #7aa2f7, #bb9af7);
+  --msg-other: rgba(255, 255, 255, 0.04);
+  --msg-other-border: rgba(255, 255, 255, 0.06);
+
+  --text: #a9b1d6;
+  --text-link: #7aa2f7;
+  --text-secondary: #565f89;
+  --text-muted: #3b4270;
+  --text-tertiary: #2a2f58;
+
+  --danger: #f7768e;
+  --success: #9ece6a;
+  --warning: #e0af68;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --divider: rgba(255, 255, 255, 0.04);
+}
+
+/* ========== forest (森林 — Everforest) ========== */
+[data-theme="forest"] {
+  --bg-app: #1e2326;
+  --bg-sidebar: #232a2e;
+  --bg-chat: #1a1e20;
+  --bg-glass: rgba(35, 42, 46, 0.8);
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-press: rgba(255, 255, 255, 0.07);
+  --bg-active: rgba(167, 192, 128, 0.1);
+
+  --accent: #a7c080;
+  --accent-hover: #bdd8a0;
+  --accent-gradient: linear-gradient(135deg, #a7c080, #e69875);
+  --accent-glow: rgba(167, 192, 128, 0.3);
+  --accent-soft: rgba(167, 192, 128, 0.08);
+  --accent-secondary: #e69875;
+
+  --msg-self: linear-gradient(135deg, #a7c080, #e69875);
+  --msg-other: rgba(255, 255, 255, 0.04);
+  --msg-other-border: rgba(255, 255, 255, 0.06);
+
+  --text: #d3c6aa;
+  --text-link: #a7c080;
+  --text-secondary: #859289;
+  --text-muted: #566058;
+  --text-tertiary: #3a423c;
+
+  --danger: #e67e80;
+  --success: #a7c080;
+  --warning: #dbbc7f;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --divider: rgba(255, 255, 255, 0.04);
+}
+
+/* ========== sunset (日落 — 暖橙) ========== */
+[data-theme="sunset"] {
+  --bg-app: #1a1410;
+  --bg-sidebar: #221a14;
+  --bg-chat: #15100c;
+  --bg-glass: rgba(34, 26, 20, 0.8);
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-press: rgba(255, 255, 255, 0.07);
+  --bg-active: rgba(232, 113, 90, 0.1);
+
+  --accent: #e8715a;
+  --accent-hover: #f08a74;
+  --accent-gradient: linear-gradient(135deg, #e8715a, #d4a080);
+  --accent-glow: rgba(232, 113, 90, 0.3);
+  --accent-soft: rgba(232, 113, 90, 0.08);
+  --accent-secondary: #d4a080;
+
+  --msg-self: linear-gradient(135deg, #e8715a, #d4a080);
+  --msg-other: rgba(255, 255, 255, 0.04);
+  --msg-other-border: rgba(255, 255, 255, 0.06);
+
+  --text: #e8d8c8;
+  --text-link: #e8715a;
+  --text-secondary: #b8957a;
+  --text-muted: #805a40;
+  --text-tertiary: #503828;
+
+  --danger: #e06050;
+  --success: #c4a060;
+  --warning: #e8a040;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --divider: rgba(255, 255, 255, 0.04);
+}
+
+/* ========== candy (甜系 — Catppuccin Mocha) ========== */
+[data-theme="candy"] {
+  --bg-app: #1e1e2e;
+  --bg-sidebar: #181825;
+  --bg-chat: #1a1a28;
+  --bg-glass: rgba(24, 24, 37, 0.8);
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-press: rgba(255, 255, 255, 0.07);
+  --bg-active: rgba(245, 194, 231, 0.1);
+
+  --accent: #f5c2e7;
+  --accent-hover: #f8d4f0;
+  --accent-gradient: linear-gradient(135deg, #f5c2e7, #cba6f7);
+  --accent-glow: rgba(245, 194, 231, 0.3);
+  --accent-soft: rgba(245, 194, 231, 0.08);
+  --accent-secondary: #cba6f7;
+
+  --msg-self: linear-gradient(135deg, #f5c2e7, #cba6f7);
+  --msg-other: rgba(255, 255, 255, 0.04);
+  --msg-other-border: rgba(255, 255, 255, 0.06);
+
+  --text: #cdd6f4;
+  --text-link: #f5c2e7;
+  --text-secondary: #a6adc8;
+  --text-muted: #585b70;
+  --text-tertiary: #45475a;
+
+  --danger: #f38ba8;
+  --success: #a6e3a1;
+  --warning: #f9e2af;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --divider: rgba(255, 255, 255, 0.04);
+}
+
+/* ========== mono (单色 — 灰度) ========== */
+[data-theme="mono"] {
+  --bg-app: #0d0d0d;
+  --bg-sidebar: #141414;
+  --bg-chat: #0a0a0a;
+  --bg-glass: rgba(20, 20, 20, 0.8);
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-press: rgba(255, 255, 255, 0.07);
+  --bg-active: rgba(136, 136, 136, 0.1);
+
+  --accent: #888;
+  --accent-hover: #aaa;
+  --accent-gradient: linear-gradient(135deg, #888, #666);
+  --accent-glow: rgba(136, 136, 136, 0.3);
+  --accent-soft: rgba(136, 136, 136, 0.08);
+  --accent-secondary: #666;
+
+  --msg-self: linear-gradient(135deg, #888, #666);
+  --msg-other: rgba(255, 255, 255, 0.04);
+  --msg-other-border: rgba(255, 255, 255, 0.06);
+
+  --text: #d8d8d8;
+  --text-link: #888;
+  --text-secondary: #888;
+  --text-muted: #555;
+  --text-tertiary: #333;
+
+  --danger: #888;
+  --success: #888;
+  --warning: #888;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --divider: rgba(255, 255, 255, 0.04);
+}
+
+/* ========== nord (北欧 — Nord) ========== */
+[data-theme="nord"] {
+  --bg-app: #2e3440;
+  --bg-sidebar: #3b4252;
+  --bg-chat: #282e38;
+  --bg-glass: rgba(59, 66, 82, 0.8);
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-press: rgba(255, 255, 255, 0.07);
+  --bg-active: rgba(136, 192, 208, 0.1);
+
+  --accent: #88c0d0;
+  --accent-hover: #a0d0e0;
+  --accent-gradient: linear-gradient(135deg, #88c0d0, #81a1c1);
+  --accent-glow: rgba(136, 192, 208, 0.3);
+  --accent-soft: rgba(136, 192, 208, 0.08);
+  --accent-secondary: #81a1c1;
+
+  --msg-self: linear-gradient(135deg, #88c0d0, #81a1c1);
+  --msg-other: rgba(255, 255, 255, 0.04);
+  --msg-other-border: rgba(255, 255, 255, 0.06);
+
+  --text: #d8dee9;
+  --text-link: #88c0d0;
+  --text-secondary: #81a1c1;
+  --text-muted: #4c566a;
+  --text-tertiary: #434c5e;
+
+  --danger: #bf616a;
+  --success: #a3be8c;
+  --warning: #ebcb8b;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --divider: rgba(255, 255, 255, 0.04);
+}

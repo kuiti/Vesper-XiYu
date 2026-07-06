@@ -1,9 +1,11 @@
-# === 只跟踪佐仓 ===
-# 忽略所有顶层目录，再单独排除佐仓
+# === 只跟踪夕语 ===
+# 忽略所有顶层目录，再单独排除夕语
 /*
 !.gitignore
-!sakura_backend/
-!sakura_frontend/
+!vesper_backend/
+!vesper_frontend/
+!vesper_new_frontend/
+!vesper_mobile/
 
 # === 通用排除 ===
 # Python

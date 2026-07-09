@@ -114,19 +114,20 @@ def _calc_consecutive_days(msg_count, ws, loop):
                 expected -= timedelta(days=1)
             else:
                 break
-        _check_achievements(msg_count, consec, ws, loop)
+        _check_achievements(msg_count, consec, ws, loop, _cid=_cid)
     except Exception as e:
         logger.warning(f"[连续天数] 计算失败: {e}")
 
 
-def _check_achievements(msg_count, consecutive_days, ws, loop):
-    """检查并解锁成就徽章，通过 WebSocket 推送通知"""
+def _check_achievements(msg_count, consecutive_days, ws, loop, _cid=0):
+    """检查并解锁成就徽章，通过 WebSocket 推送通知（per-character）"""
     try:
         from core.db import check_achievements as _check_ach
         from core.relationship import get_relationship
-        affection, trust = get_relationship()
+        affection, trust = get_relationship(character_id=_cid)
         hour = datetime.now().hour
-        with get_conn() as conn:
+        from core.db import get_chat_conn
+        with get_chat_conn(_cid) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(DISTINCT substr(timestamp,1,10)) as days FROM chat_history")
             total_days = cursor.fetchone()["days"] or 0
@@ -172,11 +173,11 @@ def _maybe_surprise(ws, loop):
 
 # ─── 目标完成检查 ───
 
-def _check_goal_completion(user_message: str):
-    """检查用户消息是否触发目标完成"""
+def _check_goal_completion(user_message: str, character_id: int = 0):
+    """检查用户消息是否触发目标完成（per-character）"""
     try:
         from core.goal_tracker import check_goal_completion
-        check_goal_completion(user_message)
+        check_goal_completion(user_message, character_id=character_id)
     except Exception as e:
         logger.warning(f"[目标检测] 异常: {e}")
 

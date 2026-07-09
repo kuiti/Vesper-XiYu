@@ -139,9 +139,12 @@ def search_similar(query: str, top_k: int = 3, include_metadata: bool = False, c
             reset_bm25_cache()  # 切换 collection，重置 BM25 缓存
         # 向量检索候选数按查询长度自适应（短查询降噪、长查询提召回）
         n_candidates = _candidate_count(top_k, query)
+        # 按角色隔离过滤：character_id>0 时只搜该角色的句子
+        _where = {"character_id": character_id} if character_id else None
         results = collection.query(
             query_embeddings=[query_emb],
             n_results=n_candidates,
+            where=_where,
             include=["documents", "distances", "metadatas", "embeddings"]
         )
         if not results or not results['documents'] or not results['documents'][0]:
@@ -160,7 +163,7 @@ def search_similar(query: str, top_k: int = 3, include_metadata: bool = False, c
         candidate_sids = []
         for _, _, meta, _ in candidates:
             if meta and meta.get("msg_id"):
-                candidate_sids.append(f"s_{meta['msg_id']}_{meta.get('seq', 0)}")
+                candidate_sids.append(f"s_{meta.get('character_id', 0)}_{meta['msg_id']}_{meta.get('seq', 0)}")
         importance_map = {}
         if candidate_sids:
             try:
@@ -219,7 +222,7 @@ def search_similar(query: str, top_k: int = 3, include_metadata: bool = False, c
                 # 时效性分数（分段：7 天内满分，之后指数衰减）
                 recency_score = 1.0
                 if meta and meta.get("msg_id"):
-                    sid = f"s_{meta['msg_id']}_{meta.get('seq', 0)}"
+                    sid = f"s_{meta.get('character_id', 0)}_{meta['msg_id']}_{meta.get('seq', 0)}"
                     imp_info = importance_map.get(sid, {})
                     created_at = imp_info.get("created_at")
                     if created_at:
@@ -233,7 +236,7 @@ def search_similar(query: str, top_k: int = 3, include_metadata: bool = False, c
                 # 重要性分数：归一化 (imp-1)/9，让默认 5.0 → 0.44，9.0 → 0.89
                 importance_score = 0.44  # 默认 5.0 的归一化值
                 if meta and meta.get("msg_id"):
-                    sid = f"s_{meta['msg_id']}_{meta.get('seq', 0)}"
+                    sid = f"s_{meta.get('character_id', 0)}_{meta['msg_id']}_{meta.get('seq', 0)}"
                     imp_info = importance_map.get(sid, {})
                     imp_raw = imp_info.get("importance", 5.0)
                     importance_score = max(0.0, min(1.0, (imp_raw - 1.0) / 9.0))
@@ -252,7 +255,7 @@ def search_similar(query: str, top_k: int = 3, include_metadata: bool = False, c
                 # 访问频率分数（常被回忆的记忆更相关）
                 access_score = 0.5
                 if meta and meta.get("msg_id"):
-                    sid = f"s_{meta['msg_id']}_{meta.get('seq', 0)}"
+                    sid = f"s_{meta.get('character_id', 0)}_{meta['msg_id']}_{meta.get('seq', 0)}"
                     imp_info = importance_map.get(sid, {})
                     access_count = imp_info.get("access_count", 0)
                     access_score = min(1.0, 0.5 + access_count * 0.1)
@@ -271,7 +274,7 @@ def search_similar(query: str, top_k: int = 3, include_metadata: bool = False, c
                 # 忽略惩罚：经常被检索到但不被选中的记忆降权
                 ignored_penalty = 0.0
                 if meta and meta.get("msg_id"):
-                    sid = f"s_{meta['msg_id']}_{meta.get('seq', 0)}"
+                    sid = f"s_{meta.get('character_id', 0)}_{meta['msg_id']}_{meta.get('seq', 0)}"
                     imp_info = importance_map.get(sid, {})
                     ignored_cnt = imp_info.get("ignored_count", 0)
                     if ignored_cnt > 2:
@@ -321,7 +324,7 @@ def search_similar(query: str, top_k: int = 3, include_metadata: bool = False, c
             ignored_ids = []
             for s_doc, s_dist, s_meta, s_hybrid, s_emb in scored:
                 if s_meta and s_meta.get("msg_id"):
-                    sid = f"s_{s_meta['msg_id']}_{s_meta.get('seq', 0)}"
+                    sid = f"s_{s_meta.get('character_id', 0)}_{s_meta['msg_id']}_{s_meta.get('seq', 0)}"
                     if sid not in mmr_ids:
                         ignored_ids.append(sid)
             if ignored_ids:

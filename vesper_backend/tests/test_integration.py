@@ -56,14 +56,12 @@ def _use_temp_db(monkeypatch, tmp_path):
 @pytest.fixture(autouse=True)
 def _reset_character_state():
     """每个测试前后重置角色卡缓存和全局配置"""
-    from core.character_card import _active_card_cache
+    from core.character_card import CharacterCard
     from core.db.config import _config_cache
-    _active_card_cache["card"] = None
-    _active_card_cache["time"] = 0
+    CharacterCard._active_cache = {}
     _config_cache.clear()
     yield
-    _active_card_cache["card"] = None
-    _active_card_cache["time"] = 0
+    CharacterCard._active_cache = {}
     _config_cache.clear()
 
 

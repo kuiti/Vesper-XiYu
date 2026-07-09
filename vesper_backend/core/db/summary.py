@@ -97,9 +97,37 @@ def get_messages_since_last_summary(character_id: int = 0):
 
 # ========== 三级摘要系统操作 ==========
 
-# --- 消息计数器 ---
-def get_msg_counter():
+# --- 消息计数器（per-character） ---
+def _get_char_counter(character_id: int) -> dict:
+    """读取角色私有的消息计数配置（从角色库的 config 表）。"""
+    from . import get_chat_conn
+    with get_chat_conn(character_id) as conn:
+        cursor = conn.cursor()
+        keys = ("_msg_counter", "_last_level1_at", "_last_level2_at", "_last_level3_at")
+        result = {}
+        for key in keys:
+            cursor.execute("SELECT value FROM config WHERE key = ?", (key,))
+            row = cursor.fetchone()
+            result[key] = int(row["value"]) if row else 0
+        return result
+
+
+def _set_char_counter(key: str, value: int, character_id: int):
+    """写入角色私有的消息计数配置。"""
+    from datetime import datetime as _dt
+    from . import get_chat_conn
+    with get_chat_conn(character_id) as conn:
+        conn.cursor().execute(
+            "INSERT OR REPLACE INTO config (key, value, updated_at) VALUES (?, ?, ?)",
+            (key, str(value), _dt.now().isoformat())
+        )
+
+
+def get_msg_counter(character_id: int = 0):
     """获取当前消息总计数。"""
+    if character_id:
+        c = _get_char_counter(character_id)
+        return c["_msg_counter"]
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT count FROM summary_msg_counter WHERE id = 1")
@@ -107,8 +135,13 @@ def get_msg_counter():
     return row["count"] if row else 0
 
 
-def increment_msg_counter():
-    """原子递增并返回新值"""
+def increment_msg_counter(character_id: int = 0):
+    """原子递增并返回新值（per-character）"""
+    if character_id:
+        c = _get_char_counter(character_id)
+        new_val = c["_msg_counter"] + 1
+        _set_char_counter("_msg_counter", new_val, character_id)
+        return new_val
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute("UPDATE summary_msg_counter SET count = count + 1 WHERE id = 1")
@@ -117,17 +150,25 @@ def increment_msg_counter():
     return row["count"] if row else 1
 
 
-def decrement_msg_counter(amount: int = 2):
+def decrement_msg_counter(amount: int = 2, character_id: int = 0):
     """撤回消息时扣减计数器（默认扣2：一条用户+一条AI）"""
+    if character_id:
+        c = _get_char_counter(character_id)
+        new_val = max(0, c["_msg_counter"] - amount)
+        _set_char_counter("_msg_counter", new_val, character_id)
+        return
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute("UPDATE summary_msg_counter SET count = MAX(0, count - ?) WHERE id = 1", (amount,))
 
 
-def get_last_trigger_at(level):
+def get_last_trigger_at(level, character_id: int = 0):
     """获取指定级别摘要上次触发时的消息计数。"""
     if level not in (1, 2, 3):
         raise ValueError(f"Invalid level: {level}")
+    if character_id:
+        c = _get_char_counter(character_id)
+        return c[f"_last_level{level}_at"]
     col = f"last_level{level}_at"
     with get_conn() as conn:
         cursor = conn.cursor()
@@ -136,18 +177,25 @@ def get_last_trigger_at(level):
     return row[col] if row else 0
 
 
-def set_last_trigger_at(level, count):
+def set_last_trigger_at(level, count, character_id: int = 0):
     """设置指定级别摘要的上次触发计数。"""
     if level not in (1, 2, 3):
         raise ValueError(f"Invalid level: {level}")
+    if character_id:
+        _set_char_counter(f"_last_level{level}_at", count, character_id)
+        return
     col = f"last_level{level}_at"
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute(f"UPDATE summary_msg_counter SET {col} = ? WHERE id = 1", (count,))
 
 
-def reset_msg_counter():
+def reset_msg_counter(character_id: int = 0):
     """重置消息计数器和所有级别触发记录。"""
+    if character_id:
+        for key in ("_msg_counter", "_last_level1_at", "_last_level2_at", "_last_level3_at"):
+            _set_char_counter(key, 0, character_id)
+        return
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute("UPDATE summary_msg_counter SET count = 0, last_level1_at = 0, last_level2_at = 0, last_level3_at = 0 WHERE id = 1")
@@ -195,9 +243,10 @@ def get_active_tiered_summaries(character_id: int = 0):
     return result
 
 
-def get_tiered_summaries_by_level(level):
-    """按级别获取未过期的摘要列表。"""
-    with get_conn() as conn:
+def get_tiered_summaries_by_level(level, character_id: int = 0):
+    """按级别获取未过期的摘要列表（per-character）。"""
+    from . import get_chat_conn
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM tiered_summary WHERE level = ? AND remaining_days > 0 ORDER BY created_at", (level,))
         rows = cursor.fetchall()
@@ -237,11 +286,9 @@ def get_messages_since_last_tiered_summary(limit=None, character_id: int = 0):
     from . import get_chat_conn
     conn = get_chat_conn(character_id)
     cursor = conn.cursor()
-    # tiered_summary 在共享库
-    with get_conn() as shared_conn:
-        sc = shared_conn.cursor()
-        sc.execute("SELECT end_time FROM tiered_summary ORDER BY id DESC LIMIT 1")
-        row = sc.fetchone()
+    # tiered_summary 在角色库
+    cursor.execute("SELECT end_time FROM tiered_summary ORDER BY id DESC LIMIT 1")
+    row = cursor.fetchone()
     if row and row["end_time"]:
         sql = "SELECT role, content, timestamp FROM chat_history WHERE timestamp > ? ORDER BY id"
         params = (row["end_time"],)
@@ -289,9 +336,10 @@ def archive_expired_summaries(character_id: int = 0):
     return count
 
 
-def get_death_archive():
-    """获取所有已归档的过期摘要。"""
-    with get_conn() as conn:
+def get_death_archive(character_id: int = 0):
+    """获取所有已归档的过期摘要（per-character）。"""
+    from . import get_chat_conn
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM death_archive ORDER BY archived_at DESC")
         rows = cursor.fetchall()
@@ -308,9 +356,10 @@ def get_death_archive():
 
 
 # --- 提及计数 ---
-def increment_mention(summary_id, boost_days):
-    """增加摘要提及计数并累加每日加成天数。"""
-    with get_conn() as conn:
+def increment_mention(summary_id, boost_days, character_id: int = 0):
+    """增加摘要提及计数并累加每日加成天数（per-character）。"""
+    from . import get_chat_conn
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute(
             "UPDATE tiered_summary SET mention_count = mention_count + 1, daily_boost = daily_boost + ? WHERE id = ?",

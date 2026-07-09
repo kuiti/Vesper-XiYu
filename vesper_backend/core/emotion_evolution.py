@@ -129,8 +129,9 @@ def update_trait(key: str, delta: float, character_id: int = 0):
     now = _now()
     with get_chat_conn(character_id) as conn:
         conn.cursor().execute(
-            "UPDATE ai_personality_traits SET value=?, updated_at=? WHERE key=?",
-            (new_val, now, key)
+            "INSERT INTO ai_personality_traits (key, value, updated_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+            (key, new_val, now)
         )
 
 

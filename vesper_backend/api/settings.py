@@ -284,12 +284,26 @@ async def get_onboarding_status():
     completed = get_config("onboarding_completed", "")
     has_key = bool(get_config("api_key", ""))
     # 检查是否有聊天记录
-    from core.db import get_conn
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) as cnt FROM chat_history")
-        row = cursor.fetchone()
-        has_history = row["cnt"] > 0 if row else False
+    from core.character_card import CharacterCard
+    has_history = False
+    all_cids = {0}
+    try:
+        for c in CharacterCard.list_all():
+            cid = c.get("id", 0) if isinstance(c, dict) else 0
+            if cid:
+                all_cids.add(cid)
+    except Exception:
+        pass
+    for cid in all_cids:
+        try:
+            from core.db import get_chat_conn
+            with get_chat_conn(cid) as conn:
+                row = conn.execute("SELECT COUNT(*) as cnt FROM chat_history").fetchone()
+                if row and row["cnt"] > 0:
+                    has_history = True
+                    break
+        except Exception:
+            pass
     return {
         "needs_onboarding": not completed and (not has_key or not has_history),
         "has_api_key": has_key,
@@ -307,35 +321,60 @@ class FullResetConfirm(BaseModel):
 
 @router.post("/full-reset")
 async def full_reset(data: FullResetConfirm = FullResetConfirm()):
-    """完全重置：清除所有数据，重新触发引导。"""
+    """完全重置：清除所有数据（主库 + 所有角色库），重新触发引导。"""
     if not data.confirm:
         return {"status": "error", "message": "请确认重置操作"}
-    from core.db import get_conn, clear_chat_history, clear_config_cache
+    from core.db import get_conn, clear_chat_history, clear_config_cache, get_chat_conn
     from core.relationship import invalidate_relationship_cache
     from core.llm_provider import clear_provider_cache
-    # 1. 清除聊天记录
-    clear_chat_history()
-    # 2. 清除所有提醒、日程、待办、笔记、倒计时、目标
+    from core.character_card import CharacterCard
     errors = []
+
+    # 收集所有角色 ID
+    all_cids = {0}
+    try:
+        for c in CharacterCard.list_all():
+            cid = c.get("id", 0) if isinstance(c, dict) else 0
+            if cid:
+                all_cids.add(cid)
+    except Exception:
+        pass
+
+    # 1. 清除聊天记录 + 2. per-character 表（遍历所有角色库）
+    for cid in all_cids:
+        clear_chat_history(character_id=cid)
+        with get_chat_conn(cid) as conn:
+            cursor = conn.cursor()
+            for table in ["goal_tracking", "pending_goals", "relationship",
+                           "emotion_daily", "emotion_log", "ai_personality_traits",
+                           "tiered_summary", "death_archive", "user_profile",
+                           "memory", "entities", "knowledge_graph",
+                           "memory_history", "conversation_summary"]:
+                try:
+                    cursor.execute(f"DELETE FROM {table}")
+                except Exception as e:
+                    errors.append(f"char{cid}/{table}: {e}")
+
+    # 3. 清除主库全局表
     with get_conn() as conn:
         cursor = conn.cursor()
-        for table in ["countdowns", "goal_tracking",
-                       "emotion_daily", "relationship", "empathy_feedback", "favorites", "documents"]:
+        for table in ["countdowns", "empathy_feedback", "favorites", "documents",
+                       "user_activity_stats", "proactive_response_log", "proactive_flags",
+                       "ai_diary", "achievements", "demand_patterns"]:
             try:
                 cursor.execute(f"DELETE FROM {table}")
             except Exception as e:
-                errors.append(f"{table}: {e}")
-    # 3. 清除配置（保留 API 设置）
+                errors.append(f"global/{table}: {e}")
+
+    # 4. 清除配置（保留 API 设置）
     api_key = get_config("api_key", "")
     api_provider = get_config("api_provider", "")
     api_base_url = get_config("api_base_url", "")
     api_model = get_config("api_model", "")
     llm_provider = get_config("llm_provider", "")
-    # 删除所有配置（除了 API 相关和内部标记）
     with get_conn() as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM config WHERE key NOT IN ('api_key', 'api_provider', 'api_base_url', 'api_model', 'llm_provider', '_tiered_migration_done', '_default_presets_seeded')")
-    # 恢复 API 设置
     if api_key:
         set_config("api_key", api_key)
     if api_provider:
@@ -346,14 +385,13 @@ async def full_reset(data: FullResetConfirm = FullResetConfirm()):
         set_config("api_model", api_model)
     if llm_provider:
         set_config("llm_provider", llm_provider)
-    # 清除配置缓存（SQL DELETE 不经过 set_config，缓存不会自动失效）
     clear_config_cache()
     invalidate_relationship_cache()
     clear_provider_cache()
-    # 4. 清除向量存储
+
+    # 5. 清除向量存储
     try:
-        import shutil
-        import os
+        import shutil, os
         chroma_path = "data/chroma_db"
         if os.path.exists(chroma_path):
             shutil.rmtree(chroma_path)
@@ -361,19 +399,7 @@ async def full_reset(data: FullResetConfirm = FullResetConfirm()):
     except Exception as e:
         errors.append(f"chroma_db: {e}")
         logger.warning(f"[重置] 清除向量库失败: {e}")
-    # 5. 清除心路历程和其他数据
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        for table in ["emotion_log", "ai_personality_traits", "user_activity_stats",
-                       "proactive_response_log", "proactive_flags", "conversation_summary",
-                       "ai_diary", "achievements", "demand_patterns", "pending_goals",
-                       "sentence_index", "memory", "user_profile", "summary",
-                       "entities", "memory_history", "death_archive", "knowledge_graph",
-                       "memory_importance"]:
-            try:
-                cursor.execute(f"DELETE FROM {table}")
-            except Exception as e:
-                errors.append(f"{table}: {e}")
+
     if errors:
         return {"status": "partial", "message": f"重置完成，{len(errors)} 个表清理失败", "errors": errors}
     return {"status": "ok", "message": "完全重置完成，即将重新开始引导"}

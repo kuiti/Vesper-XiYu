@@ -21,28 +21,27 @@ def clear_profile_cache():
 
 
 def get_profile(character_id: int = 0):
-    """获取当前用户画像"""
-    mode = _get_profile_mode(character_id)
-    if mode == "isolated" and character_id:
-        from core.db import get_char_profile_conn
-        conn = get_char_profile_conn(character_id)
-        cursor = conn.cursor()
-        cursor.execute("SELECT key, value, confidence FROM user_profile WHERE key NOT LIKE '_fact_%'")
-        rows = cursor.fetchall()
-        return {r["key"]: {"value": r["value"], "confidence": r["confidence"]} for r in rows}
-    # 默认：聚合模式（共享库）
+    """从角色库获取用户画像（per-character）。
+
+    所有 user_profile 数据统一存在 get_chat_conn(character_id) 中，
+    与 MemoryProvider 共享同一存储，消除数据孤岛。
+    """
     global _profile_cache
-    with _profile_cache_lock:
-        if _profile_cache is not None:
-            return dict(_profile_cache)
-    with get_conn() as conn:
+    # 角色 0 的画像可缓存（多角色时每个角色独立，暂不缓存）
+    if not character_id:
+        with _profile_cache_lock:
+            if _profile_cache is not None:
+                return dict(_profile_cache)
+    from core.db import get_chat_conn
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT key, value, confidence FROM user_profile WHERE key NOT LIKE '_fact_%'")
         rows = cursor.fetchall()
-    cache = {r["key"]: {"value": r["value"], "confidence": r["confidence"]} for r in rows}
-    with _profile_cache_lock:
-        _profile_cache = cache
-    return dict(cache)
+    result = {r["key"]: {"value": r["value"], "confidence": r["confidence"]} for r in rows}
+    if not character_id:
+        with _profile_cache_lock:
+            _profile_cache = result
+    return result
 
 
 def _get_profile_mode(character_id: int = 0) -> str:
@@ -63,20 +62,20 @@ def _get_profile_mode(character_id: int = 0) -> str:
     return "aggregate"
 
 
-def extract_profile_from_messages():
-    """从最近对话批量提取用户画像信息"""
+def extract_profile_from_messages(character_id: int = 0):
+    """从角色库最近对话批量提取用户画像信息（per-character）"""
     api_key = get_config("api_key", "")
     if not api_key:
         return
 
-    recent = get_recent_chat_messages(100)
+    recent = get_recent_chat_messages(100, character_id=character_id)
     if not recent or len(recent) < 5:
         return
     user_msgs = [m["content"] for m in recent if m.get("role") == "user"]
     if len(user_msgs) < 5:
         return
 
-    existing = get_profile()
+    existing = get_profile(character_id=character_id)
     existing_str = "\n".join([f"{k}: {v['value']}" for k, v in existing.items()]) if existing else "无"
 
     prompt = f"""从以下用户消息中提取用户个人信息。只输出 JSON，不要解释。
@@ -116,43 +115,23 @@ def extract_profile_from_messages():
                 clean_data[k] = v
                 confidence_map[k] = 0.7
         if clean_data:
-            save_profile(clean_data, confidence_map)
+            save_profile(clean_data, confidence_map, character_id=character_id)
 
 
 def get_facts_context(max_facts=12, character_id=0):
-    """获取原子事实上下文，按类型标注注入，带时效性门控 + 置信度衰减。
-
-    时效性规则：
-    - temporality=event 超过 30 天 → 不自动注入
-    - temporality=temporary 超过 7 天 → 不自动注入
-    - 超过时效的仍可通过 vector search 检索到
-
-    置信度衰减：
-    - 旧事实的 importance 随时间自然衰减（0.998^days）
-    - 衰减后的 importance < 4 时不再自动注入
-    """
+    """获取原子事实上下文（per-character），按类型标注注入，带时效性门控 + 置信度衰减。"""
     from datetime import datetime as _dt
     now = _dt.now()
     from core.memory_curation import effective_importance as _eff_imp
+    from core.db import get_chat_conn
 
-    mode = _get_profile_mode(character_id)
-    if mode == "isolated" and character_id:
-        from core.db import get_char_profile_conn
-        conn = get_char_profile_conn(character_id)
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT value FROM user_profile WHERE key LIKE '_fact_%' ORDER BY extracted_at DESC LIMIT ?",
             (max_facts * 3,)
         )
         rows = cursor.fetchall()
-    else:
-        with get_conn() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT value FROM user_profile WHERE key LIKE '_fact_%' ORDER BY extracted_at DESC LIMIT ?",
-                (max_facts * 3,)
-            )
-            rows = cursor.fetchall()
 
     cat_labels = {
         "personal": "基本信息", "preference": "偏好",
@@ -243,17 +222,16 @@ def extract_entities_from_text(text: str) -> list:
     return entities
 
 
-def upsert_entity(entity_text: str, entity_type: str, memory_key: str):
-    """插入或更新实体，关联到记忆"""
+def upsert_entity(entity_text: str, entity_type: str, memory_key: str, character_id: int = 0):
+    """插入或更新实体（per-character），关联到记忆"""
     import hashlib
     entity_hash = hashlib.sha256(entity_text.lower().encode()).hexdigest()
-    with get_conn() as conn:
+    from core.db import get_chat_conn
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
-        # 检查是否已存在
         cursor.execute("SELECT id, linked_memories FROM entities WHERE entity_hash = ?", (entity_hash,))
         row = cursor.fetchone()
         if row:
-            # 更新：追加关联记忆
             try:
                 existing = set(json.loads(row["linked_memories"]) if row["linked_memories"] else [])
             except (json.JSONDecodeError, TypeError):
@@ -262,22 +240,22 @@ def upsert_entity(entity_text: str, entity_type: str, memory_key: str):
             cursor.execute("UPDATE entities SET linked_memories = ?, entity_type = ? WHERE id = ?",
                           (json.dumps(list(existing)), entity_type, row["id"]))
         else:
-            # 新建
             cursor.execute(
                 "INSERT INTO entities (entity_text, entity_type, entity_hash, linked_memories, created_at) VALUES (?, ?, ?, ?, ?)",
                 (entity_text, entity_type, entity_hash, json.dumps([memory_key]), datetime.now().isoformat())
             )
 
 
-def get_entity_context(query: str, max_entities: int = 5) -> str:
-    """从查询中提取实体，返回关联的上下文"""
+def get_entity_context(query: str, max_entities: int = 5, character_id: int = 0) -> str:
+    """从查询中提取实体（per-character），返回关联的上下文"""
     entities = extract_entities_from_text(query)
     if not entities:
         return ""
     contexts = []
-    with get_conn() as conn:
+    from core.db import get_chat_conn
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
-        for entity_text, entity_type in entities[:3]:  # 最多查 3 个实体
+        for entity_text, entity_type in entities[:3]:
             entity_hash = hashlib.sha256(entity_text.lower().encode()).hexdigest()
             cursor.execute("SELECT linked_memories FROM entities WHERE entity_hash = ?", (entity_hash,))
             row = cursor.fetchone()
@@ -286,8 +264,7 @@ def get_entity_context(query: str, max_entities: int = 5) -> str:
                     memory_keys = json.loads(row["linked_memories"])
                 except (json.JSONDecodeError, TypeError):
                     continue
-                # 获取关联记忆的内容
-                for mk in memory_keys[:2]:  # 每个实体最多取 2 条关联记忆
+                for mk in memory_keys[:2]:
                     cursor.execute("SELECT value FROM user_profile WHERE key = ?", (mk,))
                     mem = cursor.fetchone()
                     if mem:
@@ -298,36 +275,34 @@ def get_entity_context(query: str, max_entities: int = 5) -> str:
                             contexts.append(f"{entity_text}: {mem['value']}")
     if not contexts:
         return ""
-    return "【实体关联】\n" + "\n".join(contexts[:max_entities])
+    return "[Entity Context]\n" + "\n".join(contexts[:max_entities])
 
 
-def save_profile(data: dict, confidence_map: dict = None):
-    """保存画像条目（带置信度合并逻辑）"""
-    global _profile_cache
+def save_profile(data: dict, confidence_map: dict = None, character_id: int = 0):
+    """保存画像条目到角色库（per-character），带置信度合并逻辑。"""
     from datetime import datetime
-    with _profile_write_lock:  # 防并发写入
-        if confidence_map is None:
-            confidence_map = {k: 0.7 for k in data}
-        existing = get_profile()
-        now = datetime.now().isoformat()
-        with get_conn() as conn:
-            cursor = conn.cursor()
-            for key, value in data.items():
-                new_conf = confidence_map.get(key, 0.7)
-                old = existing.get(key)
-                if old:
-                    old_conf = old.get("confidence", 0.5)
-                    old_val = old.get("value", "")
-                    if old_val == str(value):
-                        final_conf = max(old_conf, new_conf)
-                        cursor.execute("REPLACE INTO user_profile (key, value, confidence, extracted_at) VALUES (?, ?, ?, ?)", (str(key), str(value), final_conf, now))
-                    elif new_conf > old_conf:
-                        cursor.execute("REPLACE INTO user_profile (key, value, confidence, extracted_at) VALUES (?, ?, ?, ?)", (str(key), str(value), new_conf, now))
-                else:
+    now = datetime.now().isoformat()
+    if confidence_map is None:
+        confidence_map = {k: 0.7 for k in data}
+    existing = get_profile(character_id=character_id)
+    from core.db import get_chat_conn
+    with get_chat_conn(character_id) as conn:
+        cursor = conn.cursor()
+        for key, value in data.items():
+            new_conf = confidence_map.get(key, 0.7)
+            old = existing.get(key)
+            if old:
+                old_conf = old.get("confidence", 0.5)
+                old_val = old.get("value", "")
+                if old_val == str(value):
+                    final_conf = max(old_conf, new_conf)
+                    cursor.execute("REPLACE INTO user_profile (key, value, confidence, extracted_at) VALUES (?, ?, ?, ?)", (str(key), str(value), final_conf, now))
+                elif new_conf > old_conf:
                     cursor.execute("REPLACE INTO user_profile (key, value, confidence, extracted_at) VALUES (?, ?, ?, ?)", (str(key), str(value), new_conf, now))
-        # 缓存失效移入锁内部，避免窗口期内读到旧缓存
-        with _profile_cache_lock:
-            _profile_cache = None
+            else:
+                cursor.execute("REPLACE INTO user_profile (key, value, confidence, extracted_at) VALUES (?, ?, ?, ?)", (str(key), str(value), new_conf, now))
+    # 缓存一致：存完后通知 profile_builder 缓存失效（如果主库有缓存）
+    clear_profile_cache()
 
 
 _CORE_PROFILE_KEYS = {
@@ -336,24 +311,21 @@ _CORE_PROFILE_KEYS = {
 }
 
 
-def cleanup_expired_profile(days: int = 90):
-    """清理超过指定天数的过期画像条目（保护核心身份字段和原子事实）"""
-    global _profile_cache
+def cleanup_expired_profile(days: int = 90, character_id: int = 0):
+    """清理指定角色超过指定天数的过期画像条目（保护核心身份字段和原子事实）"""
     from datetime import datetime, timedelta
     cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-    with get_conn() as conn:
+    from core.db import get_chat_conn
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
-        # 保护核心身份字段、原子事实、高置信度条目
         cursor.execute(
             "DELETE FROM user_profile WHERE extracted_at < ? "
             "AND key NOT IN ({}) AND key NOT LIKE '_fact_%'".format(",".join("?" * len(_CORE_PROFILE_KEYS))),
             [cutoff, *_CORE_PROFILE_KEYS],
         )
         deleted = cursor.rowcount
-    with _profile_cache_lock:
-        _profile_cache = None
     if deleted > 0:
-        logger.info(f"[画像] 清理 {deleted} 条过期条目（>{days}天）")
+        logger.info(f"[画像] 角色{character_id} 清理 {deleted} 条过期条目（>{days}天）")
     return deleted
 
 
@@ -398,9 +370,10 @@ def get_profile_context(character_id: int = 0):
     return "\n".join(parts)
 
 
-def clear_completed_plans():
-    """已完成的事件清除对应的计划和进行中状态"""
-    with get_conn() as conn:
+def clear_completed_plans(character_id: int = 0):
+    """已完成的事件清除对应的计划和进行中状态（per-character）"""
+    from core.db import get_chat_conn
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT key FROM user_profile WHERE key LIKE '_event_%'")
         done_events = [r["key"].replace("_event_", "") for r in cursor.fetchall()]
@@ -471,70 +444,59 @@ _IN_PROGRESS_REGEX = [
 ]
 
 
-def _save_profile_event(key: str, value: str, confidence: float = 0.9):
-    """写入 user_profile"""
-    with _profile_write_lock:
-        with get_conn() as conn:
-            cursor = conn.cursor()
-            now = datetime.now().isoformat()
-            cursor.execute(
-                "INSERT OR REPLACE INTO user_profile (key, value, confidence, extracted_at) VALUES (?, ?, ?, ?)",
-                (key, value, confidence, now)
-            )
-            conn.commit()
-        clear_profile_cache()
+def _save_profile_event(key: str, value: str, confidence: float = 0.9, character_id: int = 0):
+    """写入 user_profile（per-character）"""
+    from core.db import get_chat_conn
+    with get_chat_conn(character_id) as conn:
+        cursor = conn.cursor()
+        now = datetime.now().isoformat()
+        cursor.execute(
+            "INSERT OR REPLACE INTO user_profile (key, value, confidence, extracted_at) VALUES (?, ?, ?, ?)",
+            (key, value, confidence, now)
+        )
 
 
-def track_event_completion(user_message: str):
-    """检测用户是否完成某事件，写入 user_profile"""
+def track_event_completion(user_message: str, character_id: int = 0):
+    """检测用户是否完成某事件（per-character）"""
     import re
     for pattern in _COMPLETION_REGEX:
         if re.search(pattern, user_message):
             category = _categorize_event(user_message)
             key = f"_event_{category}"
-
-            with _profile_write_lock:
-                with get_conn() as conn:
-                    cursor = conn.cursor()
-                    now = datetime.now().isoformat()
-                    cursor.execute(
-                        "INSERT OR REPLACE INTO user_profile (key, value, confidence, extracted_at) VALUES (?, ?, ?, ?)",
-                        (key, f"已完成（{datetime.now().strftime('%m-%d')}）", 0.9, now)
-                    )
-                    conn.commit()
-                clear_profile_cache()
+            _save_profile_event(key, f"已完成（{datetime.now().strftime('%m-%d')}）", 0.9, character_id=character_id)
             return True
     return False
 
 
-def track_plan_intent(user_message: str):
-    """检测用户是否表达计划/意图，写入 user_profile"""
+def track_plan_intent(user_message: str, character_id: int = 0):
+    """检测用户是否表达计划/意图（per-character）"""
     import re
     for pattern in _PLAN_REGEX:
         if re.search(pattern, user_message):
             category = _categorize_event(user_message)
-            _save_profile_event(f"_plan_{category}", f"计划中（{datetime.now().strftime('%m-%d')}）", 0.85)
+            _save_profile_event(f"_plan_{category}", f"计划中（{datetime.now().strftime('%m-%d')}）", 0.85, character_id=character_id)
             return True
     return False
 
 
-def track_in_progress(user_message: str):
-    """检测用户是否正在做某事"""
+def track_in_progress(user_message: str, character_id: int = 0):
+    """检测用户是否正在做某事（per-character）"""
     import re
     for pattern in _IN_PROGRESS_REGEX:
         if re.search(pattern, user_message):
             category = _categorize_event(user_message)
-            _save_profile_event(f"_progress_{category}", f"进行中（{datetime.now().strftime('%m-%d')}）", 0.85)
+            _save_profile_event(f"_progress_{category}", f"进行中（{datetime.now().strftime('%m-%d')}）", 0.85, character_id=character_id)
             return True
     return False
 
 
 # ─── 兼容 memory_table（已合并至此） ───
 
-def get_table_content() -> list:
-    """获取表格内容（用于注入 prompt）"""
+def get_table_content(character_id: int = 0) -> list:
+    """获取表格内容（per-character，用于注入 prompt）"""
     rows = []
-    with get_conn() as conn:
+    from core.db import get_chat_conn
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT key, value FROM user_profile WHERE confidence >= 0.6 AND key NOT LIKE '_fact_%' AND key NOT LIKE '_%' LIMIT 15"
@@ -544,9 +506,9 @@ def get_table_content() -> list:
     return rows
 
 
-def get_table_prompt() -> str:
-    """生成表格格式的 prompt 注入文本"""
-    rows = get_table_content()
+def get_table_prompt(character_id: int = 0) -> str:
+    """生成表格格式的 prompt 注入文本（per-character）"""
+    rows = get_table_content(character_id=character_id)
     if not rows:
         return ""
     table = "【关于你的信息】\n"
@@ -555,10 +517,11 @@ def get_table_prompt() -> str:
     return table
 
 
-def edit_table_row(key: str, value: str):
-    """用户手动编辑表格行（写 user_profile 表，非 config）"""
+def edit_table_row(key: str, value: str, character_id: int = 0):
+    """用户手动编辑表格行（per-character）"""
     from datetime import datetime
-    with get_conn() as conn:
+    from core.db import get_chat_conn
+    with get_chat_conn(character_id) as conn:
         conn.execute(
             "REPLACE INTO user_profile (key, value, confidence, extracted_at) VALUES (?, ?, ?, ?)",
             (key, value, 0.9, datetime.now().isoformat())

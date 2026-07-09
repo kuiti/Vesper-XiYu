@@ -1,6 +1,6 @@
-"""记忆管理 API — 提供手动记忆、记忆保险箱、AI日记、今日学习等功能。"""
-from fastapi import APIRouter
-from core.db import get_memory, set_memory, delete_memory
+"""记忆管理 API — 提供手动记忆、记忆保险箱、AI日记、今日学习等功能（per-character）。"""
+from fastapi import APIRouter, Query
+from core.db import get_memory, set_memory, delete_memory, get_chat_conn
 from pydantic import BaseModel
 from typing import Dict
 import json as _json
@@ -39,120 +39,80 @@ class MemoryItem(BaseModel):
     value: str
 
 @router.get("/")
-async def list_memory() -> Dict[str, str]:
-    """获取所有手动记忆（过滤内部下划线开头的）"""
-    all_mem = get_memory()
-    # 只返回不以 _ 开头的（用户手动记忆）
+async def list_memory(character_id: int = Query(0, description="角色 ID，默认 0")) -> Dict[str, str]:
+    """获取手动记忆（per-character）"""
+    all_mem = get_memory(character_id=character_id)
     return {k: v for k, v in all_mem.items() if not k.startswith("_")}
 
 @router.post("/")
-async def add_memory(item: MemoryItem):
-    """添加或更新一条手动记忆。"""
-    set_memory(item.key, item.value)
+async def add_memory(item: MemoryItem,
+                     character_id: int = Query(0, description="角色 ID，默认 0")):
+    """添加或更新一条手动记忆（per-character）"""
+    set_memory(item.key, item.value, character_id=character_id)
     return {"status": "ok"}
 
 @router.delete("/{key}")
-async def remove_memory(key: str):
-    """删除指定 key 的手动记忆。"""
-    delete_memory(key)
+async def remove_memory(key: str,
+                        character_id: int = Query(0, description="角色 ID，默认 0")):
+    """删除指定 key 的手动记忆（per-character）"""
+    delete_memory(key, character_id=character_id)
     return {"status": "ok"}
 
 @router.get("/vault")
-async def memory_vault():
-    """记忆保险箱：AI 记住的关于用户的所有信息"""
-    from core.db import get_conn, get_active_tiered_summaries, get_all_active_keypoints
+async def memory_vault(character_id: int = Query(0, description="角色 ID，默认 0")):
+    """记忆保险箱（per-character）"""
+    from core.db import get_active_tiered_summaries, get_all_active_keypoints, get_char_config
     import json
-    # 用户画像（不含原子事实和事件追踪key）
-    with get_conn() as conn:
+
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
+        # 用户画像
         cursor.execute("SELECT key, value, confidence, extracted_at FROM user_profile WHERE key NOT LIKE '_fact_%' AND key NOT LIKE '_event_%' AND key NOT LIKE '_plan_%' AND key NOT LIKE '_progress_%' ORDER BY confidence DESC")
         profile = [{"key": _human_label(r["key"]), "raw_key": r["key"], "value": _human_value(r["value"]), "confidence": r["confidence"], "extracted_at": r["extracted_at"]} for r in cursor.fetchall()]
-    # 原子事实
-    facts = []
-    with get_conn() as conn:
-        cursor = conn.cursor()
+        # 原子事实
+        facts = []
         cursor.execute("SELECT key, value, confidence, extracted_at FROM user_profile WHERE key LIKE '_fact_%' ORDER BY extracted_at DESC")
         for r in cursor.fetchall():
             try:
                 d = json.loads(r["value"])
-                facts.append({
-                    "key": r["key"],
-                    "text": d.get("text", ""),
-                    "category": d.get("category", ""),
-                    "importance": d.get("importance", 5),
-                    "confidence": r["confidence"],
-                    "extracted_at": r["extracted_at"],
-                })
+                facts.append({"key": r["key"], "text": d.get("text", ""), "category": d.get("category", ""), "importance": d.get("importance", 5), "confidence": r["confidence"], "extracted_at": r["extracted_at"]})
             except Exception as e:
                 silent_exc("memory_vault", e)
-    # 实体
-    entities = []
-    with get_conn() as conn:
-        cursor = conn.cursor()
+        # 实体
+        entities = []
         cursor.execute("SELECT entity_text, entity_type, linked_memories, created_at FROM entities ORDER BY created_at DESC LIMIT 50")
         for r in cursor.fetchall():
             try:
                 linked = json.loads(r["linked_memories"]) if r["linked_memories"] else []
             except Exception:
                 linked = []
-            entities.append({
-                "text": r["entity_text"],
-                "type": r["entity_type"],
-                "linked_count": len(linked),
-                "created_at": r["created_at"],
-            })
-    # 知识图谱
-    knowledge = []
-    with get_conn() as conn:
-        cursor = conn.cursor()
+            entities.append({"text": r["entity_text"], "type": r["entity_type"], "linked_count": len(linked), "created_at": r["created_at"]})
+        # 知识图谱
+        knowledge = []
         cursor.execute("SELECT subject, predicate, object, confidence FROM knowledge_graph ORDER BY confidence DESC LIMIT 30")
         for r in cursor.fetchall():
-            knowledge.append({
-                "subject": r["subject"],
-                "predicate": r["predicate"],
-                "object": r["object"],
-                "confidence": r["confidence"],
-            })
-    # 工作记忆
-    scratch = {}
-    with get_conn() as conn:
-        cursor = conn.cursor()
+            knowledge.append({"subject": r["subject"], "predicate": r["predicate"], "object": r["object"], "confidence": r["confidence"]})
+        # 工作记忆（per-character config）
+        scratch = {}
         for key in ["_scratch_currently", "_scratch_mood", "_scratch_goal"]:
-            cursor.execute("SELECT value FROM config WHERE key = ?", (key,))
-            row = cursor.fetchone()
-            if row and row["value"]:
-                scratch[key.replace("_scratch_", "")] = row["value"]
-    # 滚动摘要
-    rolling = ""
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM config WHERE key = '_rolling_summary'")
-        row = cursor.fetchone()
-        if row:
-            rolling = row["value"]
-    # 关键信息
-    keypoints = get_all_active_keypoints()
-    # 摘要
-    summaries = [s["summary"] for s in (get_active_tiered_summaries() or [])]
-    return {
-        "profile": profile,
-        "facts": facts,
-        "entities": entities,
-        "knowledge": knowledge,
-        "scratch": scratch,
-        "rolling_summary": rolling,
-        "keypoints": keypoints,
-        "summaries": summaries,
-    }
+            val = get_char_config(key, character_id=character_id, default="")
+            if val:
+                scratch[key.replace("_scratch_", "")] = val
+        # 滚动摘要（per-character config）
+        rolling = get_char_config("_rolling_summary", character_id=character_id, default="")
+
+    keypoints = get_all_active_keypoints(character_id=character_id)
+    summaries = [s["summary"] for s in (get_active_tiered_summaries(character_id=character_id) or [])]
+    return {"profile": profile, "facts": facts, "entities": entities, "knowledge": knowledge, "scratch": scratch, "rolling_summary": rolling, "keypoints": keypoints, "summaries": summaries}
 
 @router.delete("/vault/{vtype}")
-async def delete_memory_item(vtype: str, key: str = ""):
-    """删除特定类型的记忆（key 通过 query 参数传递，避免路径编码问题）"""
-    from core.db import get_conn
+async def delete_memory_item(vtype: str, key: str = "",
+                             character_id: int = Query(0, description="角色 ID，默认 0")):
+    """删除特定类型的记忆（per-character）"""
     if vtype == "profile":
         if not key:
             return {"status": "error", "message": "key 不能为空"}
-        with get_conn() as conn:
+        with get_chat_conn(character_id) as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM user_profile WHERE key=?", (key,))
             # 清理关联的实体记录

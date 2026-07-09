@@ -195,7 +195,23 @@ def setup_default_jobs():
                     logger.debug(f"[维护] 角色{cid} 记忆巩固 {n_mem} 条")
             except Exception as e:
                 logger.warning(f"[维护] 角色{cid} 记忆巩固失败: {e}")
+            try:
+                from core.memory_consolidation import consolidate_memories
+                result = consolidate_memories(character_id=cid)
+                if result and result.get("consolidated", 0) > 0:
+                    logger.info(f"[维护] 记忆合并: {result['report']}")
+            except Exception as e:
+                logger.warning(f"[维护] 记忆合并失败: {e}")
         logger.info(f"[维护] 完成 {len(_enumerate_character_ids())} 个角色: decay={total_decayed} mention_clean={total_cleaned} corr_clean={total_corr}")
     add_cron_job(_maintenance_job, hour=4, minute=30, job_id="daily_maintenance")
 
-    logger.info("[调度器] 已设置默认任务: 日记(23点) + 清理(周日4点) + 维护(每日4:30)")
+    # 每日 3:00 性格演化兜底（即使当天无人发消息也能运行）
+    def _evolution_cron():
+        try:
+            from core.emotion_evolution import process_daily_evolution
+            process_daily_evolution()
+        except Exception as e:
+            logger.warning(f"[性格演化] 定时执行失败: {e}")
+    add_cron_job(_evolution_cron, hour=3, minute=0, job_id="daily_evolution")
+
+    logger.info("[调度器] 已设置默认任务: 日记(23点) + 清理(周日4点) + 维护(每日4:30) + 性格演化(3:00)")

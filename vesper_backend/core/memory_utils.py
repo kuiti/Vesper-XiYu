@@ -1,21 +1,19 @@
-# core/memory_utils.py — 记忆筛选工具
+# core/memory_utils.py — 记忆筛选工具（per-character）
 """记忆筛选工具：提供安全的记忆条目检索和用户偏好提取功能。"""
 
-from core.db import get_conn
+from core.db import get_chat_conn
 import random
 
 
-def get_safe_memories(limit: int = 3) -> list:
-    """筛选高置信度、非敏感的 memory 条目，返回内容列表。
-    排除明显是敏感信息的 key（密码、密钥、token、身份证号等）。
-    """
+def get_safe_memories(limit: int = 3, character_id: int = 0) -> list:
+    """筛选高置信度、非敏感的 memory 条目（per-character）。"""
     sensitive_patterns = [
         "密码", "password", "密钥", "secret", "token", "api_key",
         "身份证", "银行卡", "手机号", "地址", "电话", "email", "邮箱",
         "账号", "账户", "pass", "credential", "private",
     ]
 
-    with get_conn() as conn:
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT key, value FROM memory ORDER BY updated_at DESC LIMIT 200"
@@ -40,9 +38,9 @@ def get_safe_memories(limit: int = 3) -> list:
     return random.sample(candidates, limit)
 
 
-def get_user_preferences() -> list:
-    """从 user_profile 表提取偏好类信息（喜欢/不喜欢/习惯）"""
-    with get_conn() as conn:
+def get_user_preferences(character_id: int = 0) -> list:
+    """从角色库 user_profile 提取偏好类信息（per-character）"""
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT key, value FROM user_profile WHERE confidence >= 0.5 ORDER BY extracted_at DESC LIMIT 20"

@@ -17,16 +17,25 @@ router = APIRouter(prefix="/characters", tags=["characters"])
 @router.get("/")
 async def list_characters():
     """列出所有已保存的角色卡"""
-    names = CharacterCard.list_all()
+    char_list = CharacterCard.list_all()
     cards = []
-    for name in names:
-        card = CharacterCard.load_from_db(name)
+    for entry in char_list:
+        cid = entry.get("id", 0) if isinstance(entry, dict) else entry
+        card = CharacterCard.load_from_db(cid)
         if card:
+            settings = card.data.get("settings", {}) or {}
+            if isinstance(settings, str):
+                try:
+                    import json
+                    settings = json.loads(settings)
+                except Exception:
+                    settings = {}
+            tone = settings.get("tone") or card.data.get("personality", {}).get("tone", "冷静")
             cards.append({
                 "name": card.name,
                 "description": card.data.get("description", "")[:80],
                 "tags": card.data.get("tags", []),
-                "tone": card.sakura.get("tone", "冷静"),
+                "tone": tone,
             })
     return {"characters": cards}
 

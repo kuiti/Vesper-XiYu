@@ -15,6 +15,8 @@ import json
 import base64
 import struct
 import zlib
+import threading
+import time
 from datetime import datetime
 from typing import Optional
 from core.db import get_config, set_config, get_conn
@@ -121,6 +123,7 @@ class CharacterCard:
 
     def __init__(self, data: dict = None):
         self.data = data or self._default()
+        self._db_id = None
         self._ensure_spec()
 
     @staticmethod
@@ -181,6 +184,14 @@ class CharacterCard:
     def sakura(self) -> dict:
         """夕语扩展字段"""
         return self.data.setdefault("extensions", {}).setdefault("sakura", {})
+
+    @property
+    def system_prompt(self) -> str:
+        return self.data.get("system_prompt", "")
+
+    @property
+    def description(self) -> str:
+        return self.data.get("description", "")
 
     # ─── 导入/导出 ───
 
@@ -294,44 +305,181 @@ class CharacterCard:
         obj = parse_ai_background(bg)
         return obj.get(key, default)
 
-    # ─── 持久化 ───
+    # ─── 持久化（characters_v2 表）───
 
-    def save_to_db(self, card_name: str = None):
-        """保存到 SQLite characters 表"""
+    def save_to_db(self, card_name: str = None) -> int:
+        """保存到 characters_v2 表，返回 id"""
         name = card_name or self.name
         now = datetime.now().isoformat()
         with get_conn() as conn:
             cursor = conn.cursor()
+            cursor.execute("SELECT id FROM characters_v2 WHERE name = ?", (name,))
+            existing = cursor.fetchone()
+            if existing:
+                cursor.execute(
+                    """UPDATE characters_v2 SET description=?, personality=?, scenario=?,
+                       first_mes=?, mes_example=?, system_prompt=?, post_history_instructions=?,
+                       creator_notes=?, tags=?, card_data=?, updated_at=? WHERE id=?""",
+                    (self.data.get("description", ""), self.data.get("personality", ""),
+                     self.data.get("scenario", ""), self.data.get("first_mes", ""),
+                     self.data.get("mes_example", ""), self.data.get("system_prompt", ""),
+                     self.data.get("post_history_instructions", ""),
+                     self.data.get("creator_notes", ""),
+                     json.dumps(self.data.get("tags", []), ensure_ascii=False),
+                     self.to_json(indent=None), now, existing["id"])
+                )
+                self._db_id = existing["id"]
+                return existing["id"]
+            else:
+                cursor.execute(
+                    """INSERT INTO characters_v2 (name, description, personality, scenario,
+                       first_mes, mes_example, system_prompt, post_history_instructions,
+                       creator_notes, tags, card_data, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (name, self.data.get("description", ""), self.data.get("personality", ""),
+                     self.data.get("scenario", ""), self.data.get("first_mes", ""),
+                     self.data.get("mes_example", ""), self.data.get("system_prompt", ""),
+                     self.data.get("post_history_instructions", ""),
+                     self.data.get("creator_notes", ""),
+                     json.dumps(self.data.get("tags", []), ensure_ascii=False),
+                     self.to_json(indent=None), now, now)
+                )
+                self._db_id = cursor.lastrowid
+                return self._db_id
+
+    def update_db(self, char_id: int):
+        """更新 characters_v2 指定 id 的卡片"""
+        now = datetime.now().isoformat()
+        with get_conn() as conn:
+            cursor = conn.cursor()
             cursor.execute(
-                "INSERT OR REPLACE INTO characters (name, data, updated_at) VALUES (?, ?, ?)",
-                (name, self.to_json(indent=None), now)
+                """UPDATE characters_v2 SET description=?, personality=?, scenario=?,
+                   first_mes=?, mes_example=?, system_prompt=?, post_history_instructions=?,
+                   creator_notes=?, tags=?, card_data=?, updated_at=? WHERE id=?""",
+                (self.data.get("description", ""), self.data.get("personality", ""),
+                 self.data.get("scenario", ""), self.data.get("first_mes", ""),
+                 self.data.get("mes_example", ""), self.data.get("system_prompt", ""),
+                 self.data.get("post_history_instructions", ""),
+                 self.data.get("creator_notes", ""),
+                 json.dumps(self.data.get("tags", []), ensure_ascii=False),
+                 self.to_json(indent=None), now, char_id)
             )
 
     @classmethod
-    def load_from_db(cls, card_name: str) -> Optional["CharacterCard"]:
-        """从 SQLite characters 表加载"""
+    def load_from_db(cls, key) -> Optional["CharacterCard"]:
+        """从 characters_v2 表加载（key 可以是 int id 或 str name）"""
         with get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT data FROM characters WHERE name = ?", (card_name,))
+            if isinstance(key, int):
+                cursor.execute("SELECT id, card_data FROM characters_v2 WHERE id = ?", (key,))
+            else:
+                cursor.execute("SELECT id, card_data FROM characters_v2 WHERE name = ?", (key,))
             row = cursor.fetchone()
         if row:
-            return cls(json.loads(row["data"]))
+            card = cls(json.loads(row["card_data"]))
+            card._db_id = row["id"]
+            return card
+        # 回退到旧 characters 表（按 name）
+        if not isinstance(key, int):
+            with get_conn() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT data FROM characters WHERE name = ?", (key,))
+                row = cursor.fetchone()
+            if row:
+                return cls(json.loads(row["data"]))
         return None
 
     @classmethod
-    def list_all(cls) -> list[str]:
-        """列出所有保存的角色卡名"""
+    def list_all(cls) -> list[dict]:
+        """列出所有保存的角色卡（返回 {id, name, description, ...} 列表）"""
         with get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT name FROM characters ORDER BY updated_at DESC")
-            return [r["name"] for r in cursor.fetchall()]
+            cursor.execute(
+                "SELECT id, name, description, personality, scenario, "
+                "first_mes, system_prompt, card_data, created_at, updated_at "
+                "FROM characters_v2 ORDER BY updated_at DESC"
+            )
+            return [dict(r) for r in cursor.fetchall()]
 
     @classmethod
-    def delete(cls, card_name: str):
-        """删除角色卡"""
+    def delete(cls, key):
+        """删除角色卡（key 可以是 int id 或 str name）"""
         with get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM characters WHERE name = ?", (card_name,))
+            if isinstance(key, int):
+                cursor.execute("DELETE FROM characters_v2 WHERE id = ?", (key,))
+            else:
+                cursor.execute("DELETE FROM characters_v2 WHERE name = ?", (key,))
+                cursor.execute("DELETE FROM characters WHERE name = ?", (key,))
+
+    # ─── 激活管理 ───
+
+    _active_cache: dict = {}
+    _active_cache_lock = threading.Lock()
+
+    @classmethod
+    def get_active(cls) -> Optional["CharacterCard"]:
+        """获取当前激活的角色卡（5 秒缓存 TTL）"""
+        now = time.time()
+        with cls._active_cache_lock:
+            cached = cls._active_cache.get("card")
+            cached_time = cls._active_cache.get("time", 0)
+            if cached is not None and now - cached_time < 5:
+                return cached
+        # 缓存失效或不存在，重新加载
+        card_name = get_config("_active_character_card", "")
+        if not card_name:
+            return None
+        loaded = cls.load_from_db(card_name)
+        with cls._active_cache_lock:
+            cls._active_cache["card"] = loaded
+            cls._active_cache["time"] = now
+        return loaded
+
+    @classmethod
+    def activate(cls, char_id: int):
+        """激活指定角色的卡片，同时取消其他卡的激活状态"""
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE characters_v2 SET is_active = 0 WHERE is_active = 1")
+            cursor.execute("UPDATE characters_v2 SET is_active = 1 WHERE id = ?", (char_id,))
+            cursor.execute("SELECT name FROM characters_v2 WHERE id = ?", (char_id,))
+            row = cursor.fetchone()
+        if row:
+            set_config("_active_character_card", row["name"])
+        with cls._active_cache_lock:
+            cls._active_cache = {}
+
+    @classmethod
+    def deactivate_all(cls):
+        """取消所有角色卡的激活状态"""
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE characters_v2 SET is_active = 0 WHERE is_active = 1")
+        set_config("_active_character_card", "")
+        with cls._active_cache_lock:
+            cls._active_cache = {}
+
+    @classmethod
+    def is_feature_enabled(cls, feature: str) -> bool:
+        """检查角色卡是否启用某个 feature（如 milestones）"""
+        active = cls.get_active()
+        if not active:
+            return False
+        features = active.data.get("features", {})
+        if isinstance(features, dict):
+            return features.get(feature, False)
+        return False
 
 
+# ─── 模块级辅助函数 ───
 
+def get_active_character_id() -> int:
+    """获取当前激活角色的 id（0 表示默认/无角色卡）"""
+    try:
+        card = CharacterCard.get_active()
+        if card and card._db_id:
+            return card._db_id
+    except Exception:
+        pass
+    return 0

@@ -1,9 +1,9 @@
-"""知识库管理 API —— 文档上传、解析、向量化索引与检索。"""
+"""知识库管理 API —— 文档上传、解析、向量化索引与检索（per-character）。"""
 import logging
 import os
 
-from fastapi import APIRouter, UploadFile, File
-from core.db import add_document, get_documents, delete_document, get_conn
+from fastapi import APIRouter, UploadFile, File, Query
+from core.db import add_document, get_documents, delete_document, get_chat_conn
 from core.vector_store import chunk_text, add_document_vectors, delete_document_vectors, is_model_ready
 
 logger = logging.getLogger(__name__)
@@ -84,11 +84,20 @@ def _flush_pending_index():
     if not _pending_index or not is_model_ready():
         return
     doc_ids = [item[0] for item in _pending_index]
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        placeholders = ",".join("?" * len(doc_ids))
-        cursor.execute(f"SELECT id, filename FROM documents WHERE id IN ({placeholders})", doc_ids)
-        id_to_file = {r["id"]: r["filename"] for r in cursor.fetchall()}
+    # 从所有角色库查找文档名（_pending_index 存储时已带 character_id）
+    id_to_file = {}
+    for cid in range(10):  # 查前 10 个角色
+        try:
+            with get_chat_conn(cid) as conn:
+                cursor = conn.cursor()
+                placeholders = ",".join("?" * len(doc_ids))
+                cursor.execute(f"SELECT id, filename FROM documents WHERE id IN ({placeholders})", doc_ids)
+                for r in cursor.fetchall():
+                    id_to_file[r["id"]] = r["filename"]
+            if len(id_to_file) == len(doc_ids):
+                break
+        except Exception:
+            pass
     flushed = []
     remaining = []
     for doc_id, text in _pending_index:
@@ -109,8 +118,9 @@ def _flush_pending_index():
 
 
 @router.post("/upload")
-async def upload_knowledge(file: UploadFile = File(...)):
-    """上传知识库文档，自动解析文本并建立向量索引。"""
+async def upload_knowledge(file: UploadFile = File(...),
+                          character_id: int = Query(0, description="角色 ID，默认 0")):
+    """上传知识库文档到指定角色（per-character）。"""
     if not file.filename:
         return {"status": "error", "message": "未选择文件"}
     safe_name = os.path.basename(file.filename)
@@ -146,10 +156,10 @@ async def upload_knowledge(file: UploadFile = File(...)):
 
     size = os.path.getsize(filepath)
     chunks = chunk_text(text)
-    doc_id = add_document(file.filename, len(chunks), size)
+    doc_id = add_document(file.filename, len(chunks), size, character_id=character_id)
 
     if is_model_ready():
-        count = add_document_vectors(doc_id, chunks, file.filename)
+        count = add_document_vectors(doc_id, chunks, file.filename, character_id=character_id)
     else:
         count = 0
         _pending_index.append((doc_id, text[:200000] if len(text) > 200000 else text))
@@ -158,19 +168,19 @@ async def upload_knowledge(file: UploadFile = File(...)):
 
 
 @router.get("/")
-async def list_knowledge():
-    """列出所有知识库文档及向量模型状态。"""
+async def list_knowledge(character_id: int = Query(0, description="角色 ID，默认 0")):
+    """列出指定角色的知识库文档。"""
     _flush_pending_index()
-    docs = get_documents()
+    docs = get_documents(character_id=character_id)
     return {"documents": docs, "model_ready": is_model_ready()}
 
 
 @router.delete("/{doc_id}")
-async def remove_knowledge(doc_id: int):
-    """删除指定知识库文档及其向量索引。"""
+async def remove_knowledge(doc_id: int,
+                          character_id: int = Query(0, description="角色 ID，默认 0")):
+    """删除指定角色知识库文档及其向量索引。"""
     _pending_index[:] = [(did, txt) for did, txt in _pending_index if did != doc_id]
-    # 先查文件名再删记录
-    with get_conn() as conn:
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT filename FROM documents WHERE id = ?", (doc_id,))
         row = cursor.fetchone()

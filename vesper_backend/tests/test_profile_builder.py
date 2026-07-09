@@ -42,7 +42,7 @@ class TestGetProfile:
         result = get_profile()
         assert result["name"]["value"] == "test"
 
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_fetches_from_db(self, mock_conn):
         import core.profile_builder as pb
         pb._profile_cache = None
@@ -57,7 +57,7 @@ class TestGetProfile:
         assert "name" in result
         assert result["name"]["value"] == "小明"
 
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_empty_db_returns_empty(self, mock_conn):
         import core.profile_builder as pb
         pb._profile_cache = None
@@ -75,7 +75,7 @@ class TestGetProfile:
 
 
 class TestSaveProfile:
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     @patch("core.profile_builder.get_profile", return_value={})
     def test_saves_new_entry(self, mock_get, mock_conn):
         mock_cursor = MagicMock()
@@ -87,7 +87,7 @@ class TestSaveProfile:
         call_args = mock_cursor.execute.call_args[0]
         assert 0.9 in call_args[1]
 
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     @patch("core.profile_builder.get_profile")
     def test_higher_confidence_overwrites(self, mock_get, mock_conn):
         """新置信度更高时应覆写。"""
@@ -98,7 +98,7 @@ class TestSaveProfile:
         save_profile({"city": "上海"}, {"city": 0.9})
         mock_cursor.execute.assert_called_once()
 
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     @patch("core.profile_builder.get_profile")
     def test_lower_confidence_keeps_old(self, mock_get, mock_conn):
         """新置信度更低时不应覆写。"""
@@ -109,7 +109,7 @@ class TestSaveProfile:
         save_profile({"city": "上海"}, {"city": 0.5})
         mock_cursor.execute.assert_not_called()
 
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     @patch("core.profile_builder.get_profile")
     def test_same_value_updates_confidence(self, mock_get, mock_conn):
         """相同值时取最高置信度。"""
@@ -129,7 +129,7 @@ class TestSaveProfile:
 
 
 class TestCleanupExpired:
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_deletes_old_entries(self, mock_conn):
         mock_cursor = MagicMock()
         mock_cursor.rowcount = 5
@@ -138,7 +138,7 @@ class TestCleanupExpired:
         deleted = cleanup_expired_profile(90)
         assert deleted == 5
 
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_custom_days(self, mock_conn):
         mock_cursor = MagicMock()
         mock_cursor.rowcount = 0
@@ -210,7 +210,7 @@ class TestGetProfileContext:
 
 
 class TestGetFactsContext:
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_empty_facts(self, mock_conn):
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = []
@@ -220,7 +220,7 @@ class TestGetFactsContext:
         mock_conn.return_value.__exit__.return_value = False
         assert get_facts_context() == ""
 
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_active_fact_included(self, mock_conn):
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = [
@@ -233,7 +233,7 @@ class TestGetFactsContext:
         result = get_facts_context()
         assert "用户喜欢猫" in result
 
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_inactive_fact_excluded(self, mock_conn):
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = [
@@ -246,7 +246,7 @@ class TestGetFactsContext:
         result = get_facts_context()
         assert "旧事实" not in result
 
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_low_importance_excluded(self, mock_conn):
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = [
@@ -259,7 +259,7 @@ class TestGetFactsContext:
         result = get_facts_context()
         assert "不重要的事" not in result
 
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_sorted_by_importance(self, mock_conn):
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = [
@@ -310,7 +310,7 @@ class TestExtractEntities:
 
 
 class TestTrackEventCompletion:
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_detects_completion(self, mock_conn):
         mock_cursor = MagicMock()
         mock_conn.return_value.__enter__ = MagicMock(return_value=MagicMock(cursor=MagicMock(return_value=mock_cursor)))
@@ -322,7 +322,7 @@ class TestTrackEventCompletion:
         result = track_event_completion("今天天气不错")
         assert result is False
 
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_detects_got_home(self, mock_conn):
         mock_cursor = MagicMock()
         mock_conn.return_value.__enter__ = MagicMock(return_value=MagicMock(cursor=MagicMock(return_value=mock_cursor)))
@@ -330,7 +330,7 @@ class TestTrackEventCompletion:
         result = track_event_completion("我到家了")
         assert result is True
 
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_detects_finished(self, mock_conn):
         mock_cursor = MagicMock()
         mock_conn.return_value.__enter__ = MagicMock(return_value=MagicMock(cursor=MagicMock(return_value=mock_cursor)))
@@ -345,7 +345,7 @@ class TestTrackEventCompletion:
 
 
 class TestTrackPlanIntent:
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_detects_plan(self, mock_conn):
         mock_cursor = MagicMock()
         mock_conn.return_value.__enter__ = MagicMock(return_value=MagicMock(cursor=MagicMock(return_value=mock_cursor)))
@@ -364,7 +364,7 @@ class TestTrackPlanIntent:
 
 
 class TestTrackInProgress:
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_detects_in_progress(self, mock_conn):
         mock_cursor = MagicMock()
         mock_conn.return_value.__enter__ = MagicMock(return_value=MagicMock(cursor=MagicMock(return_value=mock_cursor)))
@@ -408,7 +408,7 @@ class TestCategorizeEvent:
 
 
 class TestClearCompletedPlans:
-    @patch("core.profile_builder.get_conn")
+    @patch("core.db.get_chat_conn")
     def test_deletes_plans_for_done_events(self, mock_conn):
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = [

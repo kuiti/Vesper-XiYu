@@ -526,6 +526,8 @@ def _init_db_locked():
             ("episodes", "character_id", "INTEGER DEFAULT 0"),
             ("characters_v2", "settings", "TEXT DEFAULT '{}'"),
             ("memory_importance", "ignored_count", "INTEGER DEFAULT 0"),
+            ("sentence_index", "character_id", "INTEGER DEFAULT 0"),
+            ("consolidation_log", "character_id", "INTEGER DEFAULT 0"),
         ]
         for table, col, col_type in migrations:
             try:
@@ -719,6 +721,13 @@ def _init_chat_schema(conn):
             first_mentioned TEXT,
             last_mentioned TEXT,
             decayed_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS death_archive (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            original_id INTEGER, level INTEGER NOT NULL,
+            summary TEXT NOT NULL, key_points TEXT,
+            importance REAL, start_time TEXT, end_time TEXT,
+            created_at TEXT, archived_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_mention_weight ON mention_weights(weight DESC);
         CREATE TABLE IF NOT EXISTS correction_memory (
@@ -968,7 +977,7 @@ def get_chat_conn(character_id: int = 0):
                 except Exception:
                     pass
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            conn = sqlite3.connect(path, timeout=10)
+            conn = sqlite3.connect(path, timeout=10, check_same_thread=False)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA busy_timeout=5000")
@@ -1026,7 +1035,7 @@ def get_char_profile_conn(character_id: int):
                 except Exception:
                     pass
             os.makedirs(os.path.dirname(path), exist_ok=True)
-            conn = sqlite3.connect(path, timeout=10)
+            conn = sqlite3.connect(path, timeout=10, check_same_thread=False)
             conn.row_factory = sqlite3.Row
             _init_profile_schema(conn)
             _PROFILE_CONNS[path] = conn

@@ -59,7 +59,7 @@ class TestUpdateTrait:
         update_trait("openness", 0.1)
         # 应该写入 0.6
         mock_cursor.execute.assert_called_once()
-        written_val = mock_cursor.execute.call_args[0][1][0]
+        written_val = mock_cursor.execute.call_args[0][1][1]
         assert abs(written_val - 0.6) < 0.01
 
     @patch("core.emotion_evolution.get_trait", return_value=0.5)
@@ -70,7 +70,7 @@ class TestUpdateTrait:
         mock_conn.return_value.__enter__ = MagicMock(return_value=MagicMock(cursor=MagicMock(return_value=mock_cursor)))
         mock_conn.return_value.__exit__ = MagicMock(return_value=False)
         update_trait("openness", -0.1)
-        written_val = mock_cursor.execute.call_args[0][1][0]
+        written_val = mock_cursor.execute.call_args[0][1][1]
         assert abs(written_val - 0.4) < 0.01
 
     @patch("core.emotion_evolution.get_trait", return_value=0.95)
@@ -81,7 +81,7 @@ class TestUpdateTrait:
         mock_conn.return_value.__enter__ = MagicMock(return_value=MagicMock(cursor=MagicMock(return_value=mock_cursor)))
         mock_conn.return_value.__exit__ = MagicMock(return_value=False)
         update_trait("openness", 0.2)
-        written_val = mock_cursor.execute.call_args[0][1][0]
+        written_val = mock_cursor.execute.call_args[0][1][1]
         assert written_val == TRAIT_MAX
 
     @patch("core.emotion_evolution.get_trait", return_value=0.05)
@@ -92,7 +92,7 @@ class TestUpdateTrait:
         mock_conn.return_value.__enter__ = MagicMock(return_value=MagicMock(cursor=MagicMock(return_value=mock_cursor)))
         mock_conn.return_value.__exit__ = MagicMock(return_value=False)
         update_trait("openness", -0.2)
-        written_val = mock_cursor.execute.call_args[0][1][0]
+        written_val = mock_cursor.execute.call_args[0][1][1]
         assert written_val == TRAIT_MIN
 
     @patch("core.emotion_evolution.get_trait", return_value=0.5)

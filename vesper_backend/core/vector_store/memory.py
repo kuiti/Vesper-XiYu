@@ -9,8 +9,8 @@ from .bm25 import reset_bm25_cache
 logger = logging.getLogger(__name__)
 
 
-def add_sentence_vectors(msg_id: int, text: str, role: str = "user"):
-    """将消息按句拆分，批量嵌入存入 sentence_index 向量库，计算重要性，去重"""
+def add_sentence_vectors(msg_id: int, text: str, role: str = "user", character_id: int = 0):
+    """将消息按句拆分，批量嵌入存入 sentence_index 向量库，计算重要性，去重。"""
     if not is_model_ready():
         return
     sentences = split_sentences(text)
@@ -26,18 +26,19 @@ def add_sentence_vectors(msg_id: int, text: str, role: str = "user"):
         with get_conn() as conn:
             cursor = conn.cursor()
             for seq, (sentence, embedding) in enumerate(zip(sentences, embeddings)):
-                sid = f"s_{msg_id}_{seq}"
+                # ChromaDB key 加 character_id 前缀，避免多角色 msg_id 碰撞
+                sid = f"s_{character_id}_{msg_id}_{seq}"
 
                 # 去重检查
                 is_dup, existing_id, existing_doc = _check_duplicate(collection, embedding, sentence)
                 if is_dup and existing_id:
                     if len(sentence) > len(existing_doc):
-                        cursor.execute("UPDATE sentence_index SET content = ?, msg_id = ?, seq = ?, created_at = ? WHERE content = ?",
-                                      (sentence, msg_id, seq, now, existing_doc))
+                        cursor.execute("UPDATE sentence_index SET content = ?, msg_id = ?, seq = ?, character_id = ?, created_at = ? WHERE content = ?",
+                                      (sentence, msg_id, seq, character_id, now, existing_doc))
                         collection.upsert(
                             ids=[existing_id],
                             embeddings=[embedding],
-                            metadatas=[{"msg_id": msg_id, "seq": seq, "role": role, "text": sentence[:200]}],
+                            metadatas=[{"character_id": character_id, "msg_id": msg_id, "seq": seq, "role": role, "text": sentence[:200]}],
                             documents=[sentence]
                         )
                         importance = calculate_importance(sentence, role)
@@ -47,14 +48,14 @@ def add_sentence_vectors(msg_id: int, text: str, role: str = "user"):
                         logger.info(f"[去重] 跳过: {sentence[:30]} (已有更长版本)")
                     continue
 
-                cursor.execute("INSERT INTO sentence_index (msg_id, seq, content, created_at) VALUES (?, ?, ?, ?)",
-                              (msg_id, seq, sentence, now))
+                cursor.execute("INSERT INTO sentence_index (character_id, msg_id, seq, content, created_at) VALUES (?, ?, ?, ?, ?)",
+                              (character_id, msg_id, seq, sentence, now))
                 importance = calculate_importance(sentence, role)
                 set_memory_importance(sid, importance, now)
                 collection.upsert(
                     ids=[sid],
                     embeddings=[embedding],
-                    metadatas=[{"msg_id": msg_id, "seq": seq, "role": role, "text": sentence[:200]}],
+                    metadatas=[{"character_id": character_id, "msg_id": msg_id, "seq": seq, "role": role, "text": sentence[:200]}],
                     documents=[sentence]
                 )
     except Exception as e:
@@ -109,7 +110,7 @@ def add_memory_vector(key: str, value: str, meta: dict = None) -> bool:
         return False
 
 
-def delete_message_vectors(msg_id):
+def delete_message_vectors(msg_id, character_id: int = 0):
     """删除单条消息的向量（避免全量重建）"""
     if not is_model_ready():
         return
@@ -120,9 +121,9 @@ def delete_message_vectors(msg_id):
     except Exception as e:
         logger.warning(f"[向量删除] chat_memory: {e}")
     try:
-        # 句子索引集合：按 msg_id 过滤删除
+        # 句子索引集合：按 character_id + msg_id 过滤删除
         sent = get_collection("sentence_index")
-        results = sent.get(where={"msg_id": msg_id})
+        results = sent.get(where={"$and": [{"character_id": character_id}, {"msg_id": msg_id}]})
         if results and results['ids']:
             sent.delete(ids=results['ids'])
     except Exception as e:

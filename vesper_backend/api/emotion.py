@@ -55,10 +55,11 @@ async def emotion_profile(character_id: int = Query(0, ge=0)):
 
 
 @router.get("/events")
-async def emotion_events(limit: int = Query(50, ge=1, le=200)):
-    """情感事件日志"""
-    from core.db import get_conn
-    with get_conn() as conn:
+async def emotion_events(limit: int = Query(50, ge=1, le=200),
+                         character_id: int = Query(0, description="角色 ID，默认 0")):
+    """情感事件日志（per-character）"""
+    from core.db import get_chat_conn
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT timestamp, event_type, affection_delta, trust_delta, affection_after, trust_after, ai_emotion_after, reason FROM emotion_log ORDER BY timestamp DESC LIMIT ?",

@@ -70,7 +70,7 @@ def _update_access_batch(results: list):
         for item in results:
             meta = item[2] if len(item) > 2 else None
             if meta and meta.get("msg_id"):
-                sids.append(f"s_{meta['msg_id']}_{meta.get('seq', 0)}")
+                sids.append(f"s_{meta.get('character_id', 0)}_{meta['msg_id']}_{meta.get('seq', 0)}")
         if sids:
             from core.db import get_conn, update_memory_access
             if len(sids) <= 3:

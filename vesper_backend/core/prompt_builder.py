@@ -24,13 +24,14 @@ _CATEGORY_LABELS = {
 }
 
 
-def _get_user_summary() -> str:
-    """从画像和事实中生成按类型分组的用户摘要。不同类型用不同标题头，帮助 AI 区分哪些是永久事实、哪些需要跟进。"""
+def _get_user_summary(character_id: int = 0) -> str:
+    """从画像和事实中生成按类型分组的用户摘要（per-character）。"""
     import json as _json
     profile_items = {}
-    grouped_facts = {}  # category -> [(text, created_at, temporality)]
+    grouped_facts = {}
 
-    with get_conn() as conn:
+    from core.db import get_chat_conn
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT key, value, confidence FROM user_profile WHERE confidence >= 0.55 AND key NOT LIKE '_fact_%'")
         for r in cursor.fetchall():
@@ -104,17 +105,14 @@ def _get_user_summary() -> str:
             + "\n（自然地提起这些——像朋友记得对方的事。如果当前话题不相关，不提也行。）")
 
 
-def _get_memory_index() -> str:
-    """生成轻量记忆索引（5-8 行），让 AI 对话开始时快速了解自己知道什么。
-
-    类似 MEMORY.md 的索引结构：一行一条，标注类型。
-    不从零注入所有细节，而是给 AI 一个"目录"让它知道有什么可用。
-    """
+def _get_memory_index(character_id: int = 0) -> str:
+    """生成轻量记忆索引（per-character）。"""
     import json as _json
     lines = []
 
+    from core.db import get_chat_conn
     # 1. 基本信息（画像中最核心的 2-3 条）
-    with get_conn() as conn:
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT key, value FROM user_profile WHERE confidence >= 0.7 AND key NOT LIKE '_fact_%' AND key NOT LIKE '_%'")
         profile = {r["key"]: r["value"] for r in cursor.fetchall()}
@@ -126,7 +124,7 @@ def _get_memory_index() -> str:
         lines.append(f"[基本信息] {'/'.join(key_items[:3])}")
 
     # 2. 偏好（preference 类事实的简短摘要）
-    with get_conn() as conn:
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT value FROM user_profile WHERE key LIKE '_fact_%' ORDER BY extracted_at DESC LIMIT 30")
         prefs = []
@@ -146,10 +144,10 @@ def _get_memory_index() -> str:
     if events:
         lines.append(f"[事件] {'/'.join(events[:2])}")
 
-    # 3. 最近情景（最近一次 episode 的摘要）
+    # 3. 最近情景（最近一次 episode 的摘要，per-character）
     try:
         from core.episodic_memory import get_recent_episodes
-        recent = get_recent_episodes(limit=1)
+        recent = get_recent_episodes(limit=1, character_id=character_id)
         if recent and recent[0].get("topic_summary"):
             lines.append(f"[最近] {recent[0]['topic_summary'][:40]}")
     except Exception as e:
@@ -161,22 +159,21 @@ def _get_memory_index() -> str:
     return "【我知道的】\n- " + "\n- ".join(lines)
 
 
-def _get_onboarding_hint() -> str:
-    """引导入职（LobeChat 方案）：首次对话时主动了解用户"""
+def _get_onboarding_hint(character_id: int = 0) -> str:
+    """引导入职（per-character）：首次对话时主动了解用户"""
     # 检查是否已完成入职
     onboarding_done = get_config("_onboarding_done", "")
     if onboarding_done:
         return ""
-    # 检查已有画像数量
-    with get_conn() as conn:
+    # 检查已有画像数量（从角色库）
+    from core.db import get_chat_conn
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) as cnt FROM user_profile WHERE key NOT LIKE '_fact_%'")
         cnt = cursor.fetchone()["cnt"]
     if cnt >= 5:
-        # 画像足够，标记入职完成
         set_config("_onboarding_done", "true")
         return ""
-    # 入职阶段：温和引导，不主动追问隐私
     return """【入职提示】这是你和用户的早期对话。保持友好自然，用户主动分享时积极回应并用 declare_memory_intent 保存。不要主动追问用户的个人信息。"""
 
 

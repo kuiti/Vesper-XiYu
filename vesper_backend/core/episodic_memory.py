@@ -16,10 +16,10 @@ from core.db import get_conn, get_config, get_chat_conn
 logger = logging.getLogger(__name__)
 
 
-def _link_related_facts(user_msgs: list, max_facts: int = 3) -> list:
+def _link_related_facts(user_msgs: list, max_facts: int = 3, character_id: int = 0) -> list:
     """查找与用户消息相关的活跃原子事实，用词语重叠率匹配。"""
     try:
-        with get_conn() as conn:
+        with get_chat_conn(character_id) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT value FROM user_profile WHERE key LIKE '_fact_%' AND confidence >= 0.7 ORDER BY extracted_at DESC LIMIT 30"
@@ -94,7 +94,7 @@ def save_episode(start_time: str, end_time: str, messages: list,
     key_events = _extract_key_events(user_msgs)
 
     # 关联相关原子事实（来源追溯）
-    linked_facts = _link_related_facts(user_msgs)
+    linked_facts = _link_related_facts(user_msgs, character_id=character_id)
     if linked_facts:
         key_events.extend([f"(事实) {f}" for f in linked_facts])
 
@@ -259,11 +259,11 @@ def get_episode_timeline(days: int = 7, character_id: int = 0) -> list:
         return []
 
 
-def cleanup_old_episodes(retain_days: int = 30) -> int:
-    """清理超过 retain_days 天的旧情景记录。返回清理条数。"""
+def cleanup_old_episodes(retain_days: int = 30, character_id: int = 0) -> int:
+    """清理超过 retain_days 天的旧情景记录（per-character）。返回清理条数。"""
     try:
         cutoff = (datetime.now() - timedelta(days=retain_days)).isoformat()
-        with get_conn() as conn:
+        with get_chat_conn(character_id) as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM episodes WHERE start_time < ?", (cutoff,))
             return cursor.rowcount
@@ -287,7 +287,7 @@ def get_episode_context(query: str = "", limit: int = 3, character_id: int = 0) 
     if not episodes:
         return ""
 
-    parts = ["【记忆中的情景】"]
+    parts = ["[Memory Episodes]"]
     for ep in episodes:
         time_str = ep["start_time"][:16].replace("T", " ") if ep["start_time"] else "?"
         part = f"- {time_str}: {ep['topic_summary'] or '日常对话'}"
@@ -411,15 +411,14 @@ def _auto_emotion_summary(messages: list) -> str:
 def save_milestone(event_type: str, description: str, importance: float = 0.9, character_id: int = 0):
     """保存里程碑事件（如用户第一次提到某事），以高重要性情景记录。"""
     now = datetime.now().isoformat()
-    conn = get_chat_conn(character_id)
-    cursor = conn.cursor()
-    cursor.execute(
-        """INSERT INTO episodes (start_time, end_time, topic_summary, key_events, importance, user_message_count, ai_message_count)
-           VALUES (?, ?, ?, ?, ?, 1, 1)""",
-        (now, now, description,
-         json.dumps([f"[里程碑]{event_type}:{description}"], ensure_ascii=False), importance)
-    )
-    conn.commit()
+    with get_chat_conn(character_id) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """INSERT INTO episodes (start_time, end_time, topic_summary, key_events, importance, user_message_count, ai_message_count)
+               VALUES (?, ?, ?, ?, ?, 1, 1)""",
+            (now, now, description,
+             json.dumps([f"[里程碑]{event_type}:{description}"], ensure_ascii=False), importance)
+        )
 
 
 def recall_milestone(event_type: str, character_id: int = 0) -> str | None:

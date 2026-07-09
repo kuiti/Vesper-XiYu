@@ -18,34 +18,35 @@ from core.db import get_conn, get_config, set_config
 logger = logging.getLogger(__name__)
 
 
-def consolidate_memories() -> dict:
-    """执行记忆巩固，返回巩固报告。
+def consolidate_memories(character_id: int = 0) -> dict:
+    """执行记忆巩固，返回巩固报告（per-character）。
 
     Returns:
         {"consolidated": N, "cleaned": M, "report": "..."}
     """
     today = datetime.now().strftime("%Y-%m-%d")
 
-    # 检查今天是否已巩固
-    last_consolidation = get_config("_last_consolidation_date", "")
+    # 检查今天是否已巩固（per-character 隔离）
+    from core.db import get_char_config, set_char_config
+    last_consolidation = get_char_config("_last_consolidation_date", character_id=character_id, default="")
     if last_consolidation == today:
         return {"consolidated": 0, "cleaned": 0, "report": "今天已巩固"}
 
     try:
-        # Step 1: 扫描近期高重要性消息
-        consolidated = _consolidate_recent_important()
+        # Step 1: 扫描近期高重要性消息（传入 character_id）
+        consolidated = _consolidate_recent_important(character_id=character_id)
 
         # Step 2: 清理低价值短期记忆
-        cleaned = _cleanup_low_value_memories()
+        cleaned = _cleanup_low_value_memories(character_id=character_id)
 
         # Step 3: 生成报告
         report = f"巩固 {consolidated} 条重要记忆，清理 {cleaned} 条低价值记忆"
 
-        # 记录巩固日志
-        _log_consolidation(consolidated, cleaned, report)
+        # 记录巩固日志（含 character_id）
+        _log_consolidation(consolidated, cleaned, report, character_id=character_id)
 
-        set_config("_last_consolidation_date", today)
-        logger.info(f"[巩固] {report}")
+        set_char_config("_last_consolidation_date", today, character_id=character_id)
+        logger.info(f"[巩固] 角色{character_id}: {report}")
 
         return {"consolidated": consolidated, "cleaned": cleaned, "report": report}
 
@@ -54,7 +55,7 @@ def consolidate_memories() -> dict:
         return {"consolidated": 0, "cleaned": 0, "report": f"失败: {e}"}
 
 
-def _consolidate_recent_important() -> int:
+def _consolidate_recent_important(character_id: int = 0) -> int:
     """扫描最近 3 天的对话，将高重要性内容写入长期记忆。"""
     from core.vector_store import add_sentence_vectors, is_model_ready
 
@@ -66,10 +67,7 @@ def _consolidate_recent_important() -> int:
 
     try:
         from core.db import get_chat_conn
-        from core.character_card import CharacterCard
-        _card = CharacterCard.get_active()
-        _cid = _card._db_id if _card and hasattr(_card, '_db_id') else 0
-        chat_conn = get_chat_conn(_cid)
+        chat_conn = get_chat_conn(character_id)
         cursor = chat_conn.cursor()
         cursor.execute(
             """SELECT id, role, content, timestamp
@@ -83,10 +81,13 @@ def _consolidate_recent_important() -> int:
         if not rows:
             return 0
 
-        # 检查哪些消息已被向量化（通过 sentence_index）
+        # 检查哪些消息已被向量化（通过 sentence_index，按角色过滤）
         with get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT msg_id FROM sentence_index")
+            cursor.execute(
+                "SELECT DISTINCT msg_id FROM sentence_index WHERE character_id = ?",
+                (character_id,)
+            )
             existing_ids = {r["msg_id"] for r in cursor.fetchall()}
 
         # 筛选未向量化且重要的消息
@@ -101,7 +102,7 @@ def _consolidate_recent_important() -> int:
         top_mentions = set()
         try:
             from core.mention_tracker import get_top_mentions
-            for m in get_top_mentions(n=15, min_weight=0.3):
+            for m in get_top_mentions(n=15, min_weight=0.3, character_id=character_id):
                 top_mentions.add(m["phrase"])
         except Exception as e:
             logger.warning(f"[巩固] 提及权重查询失败: {e}")
@@ -135,9 +136,9 @@ def _consolidate_recent_important() -> int:
             if not is_important and not hits_mention:
                 continue
 
-            # 写入向量
+            # 写入向量（传入 character_id）
             try:
-                add_sentence_vectors(msg_id, content, "user")
+                add_sentence_vectors(msg_id, content, "user", character_id=character_id)
                 consolidated += 1
             except Exception as e:
                 logger.warning(f"[巩固] 向量化失败 msg_id={msg_id}: {e}")
@@ -152,13 +153,13 @@ def _consolidate_recent_important() -> int:
     return consolidated
 
 
-def _cleanup_low_value_memories() -> int:
-    """清理低价值的短期记忆（过期摘要、冗余句子索引）。"""
+def _cleanup_low_value_memories(character_id: int = 0) -> int:
+    """清理低价值的短期记忆（过期摘要、冗余句子索引，per-character）。"""
     cleaned = 0
 
     try:
-        # 1. 归档过期摘要（已衰减到 0 的）
-        with get_conn() as conn:
+        # 1. 归档过期摘要（已衰减到 0 的）— 从 per-character DB 操作
+        with get_chat_conn(character_id) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """INSERT INTO death_archive
@@ -175,38 +176,52 @@ def _cleanup_low_value_memories() -> int:
             )
             cleaned += archived
 
-        # 2. 清理冗余句子索引（同一 msg_id 的重复句子）
+        # 2. 清理冗余句子索引（同一 character_id+msg_id+seq 的重复句子）
         with get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """DELETE FROM sentence_index
                    WHERE sid NOT IN (
-                       SELECT MIN(sid) FROM sentence_index GROUP BY msg_id, seq
+                       SELECT MIN(sid) FROM sentence_index GROUP BY character_id, msg_id, seq
                    )"""
             )
             deduped = cursor.rowcount
             cleaned += deduped
 
-        # 3. 清理超过 30 天的低重要性记忆向量
+        # 3. 清理超过 30 天的低重要性记忆向量（按角色过滤）
+        important_ids = set()
+        try:
+            with get_chat_conn(character_id) as chat_conn:
+                chat_cursor = chat_conn.cursor()
+                chat_cursor.execute(
+                    "SELECT id FROM chat_history WHERE role = 'user' "
+                    "AND (content LIKE '%喜欢%' OR content LIKE '%讨厌%' "
+                    "OR content LIKE '%习惯%' OR content LIKE '%生日%')"
+                )
+                important_ids = {r["id"] for r in chat_cursor.fetchall()}
+        except Exception:
+            pass
         with get_conn() as conn:
             cursor = conn.cursor()
             cutoff = (datetime.now() - timedelta(days=30)).isoformat()
-            cursor.execute(
-                """DELETE FROM sentence_index
-                   WHERE created_at < ? AND msg_id NOT IN (
-                       SELECT id FROM chat_history WHERE role = 'user'
-                       AND (content LIKE '%喜欢%' OR content LIKE '%讨厌%'
-                       OR content LIKE '%习惯%' OR content LIKE '%生日%')
-                   )""",
-                (cutoff,)
-            )
+            if important_ids:
+                placeholders = ",".join("?" * len(important_ids))
+                cursor.execute(
+                    f"DELETE FROM sentence_index WHERE character_id = ? AND created_at < ? AND msg_id NOT IN ({placeholders})",
+                    (character_id, cutoff, *important_ids)
+                )
+            else:
+                cursor.execute(
+                    "DELETE FROM sentence_index WHERE character_id = ? AND created_at < ?",
+                    (character_id, cutoff)
+                )
             old_cleaned = cursor.rowcount
             cleaned += old_cleaned
 
-        # 4. 清理 30 天前的旧情景记录
+        # 4. 清理 30 天前的旧情景记录（per-character）
         try:
             from core.episodic_memory import cleanup_old_episodes
-            cleaned += cleanup_old_episodes(retain_days=30)
+            cleaned += cleanup_old_episodes(retain_days=30, character_id=character_id)
         except Exception as e:
             logger.warning(f"[巩固] 情景清理失败: {e}")
 
@@ -216,16 +231,16 @@ def _cleanup_low_value_memories() -> int:
     return cleaned
 
 
-def _log_consolidation(consolidated: int, cleaned: int, report: str):
+def _log_consolidation(consolidated: int, cleaned: int, report: str, character_id: int = 0):
     """记录巩固日志。"""
     try:
         with get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 """INSERT INTO consolidation_log
-                   (consolidated_at, source_count, target_count, details)
-                   VALUES (?, ?, ?, ?)""",
-                (datetime.now().isoformat(), consolidated, cleaned, report)
+                   (consolidated_at, source_count, target_count, details, character_id)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (datetime.now().isoformat(), consolidated, cleaned, report, character_id)
             )
     except Exception as e:
         logger.warning(f"[巩固] 日志记录失败: {e}")

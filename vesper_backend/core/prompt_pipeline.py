@@ -294,31 +294,65 @@ class PersonaPipe(PromptPipe):
 
 
 class UserSummaryPipe(PromptPipe):
-    """用户摘要 + 记忆索引 + 结构化表格"""
+    """用户摘要 + 记忆索引 + 结构化表格（per-character）"""
     def process(self, ctx: PipelineContext) -> str | None:
         if not ctx.is_module_enabled("user_summary"):
             return None
+        cid = ctx.character_id
         parts = []
-        # 对话开始时注入记忆索引（一次性的简短总览）
         if ctx.msg_counter == 0:
-            idx = _get_memory_index()
+            idx = _get_memory_index(character_id=cid)
             if idx:
                 parts.append(idx)
-        # 每 20 条注入详细用户摘要（offset 0）
         if ctx.msg_counter % 20 == 0:
-            summary = _get_user_summary()
+            summary = _get_user_summary(character_id=cid)
             if summary:
                 parts.append(summary)
-        # 每 10 条注入结构化记忆表格（offset 0，与 summary 同步）
         if ctx.msg_counter % 10 == 0:
             try:
                 from core.profile_builder import get_table_prompt
-                table = get_table_prompt()
+                table = get_table_prompt(character_id=cid)
                 if table:
                     parts.append(table)
             except Exception:
                 pass
         return "\n\n".join(parts) if parts else None
+
+
+class PersonalityTraitPipe(PromptPipe):
+    """OCEAN 五维人格特征注入"""
+    zone = "depth:2"
+    def process(self, ctx: PipelineContext) -> str | None:
+        if not ctx.is_module_enabled("personality_traits"):
+            return None
+        try:
+            from core.emotion_evolution import get_all_traits, TRAIT_DESCRIPTIONS
+            traits = get_all_traits(ctx.character_id)
+            if not traits:
+                return None
+            labels = {
+                "openness": "开放性 O",
+                "conscientiousness": "尽责性 C",
+                "extraversion": "外向性 E",
+                "agreeableness": "宜人性 A",
+                "neuroticism": "神经质 N",
+            }
+            lines = ["【人格特征】"]
+            for key, label in labels.items():
+                score = traits.get(key, 0.5)
+                desc = ""
+                if key in TRAIT_DESCRIPTIONS:
+                    if score >= 0.6:
+                        desc = TRAIT_DESCRIPTIONS[key]["high"]
+                    elif score <= 0.3:
+                        desc = TRAIT_DESCRIPTIONS[key]["low"]
+                    else:
+                        desc = TRAIT_DESCRIPTIONS[key]["mid"]
+                lines.append(f"- {label}({score:.1f})：{desc}")
+            return "\n".join(lines)
+        except Exception as e:
+            logger.warning(f"[pipeline] 人格特征注入失败: {e}")
+            return None
 
 
 class WorkMemoryPipe(PromptPipe):
@@ -360,12 +394,12 @@ class EpisodicMemoryPipe(PromptPipe):
                             return f"（{_n}突然想起……上次你也是这样说的：「{doc[:30]}」）"
             except Exception:
                 pass
-        # 每 10 条注入近期情景（offset 1）
+        # 每 10 条注入近期情景（offset 1，per-character）
         if ctx.msg_counter % 10 != 1:
             return None
         try:
             from core.episodic_memory import get_episode_context
-            context = get_episode_context(query=ctx.user_message, limit=3)
+            context = get_episode_context(query=ctx.user_message, limit=3, character_id=ctx.character_id)
             return context if context else None
         except Exception:
             return None
@@ -382,13 +416,11 @@ class ContinuityPipe(PromptPipe):
         bridge = _get_continuity_bridge()
         if bridge:
             parts.append(bridge)
-        # 跨对话续接提示（需开启 conversation_followup feature）
+        # 跨对话续接提示（per-character，需开启 conversation_followup feature）
         if ctx.msg_counter == 0 and CharacterCard.is_feature_enabled("conversation_followup"):
             try:
                 from core.episodic_memory import get_conversation_continuation
-                _card = CharacterCard.get_active()
-                _cid = _card._db_id if _card and hasattr(_card, '_db_id') else 0
-                cont = get_conversation_continuation(character_id=_cid)
+                cont = get_conversation_continuation(character_id=ctx.character_id)
                 if cont:
                     parts.append(cont)
             except Exception:
@@ -397,7 +429,7 @@ class ContinuityPipe(PromptPipe):
 
 
 class EntityContextPipe(PromptPipe):
-    """实体关联上下文"""
+    """实体关联上下文（per-character）"""
     def process(self, ctx: PipelineContext) -> str | None:
         if not ctx.is_module_enabled("entity"):
             return None
@@ -405,14 +437,14 @@ class EntityContextPipe(PromptPipe):
             return None
         try:
             from core.profile_builder import get_entity_context
-            return get_entity_context(ctx.user_message)
+            return get_entity_context(ctx.user_message, character_id=ctx.character_id)
         except Exception as e:
             logger.warning(f"[pipeline] 实体上下文获取失败: {e}")
             return None
 
 
 class FactsContextPipe(PromptPipe):
-    """原子事实注入（每 15 条消息，按类型标注注入）"""
+    """原子事实注入（每 15 条消息，通过 MemoryProvider 统一检索）"""
     zone = "depth:3"
     def process(self, ctx: PipelineContext) -> str | None:
         if not ctx.is_module_enabled("facts_context"):
@@ -420,8 +452,13 @@ class FactsContextPipe(PromptPipe):
         if ctx.msg_counter % 15 != 2:  # offset 2
             return None
         try:
-            from core.profile_builder import get_facts_context
-            return get_facts_context(max_facts=10)
+            from core.memory_provider import MemoryProvider
+            provider = MemoryProvider()
+            return provider.get_context(
+                character_id=ctx.character_id,
+                query=ctx.user_message or "",
+                limit=8,
+            )
         except Exception:
             return None
 
@@ -458,9 +495,9 @@ class ConclusionPipe(PromptPipe):
             return None
         try:
             from core.conclusion_engine import get_active_conclusions, get_conclusion_context
-            base = get_conclusion_context()
+            base = get_conclusion_context(character_id=ctx.character_id)
             # 从结论中提取偏好，生成表达方式指令
-            conclusions = get_active_conclusions(5)
+            conclusions = get_active_conclusions(5, character_id=ctx.character_id)
             preferences = [c["text"] for c in conclusions if c.get("category") == "preference"]
             if preferences:
                 adjustment = "注意：用户" + "、".join(preferences[:2])
@@ -471,16 +508,16 @@ class ConclusionPipe(PromptPipe):
 
 
 class VocabularyPipe(PromptPipe):
-    """用户用语/梗注入（每 15 条注入一次）"""
+    """用户用语/梗注入（per-character，每 15 条注入一次）"""
     zone = "dynamic"
     def process(self, ctx: PipelineContext) -> str | None:
         if not ctx.is_module_enabled("vocabulary"):
             return None
-        if ctx.msg_counter % 15 != 5:  # offset 5
+        if ctx.msg_counter % 15 != 5:
             return None
         try:
-            from core.db import get_conn
-            with get_conn() as conn:
+            from core.db import get_chat_conn
+            with get_chat_conn(ctx.character_id) as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT phrase, meaning FROM user_vocabulary ORDER BY use_count DESC LIMIT 5")
                 rows = cursor.fetchall()
@@ -570,14 +607,15 @@ class SummariesPipe(PromptPipe):
 
 
 class SchedulePipe(PromptPipe):
-    """近期日程"""
+    """近期日程（per-character）"""
     def process(self, ctx: PipelineContext) -> str | None:
         if not ctx.is_module_enabled("schedule"):
             return None
         if not ctx.user_message:
             return None
         try:
-            with get_conn() as conn:
+            from core.db import get_chat_conn
+            with get_chat_conn(ctx.character_id) as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     "SELECT title, start_time FROM schedule WHERE start_time >= ? ORDER BY start_time LIMIT 10",
@@ -806,7 +844,7 @@ class PendingGoalPipe(PromptPipe):
             return None
         try:
             from core.goal_tracker import get_pending_goals
-            pending = get_pending_goals(1)
+            pending = get_pending_goals(1, character_id=ctx.character_id)
             if pending:
                 goal_text = pending[0]["goal_text"]
                 gid = pending[0]["id"]
@@ -843,6 +881,7 @@ def get_default_pipeline() -> PromptPipeline:
         p.register_static(IdentityPipe())
         # 动态管道（按优先级排序）
         p.register(PersonaPipe())
+        p.register(PersonalityTraitPipe())
         p.register(ThinkingPipe())
         p.register(CustomContextPipe())
         p.register(ContinuityPipe())

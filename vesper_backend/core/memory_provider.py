@@ -15,6 +15,7 @@
 
 import json
 import logging
+import threading
 from datetime import datetime, timedelta
 from typing import Optional
 from core.retry import silent_exc
@@ -257,14 +258,29 @@ def save_temp_conversation(character_id: int, user_msg: str, ai_reply: str):
         silent_exc("save_temp_conversation", e)
 
 
+# per-character 锁，防止 batch_extract 并发处理同一批记录
+_batch_locks: dict[int, threading.Lock] = {}
+_batch_locks_lock = threading.Lock()
+
+
+def _get_batch_lock(character_id: int) -> threading.Lock:
+    with _batch_locks_lock:
+        if character_id not in _batch_locks:
+            _batch_locks[character_id] = threading.Lock()
+        return _batch_locks[character_id]
+
+
 def batch_extract_memories(character_id: int = 0, max_items: int = 10):
     """批量提取未处理的 TempMemory 为正式记忆。
 
     从 temp_memory 读取未处理的记录，调用 LLM 提取事实/偏好/事件，
     写入 user_profile，标记 temp 记录为已处理。
     """
-    from core.db import get_chat_conn
+    lock = _get_batch_lock(character_id)
+    if not lock.acquire(blocking=False):
+        return 0  # 已有线程在处理同一角色的批量提取，跳过
     try:
+        from core.db import get_chat_conn
         with get_chat_conn(character_id) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -308,6 +324,8 @@ def batch_extract_memories(character_id: int = 0, max_items: int = 10):
     except Exception as e:
         silent_exc("batch_extract_memories", e)
         return 0
+    finally:
+        lock.release()
 
 
 def _llm_extract_facts(text: str) -> list:
@@ -328,6 +346,8 @@ def _llm_extract_facts(text: str) -> list:
         result = call_llm(prompt, temperature=0.1, max_tokens=500, json_mode=True)
         if isinstance(result, list):
             return result
+        if isinstance(result, dict):
+            return result.get("facts", result.get("conclusions", []))
         return []
     except Exception as e:
         silent_exc("_llm_extract_facts", e)

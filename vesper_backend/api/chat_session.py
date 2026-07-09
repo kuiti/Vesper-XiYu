@@ -172,8 +172,8 @@ def _compress_conversation_context(msgs: list[dict], max_chars: int = 40000) -> 
     return system_msgs + keep
 
 
-def _run_memory_curation(history: list):
-    """后台记忆整理：每 8 轮对话自动提取事实"""
+def _run_memory_curation(history: list, character_id: int = 0):
+    """后台记忆整理：每 8 轮对话自动提取事实（per-character）"""
     try:
         # 提取最近对话用于分析
         recent = []
@@ -186,7 +186,7 @@ def _run_memory_curation(history: list):
             return
 
         from core.memory_curation import run_curation
-        result = run_curation(recent)
+        result = run_curation(recent, character_id=character_id)
         if result.get("saved", 0) > 0:
             logger.info(f"[记忆整理] 从 {len(recent)} 条对话中提取并保存了 {result['saved']} 条事实")
     except Exception as e:
@@ -411,7 +411,8 @@ class ChatSession:
         if not msg_id or score not in (1, -1):
             return
         try:
-            with get_conn() as conn:
+            from core.db import get_chat_conn as _get_chat
+            with _get_chat(self._character_id) as conn:
                 conn.cursor().execute(
                     "INSERT INTO empathy_feedback (msg_id, score, created_at) VALUES (?, ?, ?)",
                     (msg_id, score, datetime.now().isoformat()),
@@ -567,7 +568,7 @@ class ChatSession:
             await self.ws.send_text(json.dumps({"type": "error", "content": "用法: /goal confirm <ID>"}))
             return
         gid = int(raw)
-        with get_conn() as conn:
+        with get_chat_conn(self._character_id) as conn:
             conn.cursor().execute("UPDATE pending_goals SET status='confirmed' WHERE id=?", (gid,))
         await self.ws.send_text(json.dumps({"type": "token", "content": "好的，我帮你记着这个目标。"}))
         await self.ws.send_text(json.dumps({"type": "done"}))
@@ -579,7 +580,7 @@ class ChatSession:
             await self.ws.send_text(json.dumps({"type": "error", "content": "用法: /goal reject <ID>"}))
             return
         gid = int(raw)
-        with get_conn() as conn:
+        with get_chat_conn(self._character_id) as conn:
             conn.cursor().execute("UPDATE pending_goals SET status='rejected' WHERE id=?", (gid,))
         await self.ws.send_text(json.dumps({"type": "token", "content": "好的，不跟踪了。"}))
         await self.ws.send_text(json.dumps({"type": "done"}))
@@ -605,7 +606,7 @@ class ChatSession:
                     if not self._is_system:
                         tid = add_chat_message("user", msg, character_id=self._character_id)
                         if tid:
-                            _background_thread_pool.submit(add_sentence_vectors, tid, msg, "user")
+                            _background_thread_pool.submit(add_sentence_vectors, tid, msg, "user", self._character_id)
                     add_chat_message("assistant", tease_reply, character_id=self._character_id)
                     await ws.send_text(json.dumps({"type": "token", "content": _clean_dsml(tease_reply)}))
                     await ws.send_text(json.dumps({"type": "done"}))
@@ -673,7 +674,7 @@ class ChatSession:
         if not self._is_system:
             uid = add_chat_message("user", msg, character_id=self._character_id)
             if uid:
-                _background_thread_pool.submit(add_sentence_vectors, uid, msg, "user")
+                _background_thread_pool.submit(add_sentence_vectors, uid, msg, "user", self._character_id)
 
         await self._analyze_context(history, hours_since or 0)
         await self._build_and_send(history, hours_since or 0)
@@ -1055,14 +1056,14 @@ class ChatSession:
             await ws.send_text(json.dumps({"type": "toast", "content": content.strip()[:120]}))
 
         if not self._is_system:
-            mc = increment_msg_counter()
+            mc = increment_msg_counter(character_id=self._character_id)
             loop = asyncio.get_running_loop()
             # 用户活跃统计
             _background_thread_pool.submit(record_user_activity_hour)
             _background_thread_pool.submit(_trigger_daily_evolution)
             _background_thread_pool.submit(_calc_consecutive_days, mc, self.ws, loop)
             _background_thread_pool.submit(_maybe_surprise, self.ws, loop)
-            _background_thread_pool.submit(_check_goal_completion, content)
+            _background_thread_pool.submit(_check_goal_completion, content, self._character_id)
             # 里程碑检查（需开启 milestones feature）
             try:
                 from core.character_card import CharacterCard
@@ -1078,37 +1079,49 @@ class ChatSession:
             except Exception:
                 pass
 
-            # 记忆整理（每 8 轮自动提取事实）
+            # 三级摘要后台任务（per-character：衰减/摘要生成/关键词/反思/巩固）
+            try:
+                from core.summary_engine import run_background_tasks
+                _background_thread_pool.submit(run_background_tasks, mc, self.user_message, self._character_id)
+            except Exception as e:
+                silent_exc("后台摘要任务", e)
+            # 记忆整理（每 8 轮自动提取事实，per-character）
             if mc > 0 and mc % 8 == 0:
-                _background_thread_pool.submit(_run_memory_curation, self.history)
+                _background_thread_pool.submit(_run_memory_curation, self.history, self._character_id)
             # 共同经历检测
             try:
                 from core.shared_memory import detect_moment, record_shared_moment
                 moment_type = detect_moment(self.user_message, content)
                 if moment_type:
                     _background_thread_pool.submit(record_shared_moment, content[:100], moment_type)
-            except Exception:
-                pass
+            except Exception as e:
+                silent_exc("共同经历检测", e)
             if parser and hasattr(parser, "extract_demand"):
                 d = parser.extract_demand()
                 if d and d.get("level", "") not in ("LITERAL", "UNKNOWN"):
                     _background_thread_pool.submit(save_demand_record, d, self.user_message)
             _background_thread_pool.submit(self._extract_knowledge_graph, content)
-        # 半成品 Pipe 数据链修复：每轮提取实体 + 用语
+        # 每轮提取实体 + 用语
         try:
             from core.memory_provider import MemoryProvider
             provider = MemoryProvider()
             provider.extract_entities_from_text(self.user_message, self._character_id)
             provider.extract_vocabulary_from_text(self.user_message, self._character_id)
-        except Exception:
-            pass
+        except Exception as e:
+            silent_exc("实体/用语提取", e)
         # 结论分析：每 30 条消息执行一次（AI 对用户行为模式的总结）
         if self._session_msg_count > 0 and self._session_msg_count % 30 == 0:
             try:
                 from core.conclusion_engine import run_conclusion_analysis
                 _background_thread_pool.submit(run_conclusion_analysis)
-            except Exception:
-                pass
+            except Exception as e:
+                silent_exc("结论分析", e)
+            # TempMemory 批量巩固：每 30 条消息后台提取一次（不用等到每日 4:30）
+            try:
+                from core.memory_provider import batch_extract_memories
+                _background_thread_pool.submit(batch_extract_memories, self._character_id, 5)
+            except Exception as e:
+                silent_exc("TempMemory 巩固", e)
         # 需求模式提炼：每 50 条消息执行一次（LLM 分析用户深层需求）
         if self._session_msg_count > 0 and self._session_msg_count % 50 == 0:
             _background_thread_pool.submit(_run_demand_pattern_extraction)
@@ -1116,8 +1129,8 @@ class ChatSession:
         try:
             from core.memory_provider import save_temp_conversation
             _background_thread_pool.submit(save_temp_conversation, self._character_id, self.user_message, content)
-        except Exception:
-            pass
+        except Exception as e:
+            silent_exc("TempMemory 暂存", e)
 
     async def _save_response(self, content, is_tool_response=False):
         """Save AI response to chat_history and vector store"""

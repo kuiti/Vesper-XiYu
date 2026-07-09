@@ -58,16 +58,24 @@ def get_documents(character_id: int = 0):
 
 
 def get_knowledge_filenames():
-    """获取所有已上传文档的文件名列表。"""
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT filename FROM documents")
-        return [r["filename"] for r in cursor.fetchall()]
+    """获取所有已上传文档的文件名列表（遍历各角色库）。"""
+    filenames = []
+    seen = set()
+    # 查角色 0 的默认库
+    try:
+        with get_chat_conn(0) as conn:
+            for r in conn.cursor().execute("SELECT filename FROM documents").fetchall():
+                if r["filename"] not in seen:
+                    seen.add(r["filename"])
+                    filenames.append(r["filename"])
+    except Exception:
+        pass
+    return filenames
 
 
-def delete_document(doc_id):
-    """删除指定文档记录。"""
-    with get_conn() as conn:
+def delete_document(doc_id, character_id: int = 0):
+    """删除指定角色的文档记录。"""
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
 

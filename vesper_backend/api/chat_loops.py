@@ -111,7 +111,7 @@ async def proactive_loop(
                         log_proactive_message(trigger_type, msg)
                         add_chat_message("assistant", msg, character_id=character_id)
                         if is_model_ready():
-                            threading.Thread(target=add_sentence_vectors, args=(f"proactive_{datetime.now().timestamp()}", msg, "assistant"), daemon=True).start()
+                            threading.Thread(target=add_sentence_vectors, args=(f"proactive_{datetime.now().timestamp()}", msg, "assistant", character_id), daemon=True).start()
             except WebSocketDisconnect:
                 raise
             except Exception as e:

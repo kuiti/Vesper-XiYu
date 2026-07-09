@@ -240,7 +240,7 @@ def should_proactive_trigger(
     # ─── 触发 E: 长期目标跟进 ───
     try:
         from core.goal_tracker import get_stale_goals
-        stale = get_stale_goals(days_threshold=7, limit=1)
+        stale = get_stale_goals(days_threshold=7, limit=1, character_id=character_id)
         if stale and "goal_followup" not in session_triggered:
             goal = stale[0]
             return True, "goal_followup", {

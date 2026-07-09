@@ -216,12 +216,12 @@ def delete_chat_history_older_than(days: int, character_id=0):
 
 
 def _cascade_cleanup_msg_refs(ids: list[int], character_id=0):
-    """清理共享库中引用了已删消息 id 的关联表。
+    """清理引用了已删消息 id 的关联表。
 
-    仅当 character_id=0（共享库）时执行：favorites / sentence_index / empathy_feedback
-    只引用主 db 的 chat_history，角色库无这些表且 id 空间可能与主 db 撞车。
+    favorites / empathy_feedback 在主库。
+    sentence_index 在主库但有 character_id 列，需按角色过滤删除。
     """
-    if not ids or character_id:
+    if not ids:
         return
     try:
         import core.db as _db_mod
@@ -231,26 +231,47 @@ def _cascade_cleanup_msg_refs(ids: list[int], character_id=0):
         for i in range(0, len(ids), 500):
             batch = ids[i:i + 500]
             placeholders = ",".join("?" * len(batch))
-            for tbl in ("favorites", "sentence_index", "empathy_feedback"):
+            for tbl in ("favorites", "empathy_feedback"):
                 try:
                     mc.execute(f"DELETE FROM {tbl} WHERE msg_id IN ({placeholders})", batch)
                 except Exception as e:
                     logger.warning(f"[chat] 级联清理 {tbl} 失败: {e}")
+            # sentence_index 有 character_id 列，需按角色过滤
+            try:
+                mc.execute(
+                    f"DELETE FROM sentence_index WHERE character_id = ? AND msg_id IN ({placeholders})",
+                    (character_id, *batch)
+                )
+            except Exception as e:
+                logger.warning(f"[chat] 级联清理 sentence_index 失败: {e}")
         main_conn.commit()
     except Exception as e:
         logger.warning(f"[chat] 级联清理失败: {e}")
 
 
 def search_chat_messages(keyword: str, limit: int = 20, character_id=0):
-    """搜索聊天记录。character_id>0 时查角色独立库（LIKE），否则查共享库（FTS5）。"""
+    """搜索角色库聊天记录（FTS5 优先，降级到 LIKE）。"""
     if not keyword or not keyword.strip():
         return []
     keyword_stripped = keyword.strip()
 
-    if character_id:
-        # 角色独立库：LIKE 搜索
-        conn = _get_chat(character_id)
-        cursor = conn.cursor()
+    conn = _get_chat(character_id)
+    cursor = conn.cursor()
+    # FTS5 搜索（角色库也有 chat_fts）
+    safe_keyword = '"' + keyword_stripped.replace('"', '""') + '"'
+    try:
+        cursor.execute('''
+            SELECT f.rowid, f.content, h.role, h.timestamp,
+                   snippet(chat_fts, 0, '<mark>', '</mark>', '...', 40) as snippet
+            FROM chat_fts f
+            JOIN chat_history h ON h.id = f.rowid
+            WHERE chat_fts MATCH ?
+            ORDER BY rank
+            LIMIT ?
+        ''', (safe_keyword, limit))
+        rows = cursor.fetchall()
+    except Exception as e:
+        logger.warning(f"[chat] FTS5 搜索失败，降级到 LIKE: {e}")
         try:
             cursor.execute(
                 "SELECT id as rowid, content, role, timestamp, substr(content, 1, 40) as snippet "
@@ -260,34 +281,6 @@ def search_chat_messages(keyword: str, limit: int = 20, character_id=0):
             rows = cursor.fetchall()
         except Exception:
             return []
-        return [{"id": r["rowid"], "content": r["content"], "role": r["role"], "timestamp": r["timestamp"], "snippet": r["snippet"]} for r in rows]
-
-    # 共享库：FTS5 搜索
-    with _db_mod.get_conn() as conn:
-        cursor = conn.cursor()
-        safe_keyword = '"' + keyword_stripped.replace('"', '""') + '"'
-        try:
-            cursor.execute('''
-                SELECT f.rowid, f.content, h.role, h.timestamp,
-                       snippet(chat_fts, 0, '<mark>', '</mark>', '...', 40) as snippet
-                FROM chat_fts f
-                JOIN chat_history h ON h.id = f.rowid
-                WHERE chat_fts MATCH ?
-                ORDER BY rank
-                LIMIT ?
-            ''', (safe_keyword, limit))
-            rows = cursor.fetchall()
-        except Exception as e:
-            logger.warning(f"[chat] FTS5 搜索失败，降级到 LIKE: {e}")
-            try:
-                cursor.execute(
-                    "SELECT id as rowid, content, role, timestamp, substr(content, 1, 40) as snippet "
-                    "FROM chat_history WHERE content LIKE ? ORDER BY id DESC LIMIT ?",
-                    (f"%{keyword_stripped}%", limit)
-                )
-                rows = cursor.fetchall()
-            except Exception:
-                return []
     return [{"id": r["rowid"], "content": r["content"], "role": r["role"], "timestamp": r["timestamp"], "snippet": r["snippet"]} for r in rows]
 
 

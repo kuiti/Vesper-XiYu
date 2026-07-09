@@ -11,7 +11,7 @@ import json
 import logging
 import hashlib
 from datetime import datetime
-from core.db import get_conn
+from core.db import get_conn, get_chat_conn
 
 logger = logging.getLogger(__name__)
 
@@ -54,15 +54,15 @@ def effective_importance(importance: float, created_at: str) -> float:
     return importance
 
 
-def batch_decay_confidence(min_confidence: float = 0.1):
-    """批量衰减所有事实的置信度并持久化到 DB。
+def batch_decay_confidence(min_confidence: float = 0.1, character_id: int = 0):
+    """批量衰减指定角色的事实置信度并持久化到 DB。
 
     日常检索用 effective_confidence() 动态计算即可，
     此函数只在维护/清理时调用，避免 DB 写放大。
     """
     from datetime import datetime as _dt
     now = _dt.now()
-    with get_conn() as conn:
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id, confidence, updated_at FROM facts WHERE confidence > ?", (min_confidence,))
         rows = cursor.fetchall()
@@ -75,7 +75,7 @@ def batch_decay_confidence(min_confidence: float = 0.1):
                 changed += 1
         conn.commit()
         if changed:
-            logger.info(f"[记忆整理] 批量衰减 {changed} 条事实的置信度")
+            logger.info(f"[记忆整理] 批量衰减角色{character_id} {changed} 条事实的置信度")
         return changed
 
 CURATION_PROMPT = """从以下对话中提取值得长期记住的信息。提取维度：
@@ -152,8 +152,8 @@ def extract_facts_from_conversation(conversation_text: str, existing_text: str =
     return valid
 
 
-def _save_extracted_facts(facts: list[dict], source_episode: str = ""):
-    """将提取的事实存入 facts 表，通过文本前缀匹配自动去重，支持矛盾检测和合并。"""
+def _save_extracted_facts(facts: list[dict], source_episode: str = "", character_id: int = 0):
+    """将提取的事实存入指定角色库的 facts 表，通过文本前缀匹配自动去重，支持矛盾检测和合并。"""
     if not facts:
         return 0
 
@@ -168,7 +168,7 @@ def _save_extracted_facts(facts: list[dict], source_episode: str = ""):
         # 用文本 hash 做去重 key
         text_hash = hashlib.sha256(text.encode()).hexdigest()
 
-        with get_conn() as conn:
+        with get_chat_conn(character_id) as conn:
             cursor = conn.cursor()
 
             # 检查是否已存在相似事实
@@ -222,20 +222,21 @@ def _save_extracted_facts(facts: list[dict], source_episode: str = ""):
     return saved
 
 
-def run_curation(conversation_history: list[dict] = None):
-    """执行一轮记忆整理（对外入口）
+def run_curation(conversation_history: list[dict] = None, character_id: int = 0):
+    """执行一轮记忆整理（对外入口，per-character）
 
     Args:
-        conversation_history: 最近对话历史，格式 [{"role": "user/assistant", "content": "..."}]
+        conversation_history: 最近对话历史
+        character_id: 角色 ID（影响 user_profile 写入的目标角色库）
     """
     if not conversation_history:
         logger.info("[记忆整理] 无对话历史，跳过")
         return {"extracted": 0, "saved": 0}
 
-    # 1. 获取已有事实（避免重复）
+    # 1. 获取已有事实（从角色库读取，避免重复）
     existing_facts = []
     try:
-        with get_conn() as conn:
+        with get_chat_conn(character_id) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT fact_text FROM facts WHERE confidence >= 0.5 ORDER BY updated_at DESC LIMIT 20")
             existing_facts = [r["fact_text"] for r in cursor.fetchall()]
@@ -256,7 +257,33 @@ def run_curation(conversation_history: list[dict] = None):
         logger.info("[记忆整理] 未提取到新事实")
         return {"extracted": 0, "saved": 0}
 
-    # 4. 存入数据库
-    saved = _save_extracted_facts(facts)
+    # 4. 先写入 user_profile（供 MemoryProvider + FactsContextPipe 读取，优先级高）
+    saved = 0
+    try:
+        from core.memory_provider import MemoryProvider
+        provider = MemoryProvider()
+        for f in facts:
+            category_map = {
+                "personal": "FACT", "preference": "PREFERENCE",
+                "event": "EVENT", "goal": "FACT",
+                "emotion": "EMOTION", "style": "HABIT", "personality": "FACT",
+            }
+            provider.save_fact(
+                character_id=character_id,
+                content=f["text"],
+                category=category_map.get(f.get("category", "personal"), "FACT"),
+                confidence=f.get("importance", 0.7),
+                source="curation",
+            )
+            saved += 1
+    except Exception as e:
+        logger.warning(f"[记忆整理] user_profile 写入失败: {e}")
+
+    # 5. 再同步到 facts 表（归档存储，含去重合并逻辑，失败不影响 prompt 注入）
+    try:
+        _saved_facts = _save_extracted_facts(facts, character_id=character_id)
+        saved += _saved_facts
+    except Exception as e:
+        logger.warning(f"[记忆整理] facts 表写入失败: {e}")
 
     return {"extracted": len(facts), "saved": saved}

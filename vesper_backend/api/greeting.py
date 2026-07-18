@@ -359,23 +359,6 @@ def generate_proactive(trigger_type: str, context: dict = None, character_id: in
     except Exception:
         affection, trust = 30, 50
 
-    from api.proactive import (
-        get_proactive_tone_hint,
-        get_trust_openness_hint,
-        get_cross_hint,
-        get_trait_proactive_hint,
-    )
-    tone_hint = get_proactive_tone_hint(affection, user_name)
-    trust_hint = get_trust_openness_hint(trust)
-    cross_hint = get_cross_hint(affection, trust)
-
-    # ─── 性格特征 → 风格提示 ───
-    try:
-        from core.emotion_evolution import get_all_traits
-        traits = get_all_traits(character_id=character_id)
-    except Exception:
-        traits = {"openness": 0.4, "conscientiousness": 0.3, "extraversion": 0.5, "agreeableness": 0.5, "neuroticism": 0.3}
-    trait_hint = get_trait_proactive_hint(traits)
 
     # ─── 记忆 ───
     memory_context = ""
@@ -457,8 +440,6 @@ def generate_proactive(trigger_type: str, context: dict = None, character_id: in
     elif trigger_type == "upcoming_reminder":
         notify_msg = context.get('notify_message') or context.get('content', '')
         idle_desc = f"「{user_name}」有一个提醒即将到期：{notify_msg}"
-    elif trigger_type == "goal_followup":
-        idle_desc = f"「{user_name}」之前提过一个目标「{context.get('goal_text', '')}」，很久没更新了。"
     elif trigger_type == "active_hours":
         idle_desc = f"现在是「{user_name}」平时活跃的时段，但已经几小时没说话了。"
     elif trigger_type == "heartbeat":
@@ -497,14 +478,6 @@ def generate_proactive(trigger_type: str, context: dict = None, character_id: in
     system_parts = [personality_part]
     if base_rules:
         system_parts.append(base_rules)
-    if tone_hint:
-        system_parts.append(tone_hint)
-    if trust_hint:
-        system_parts.append(trust_hint)
-    if cross_hint:
-        system_parts.append(cross_hint)
-    if trait_hint:
-        system_parts.append(trait_hint)
     if style_hint:
         system_parts.append(style_hint)
     if weather_context:
@@ -519,10 +492,7 @@ def generate_proactive(trigger_type: str, context: dict = None, character_id: in
     # 获取最近几句自己说过的话，避免重复
     try:
         from core.db import get_chat_conn
-        from core.character_card import CharacterCard
-        _card = CharacterCard.get_active()
-        _cid = _card._db_id if _card and hasattr(_card, '_db_id') else 0
-        chat_conn = get_chat_conn(_cid)
+        chat_conn = get_chat_conn(character_id)
         cur = chat_conn.cursor()
         cur.execute("SELECT content FROM chat_history WHERE role='assistant' ORDER BY id DESC LIMIT 5")
         rows = cur.fetchall()

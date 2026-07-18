@@ -110,14 +110,20 @@ def rename_session(session_id: int, name: str, character_id=0):
 
 
 # ========== chat_history ==========
-def get_all_chat_messages(character_id: int = 0, session_id: int = 0):
+def get_all_chat_messages(character_id: int = 0, session_id: int = 0, limit: int = 0):
     """获取全部聊天消息，支持按角色和会话过滤。"""
     conn = _get_chat(character_id)
     cursor = conn.cursor()
     if session_id:
-        cursor.execute("SELECT role, content, timestamp FROM chat_history WHERE session_id = ? ORDER BY id", (session_id,))
+        if limit:
+            cursor.execute("SELECT role, content, timestamp FROM chat_history WHERE session_id = ? ORDER BY id LIMIT ?", (session_id, limit))
+        else:
+            cursor.execute("SELECT role, content, timestamp FROM chat_history WHERE session_id = ? ORDER BY id", (session_id,))
     else:
-        cursor.execute("SELECT role, content, timestamp FROM chat_history ORDER BY id")
+        if limit:
+            cursor.execute("SELECT role, content, timestamp FROM chat_history ORDER BY id LIMIT ?", (limit,))
+        else:
+            cursor.execute("SELECT role, content, timestamp FROM chat_history ORDER BY id")
     rows = cursor.fetchall()
     return [{"role": r["role"], "content": r["content"], "timestamp": r["timestamp"]} for r in rows]
 
@@ -231,11 +237,19 @@ def _cascade_cleanup_msg_refs(ids: list[int], character_id=0):
         for i in range(0, len(ids), 500):
             batch = ids[i:i + 500]
             placeholders = ",".join("?" * len(batch))
-            for tbl in ("favorites", "empathy_feedback"):
+            for tbl in ("favorites",):
                 try:
                     mc.execute(f"DELETE FROM {tbl} WHERE msg_id IN ({placeholders})", batch)
                 except Exception as e:
                     logger.warning(f"[chat] 级联清理 {tbl} 失败: {e}")
+            # empathy_feedback 在 chat 库
+            try:
+                chat_conn = _db_mod.get_chat_conn(character_id)
+                cc = chat_conn.cursor()
+                cc.execute(f"DELETE FROM empathy_feedback WHERE msg_id IN ({placeholders})", batch)
+                chat_conn.commit()
+            except Exception as e:
+                logger.warning(f"[chat] 级联清理 empathy_feedback 失败: {e}")
             # sentence_index 有 character_id 列，需按角色过滤
             try:
                 mc.execute(

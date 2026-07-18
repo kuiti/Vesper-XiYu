@@ -7,8 +7,6 @@ Stage 3: 错误消息
 import asyncio
 import json
 import logging
-from core.db import add_chat_message
-from api.split_sentences import fallback_split
 from api.chat_tasks import _clean_dsml
 
 logger = logging.getLogger(__name__)
@@ -42,12 +40,6 @@ async def try_fallback_reply(
         )
         if fallback_reply:
             cleaned = _clean_dsml(fallback_reply)
-            sentences = fallback_split(cleaned)
-            if sentences:
-                for sentence in sentences:
-                    add_chat_message("assistant", _clean_dsml(sentence), character_id=character_id)
-            else:
-                add_chat_message("assistant", cleaned, character_id=character_id)
             for char in cleaned:
                 await websocket.send_text(json.dumps({"type": "token", "content": char}))
                 await asyncio.sleep(0.02)

@@ -14,7 +14,7 @@
 import json
 import logging
 from datetime import datetime
-from core.db import get_chat_conn, get_config, set_config
+from core.db import get_chat_conn
 
 logger = logging.getLogger(__name__)
 

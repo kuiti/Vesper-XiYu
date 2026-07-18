@@ -136,7 +136,7 @@ def call_tool(name: str, arguments: dict) -> str:
 
 
 def handle_command(cmd: str, args: str = "") -> str | None:
-    """处理文本命令（如 /countdowns）"""
+    """处理文本命令（如内置命令）"""
     name = _command_registry.get(cmd)
     if not name:
         return None

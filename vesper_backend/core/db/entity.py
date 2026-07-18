@@ -5,27 +5,27 @@ memory_importance 暂时还在主库，未迁移。
 """
 
 from datetime import datetime
-from . import get_conn, get_chat_conn
+from . import get_chat_conn
 
 
 # ========== memory_importance ==========
 
-def get_memory_importance(memory_id):
+def get_memory_importance(memory_id, character_id: int = 0):
     """获取记忆重要性"""
-    with get_conn() as conn:
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT importance, last_accessed, access_count FROM memory_importance WHERE id = ?", (memory_id,))
+        cursor.execute("SELECT importance, last_accessed, access_count, ignored_count FROM memory_importance WHERE id = ?", (memory_id,))
         row = cursor.fetchone()
         if row:
-            return {"importance": row["importance"], "last_accessed": row["last_accessed"], "access_count": row["access_count"]}
-        return {"importance": 5.0, "last_accessed": None, "access_count": 0}
+            return {"importance": row["importance"], "last_accessed": row["last_accessed"], "access_count": row["access_count"], "ignored_count": row["ignored_count"] or 0}
+        return {"importance": 5.0, "last_accessed": None, "access_count": 0, "ignored_count": 0}
 
 
-def set_memory_importance(memory_id, importance, created_at=None):
+def set_memory_importance(memory_id, importance, created_at=None, character_id: int = 0):
     """设置记忆重要性"""
     if created_at is None:
         created_at = datetime.now().isoformat()
-    with get_conn() as conn:
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("""INSERT INTO memory_importance (id, importance, last_accessed, access_count, created_at)
                           VALUES (?, ?, ?, 0, ?)
@@ -33,10 +33,10 @@ def set_memory_importance(memory_id, importance, created_at=None):
                        (memory_id, importance, None, created_at, importance, None))
 
 
-def update_memory_access(memory_id):
+def update_memory_access(memory_id, character_id: int = 0):
     """更新记忆访问时间和次数"""
     now = datetime.now().isoformat()
-    with get_conn() as conn:
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("""INSERT INTO memory_importance (id, importance, last_accessed, access_count, created_at)
                           VALUES (?, 5.0, ?, 1, ?)
@@ -46,9 +46,9 @@ def update_memory_access(memory_id):
                        (memory_id, now, now, now))
 
 
-def get_all_memory_importance():
+def get_all_memory_importance(character_id: int = 0):
     """获取所有记忆重要性"""
-    with get_conn() as conn:
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id, importance, last_accessed, access_count, ignored_count, created_at FROM memory_importance")
         return {row["id"]: {"importance": row["importance"], "last_accessed": row["last_accessed"],
@@ -57,11 +57,11 @@ def get_all_memory_importance():
                 for row in cursor.fetchall()}
 
 
-def increment_ignored_batch(ids: list):
+def increment_ignored_batch(ids: list, character_id: int = 0):
     """批量递增未被 MMR 选中的候选的忽略计数"""
     if not ids:
         return
-    with get_conn() as conn:
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.executemany(
             """INSERT INTO memory_importance (id, ignored_count)

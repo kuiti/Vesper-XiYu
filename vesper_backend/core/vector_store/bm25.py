@@ -89,7 +89,7 @@ def _update_access_batch(results: list):
         silent_exc("_update_access_batch", e)
 
 
-def _keyword_search_memories(query: str, top_k: int = 5) -> list[dict]:
+def _keyword_search_memories(query: str, top_k: int = 5, character_id: int = 0) -> list[dict]:
     """关键词回退：用 SQL LIKE 模糊搜索 memory 表和 user_profile 表"""
     results = []
     like_pattern = f"%{query}%"

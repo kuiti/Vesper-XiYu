@@ -133,14 +133,14 @@ class TestTagExecutorExecute:
     def test_execute_add(self, mock_add):
         mock_add.return_value = "已记住"
         result = TagExecutor.execute({"type": "add", "content": "test"})
-        mock_add.assert_called_once_with("test")
+        mock_add.assert_called_once_with("test", character_id=0)
         assert result == "已记住"
 
     @patch("core.tag_parser.TagExecutor._search")
     def test_execute_search(self, mock_search):
         mock_search.return_value = "搜索结果"
         result = TagExecutor.execute({"type": "search", "content": "keyword"})
-        mock_search.assert_called_once_with("keyword")
+        mock_search.assert_called_once_with("keyword", character_id=0)
         assert result == "搜索结果"
 
     @patch("core.tag_parser.TagExecutor._note")

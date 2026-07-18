@@ -263,12 +263,20 @@ class PersonaPipe(PromptPipe):
     def process(self, ctx: PipelineContext) -> str:
         if not ctx.is_module_enabled("persona"):
             return ""
+        self._ctx_character_id = ctx.character_id
         return self._build_persona()
 
     def _build_persona(self) -> str:
         """人设构建：优先从角色卡读取，否则回退到全局配置"""
         try:
             from core.character_card import CharacterCard
+            # 优先使用 context 中的 character_id 加载角色卡
+            cid = getattr(self, '_ctx_character_id', 0)
+            if cid:
+                card = CharacterCard.load_from_db(cid)
+                if card:
+                    return self._build_from_card(card)
+            # 回退到全局活跃角色
             active = CharacterCard.get_active()
             if active:
                 return self._build_from_card(active)
@@ -278,18 +286,21 @@ class PersonaPipe(PromptPipe):
         return build_persona()
 
     def _build_from_card(self, card) -> str:
-        """从角色卡构建 prompt"""
+        """从角色卡构建 prompt。
+        system_prompt 已含完整人设时直接使用，避免与 description/personality/scenario 重复。
+        """
         parts = []
-        if card.description:
-            parts.append(f"【角色设定】\n{card.description}")
-        if card.personality:
-            parts.append(f"【性格】{card.personality}")
-        if card.scenario:
-            parts.append(f"【场景】{card.scenario}")
         if card.system_prompt:
             parts.append(card.system_prompt)
+        else:
+            if card.description:
+                parts.append(f"【角色设定】\n{card.data.get('description')}")
+            if card.personality:
+                parts.append(f"【性格】{card.data.get('personality')}")
+            if card.scenario:
+                parts.append(f"【场景】{card.data.get('scenario')}")
         if card.post_history_instructions:
-            parts.append(f"【补充指令】{card.post_history_instructions}")
+            parts.append(f"【补充指令】{card.data.get('post_history_instructions')}")
         return "\n\n".join(parts)
 
 
@@ -713,7 +724,16 @@ class PostHistoryPipe(PromptPipe):
     def process(self, ctx: PipelineContext) -> str | None:
         if not ctx.is_module_enabled("post_history"):
             return None
-        # 优先读角色卡
+        # 优先从 context character_id 读角色卡
+        try:
+            from core.character_card import CharacterCard
+            if ctx.character_id:
+                card = CharacterCard.load_from_db(ctx.character_id)
+                if card and card.post_history_instructions:
+                    return card.post_history_instructions
+        except Exception:
+            pass
+        # 回退到全局活跃角色
         try:
             from core.character_card import CharacterCard
             card = CharacterCard.get_active()
@@ -834,28 +854,6 @@ class DroppedContextPipe(PromptPipe):
         return dropped
 
 
-class PendingGoalPipe(PromptPipe):
-    """待确认目标"""
-    def process(self, ctx: PipelineContext) -> str | None:
-        if not ctx.user_message:
-            return None
-        session_triggered = ctx.session_triggered
-        if session_triggered and "goal_asked" in session_triggered:
-            return None
-        try:
-            from core.goal_tracker import get_pending_goals
-            pending = get_pending_goals(1, character_id=ctx.character_id)
-            if pending:
-                goal_text = pending[0]["goal_text"]
-                gid = pending[0]["id"]
-                return f"\n【待确认目标】用户提过「{goal_text}」，自然问一句要不要跟踪。确认回[/goal confirm {gid}]，拒绝回[/goal reject {gid}]。"
-        except Exception as e:
-            logger.warning(f"[pipeline] 目标追踪查询失败: {e}")
-            return None
-
-        return None
-
-
 # ─── 全局默认管道注册 ───
 
 _default_pipeline = None
@@ -904,7 +902,6 @@ def get_default_pipeline() -> PromptPipeline:
         p.register(QuirkPipe())
         p.register(PatternPipe())
         p.register(DroppedContextPipe())
-        p.register(PendingGoalPipe())
         p.register(UserSummaryPipe())
         p.register(DepthHintPipe())
         p.register(PostHistoryPipe())

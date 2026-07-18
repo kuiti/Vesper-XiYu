@@ -237,20 +237,6 @@ def should_proactive_trigger(
                 "style": "温暖陪伴，不提问，不安慰不说教，只是表达'我在'"
             }
 
-    # ─── 触发 E: 长期目标跟进 ───
-    try:
-        from core.goal_tracker import get_stale_goals
-        stale = get_stale_goals(days_threshold=7, limit=1, character_id=character_id)
-        if stale and "goal_followup" not in session_triggered:
-            goal = stale[0]
-            return True, "goal_followup", {
-                "goal_text": goal["goal_text"],
-                "category": goal.get("category", "other"),
-                "style": "自然提起，不像任务清单，像朋友关心进展"
-            }
-    except Exception as e:
-        silent_exc("proactive.goal_followup", e)
-
     # ─── 久别问候: 超过 3 天没说话 ───
     if idle_minutes >= 4320 and "long_absence" not in session_triggered:  # 3天 = 4320分钟
         days = int(idle_minutes / 1440)
@@ -346,7 +332,7 @@ def _reset_care_counts_if_new_day():
 def _resolve_care_category(trigger_type: str) -> str:
     category = _TRIGGER_TO_CATEGORY.get(trigger_type)
     if not category:
-        if trigger_type.startswith("upcoming_reminder") or trigger_type == "goal_followup":
+        if trigger_type.startswith("upcoming_reminder"):
             return "task"
         return None
     return category

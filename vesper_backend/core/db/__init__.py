@@ -93,20 +93,6 @@ def _init_db_locked():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT, content TEXT, created TEXT, updated_at TEXT
         )""")
-        # countdowns 表
-        cursor.execute("""CREATE TABLE IF NOT EXISTS countdowns (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT, target_date TEXT
-        )""")
-        # habits 表
-        cursor.execute("""CREATE TABLE IF NOT EXISTS habits (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            checked INTEGER DEFAULT 0,
-            streak INTEGER DEFAULT 0,
-            date TEXT,
-            created TEXT
-        )""")
         # reminders 表
         cursor.execute("""CREATE TABLE IF NOT EXISTS reminders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -162,20 +148,6 @@ def _init_db_locked():
             last_matched TEXT,
             created_at TEXT
         )""")
-        # 长期目标追踪
-        cursor.execute("""CREATE TABLE IF NOT EXISTS goal_tracking (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            goal_text TEXT,
-            category TEXT,
-            status TEXT DEFAULT 'active',
-            first_mentioned TEXT,
-            last_mentioned TEXT,
-            last_followed_up TEXT,
-            follow_up_count INTEGER DEFAULT 0,
-            source_summary_id INTEGER,
-            created_at TEXT
-        )""")
-        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_goal_text ON goal_tracking(goal_text)")
         # 句子索引表
         cursor.execute("""CREATE TABLE IF NOT EXISTS sentence_index (
             sid INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -207,15 +179,6 @@ def _init_db_locked():
         )""")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_kg_subject ON knowledge_graph(subject)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_kg_object ON knowledge_graph(object)")
-        # 待确认目标
-        cursor.execute("""CREATE TABLE IF NOT EXISTS pending_goals (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            goal_text TEXT,
-            category TEXT DEFAULT 'other',
-            extracted_at TEXT,
-            status TEXT DEFAULT 'pending'
-        )""")
-        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_goal_text ON pending_goals(goal_text)")
         # 共情反馈
         cursor.execute("""CREATE TABLE IF NOT EXISTS empathy_feedback (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -683,17 +646,6 @@ def _init_chat_schema(conn):
             start_time TEXT, end_time TEXT, created_at TEXT,
             is_active INTEGER DEFAULT 1
         );
-        CREATE TABLE IF NOT EXISTS goal_tracking (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            goal_text TEXT, category TEXT,
-            status TEXT DEFAULT 'active',
-            progress TEXT DEFAULT '',
-            created_at TEXT, updated_at TEXT
-        );
-        CREATE TABLE IF NOT EXISTS countdowns (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT, target_date TEXT
-        );
         CREATE INDEX IF NOT EXISTS idx_chat_time ON chat_history(timestamp);
 
         -- ─── 全局演化系统 per-character 表（与主库同名同列，便于迁移）───
@@ -751,25 +703,6 @@ def _init_chat_schema(conn):
             created_at TEXT,
             active INTEGER DEFAULT 1
         );
-        -- 世界书（可全局可角色特有）
-        CREATE TABLE IF NOT EXISTS lorebook (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            keys TEXT NOT NULL DEFAULT '[]',
-            content TEXT NOT NULL DEFAULT '',
-            priority INTEGER NOT NULL DEFAULT 5,
-            position TEXT NOT NULL DEFAULT 'after_persona',
-            logic TEXT NOT NULL DEFAULT 'AND_ANY',
-            group_name TEXT NOT NULL DEFAULT '',
-            probability INTEGER NOT NULL DEFAULT 100,
-            sticky INTEGER NOT NULL DEFAULT 0,
-            cooldown INTEGER NOT NULL DEFAULT 0,
-            scope TEXT NOT NULL DEFAULT 'global',
-            character_name TEXT NOT NULL DEFAULT '',
-            character_id INTEGER DEFAULT 0,
-            enabled INTEGER NOT NULL DEFAULT 1,
-            created_at TEXT, updated_at TEXT
-        );
-        CREATE INDEX IF NOT EXISTS idx_lorebook_scope ON lorebook(scope, enabled);
         -- 文档/RAG 表（per-character）
         CREATE TABLE IF NOT EXISTS documents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -838,7 +771,30 @@ def _init_chat_schema(conn):
             processed INTEGER DEFAULT 0,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS favorites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            msg_id INTEGER UNIQUE, content TEXT, role TEXT, timestamp TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE INDEX IF NOT EXISTS idx_temp_memory_unprocessed ON temp_memory(processed, character_id, id);
+        CREATE TABLE IF NOT EXISTS memory_importance (
+            id TEXT PRIMARY KEY,
+            importance REAL DEFAULT 5.0,
+            last_accessed TEXT,
+            access_count INTEGER DEFAULT 0,
+            ignored_count INTEGER DEFAULT 0,
+            created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS demand_patterns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trigger_context TEXT,
+            demand_level TEXT,
+            emotion_analysis TEXT,
+            latent_need TEXT,
+            frequency INTEGER DEFAULT 1,
+            last_matched TEXT,
+            created_at TEXT
+        );
     """)
     conn.commit()
 
@@ -1077,11 +1033,10 @@ from .config import *      # clear_config_cache, get_config, set_config
 from .chat import *         # get_all_chat_messages, get_recent_chat_messages, ..., archive_message
 from .memory import *       # get_memory, set_memory, delete_memory
 from .summary import *      # get_last_summary, add_summary, ..., migrate_old_summaries
-from .tools import *        # get_habits, add_habit, ..., delete_preset
+from .tools import *        # presets CRUD
 from .emotion import *      # cleanup_emotion_log, record_user_activity_hour, ..., set_proactive_flag
-from .goal import *         # (currently empty but reserved)
-from .entity import *       # get_memory_importance, set_memory_importance, ..., get_all_knowledge
 from .misc import *         # get_favorites, add_favorite, ..., get_diary_entries
+from .entity import *       # get_memory_importance, set_memory_importance, ..., get_all_knowledge
 from .cleanup import *      # clear_chat_history
 
 # 导出 get_chat_conn 供外部使用

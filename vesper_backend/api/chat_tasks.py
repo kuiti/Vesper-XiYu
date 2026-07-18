@@ -88,69 +88,15 @@ def _trigger_daily_evolution():
         logger.warning(f"[情绪演化] 触发异常: {e}")
 
 
-# ─── 连续天数 + 成就 ───
-
-def _calc_consecutive_days(msg_count, ws, loop):
-    """后台计算连续互动天数 + 触发成就检查"""
-    try:
-        cutoff = (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d")
-        from core.db import get_chat_conn
-        from core.character_card import CharacterCard
-        _card = CharacterCard.get_active()
-        _cid = _card._db_id if _card and hasattr(_card, '_db_id') else 0
-        chat_conn = get_chat_conn(_cid)
-        cur = chat_conn.execute(
-            "SELECT DISTINCT substr(timestamp,1,10) as d FROM chat_history "
-            "WHERE timestamp >= ? ORDER BY d DESC", (cutoff,)
-        )
-        dates = [r["d"] for r in cur.fetchall()]
-        today = datetime.now().strftime("%Y-%m-%d")
-        consec = 0
-        expected = datetime.strptime(today, "%Y-%m-%d")
-        for d in dates:
-            d_parsed = datetime.strptime(d, "%Y-%m-%d")
-            if d_parsed == expected:
-                consec += 1
-                expected -= timedelta(days=1)
-            else:
-                break
-        _check_achievements(msg_count, consec, ws, loop, _cid=_cid)
-    except Exception as e:
-        logger.warning(f"[连续天数] 计算失败: {e}")
-
-
-def _check_achievements(msg_count, consecutive_days, ws, loop, _cid=0):
-    """检查并解锁成就徽章，通过 WebSocket 推送通知（per-character）"""
-    try:
-        from core.db import check_achievements as _check_ach
-        from core.relationship import get_relationship
-        affection, trust = get_relationship(character_id=_cid)
-        hour = datetime.now().hour
-        from core.db import get_chat_conn
-        with get_chat_conn(_cid) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(DISTINCT substr(timestamp,1,10)) as days FROM chat_history")
-            total_days = cursor.fetchone()["days"] or 0
-        unlocked = _check_ach(msg_count, consecutive_days, total_days, hour, affection, trust)
-        if unlocked:
-            for a in unlocked:
-                try:
-                    asyncio.run_coroutine_threadsafe(
-                        ws.send_text(json.dumps({"type": "achievement", "data": a})), loop
-                    )
-                except Exception as e:
-                    silent_exc("_check_achievements", e)
-    except Exception as e:
-        logger.warning(f"[成就] 检查失败: {e}")
 
 
 # ─── 小惊喜 ───
 
-def _maybe_surprise(ws, loop):
+def _maybe_surprise(ws, loop, character_id: int = 0):
     """后台随机触发小惊喜"""
     try:
         from core.relationship import get_relationship
-        affection, _ = get_relationship()
+        affection, _ = get_relationship(character_id=character_id)
         hour = datetime.now().hour
         last_surprise = get_config("_last_surprise", "")
         today = datetime.now().strftime("%Y-%m-%d")
@@ -173,27 +119,21 @@ def _maybe_surprise(ws, loop):
 
 # ─── 目标完成检查 ───
 
-def _check_goal_completion(user_message: str, character_id: int = 0):
-    """检查用户消息是否触发目标完成（per-character）"""
-    try:
-        from core.goal_tracker import check_goal_completion
-        check_goal_completion(user_message, character_id=character_id)
-    except Exception as e:
-        logger.warning(f"[目标检测] 异常: {e}")
+# (目标追踪功能已移除)
 
 
-def _run_demand_pattern_extraction():
+def _run_demand_pattern_extraction(character_id: int = 0):
     """后台：LLM 提炼用户需求模式（更新 demand_patterns.latent_need）"""
     try:
         from core.demand_analyzer import extract_patterns_via_llm
-        extract_patterns_via_llm()
+        extract_patterns_via_llm(character_id)
     except Exception as e:
         logger.warning(f"[需求模式] 提炼失败: {e}")
 
 
 # ─── RAG 上下文构建（KB 标题匹配 + 向量搜索）───
 
-def _build_rag_context(user_message: str, is_system: bool) -> tuple[str, str]:
+def _build_rag_context(user_message: str, is_system: bool, character_id: int = 0) -> tuple[str, str]:
     """构建 RAG 上下文：KB 标题提示 + 向量检索结果。
 
     Returns:
@@ -218,7 +158,7 @@ def _build_rag_context(user_message: str, is_system: bool) -> tuple[str, str]:
     rag_context = ""
     if not is_system and is_model_ready():
         try:
-            similar_docs = search_similar(user_message, top_k=3, include_metadata=True)
+            similar_docs = search_similar(user_message, top_k=3, include_metadata=True, character_id=character_id)
             kb_docs = search_knowledge_similar(user_message, top_k=3)
             if similar_docs:
                 RAG_THRESHOLD = 0.55
@@ -256,7 +196,4 @@ clean_dsml = _clean_dsml
 apply_background_update = _apply_background_update
 build_rag_context = _build_rag_context
 trigger_daily_evolution = _trigger_daily_evolution
-calc_consecutive_days = _calc_consecutive_days
-check_achievements = _check_achievements
 maybe_surprise = _maybe_surprise
-check_goal_completion = _check_goal_completion

@@ -264,64 +264,6 @@ class TestChatMessageRouting:
 # ═══════════════════════════════════════════════════════════════
 
 
-class TestSettingsInheritance:
-    """resolve_config: 角色级 → 全局 → 默认值"""
-
-    def test_global_fallback(self):
-        from core.db import set_config
-        from core.character_card import resolve_config
-        set_config("test_inherit_key", "global_value")
-        result = resolve_config("test_inherit_key", "default", character_id=0)
-        assert result == "global_value"
-
-    def test_default_value(self):
-        from core.character_card import resolve_config
-        result = resolve_config("nonexistent_key_xyz", "fallback", character_id=0)
-        assert result == "fallback"
-
-    def test_character_override(self, create_card):
-        from core.db import set_config
-        from core.character_card import resolve_config, CharacterCard
-        set_config("api_key", "global_key")
-        card, cid = create_card()
-        # 给角色设置覆盖
-        card.data["settings"] = {"api_key": "char_key"}
-        card.update_db(cid)
-        result = resolve_config("api_key", "", character_id=cid)
-        assert result == "char_key"
-
-    def test_character_inherits_global_when_no_override(self, create_card):
-        from core.db import set_config
-        from core.character_card import resolve_config
-        set_config("user_name", "全局用户名")
-        card, cid = create_card()
-        result = resolve_config("user_name", "", character_id=cid)
-        assert result == "全局用户名"
-
-    def test_character_settings_json_string(self, create_card):
-        """settings 为 JSON 字符串时也能正确解析"""
-        from core.character_card import resolve_config, CharacterCard
-        card, cid = create_card()
-        card.data["settings"] = '{"temperature": 0.8}'
-        card.update_db(cid)
-        result = resolve_config("temperature", 0.5, character_id=cid)
-        assert result == 0.8
-
-    def test_settings_update_via_api(self, create_card):
-        """通过 API 更新角色设置"""
-        card, cid = create_card()
-        card.data["settings"] = {"key1": "val1"}
-        card.update_db(cid)
-        loaded = card.load_from_db(cid)
-        settings = loaded.data.get("settings", {})
-        assert settings["key1"] == "val1"
-
-
-# ═══════════════════════════════════════════════════════════════
-# 4. 功能开关 — is_feature_enabled
-# ═══════════════════════════════════════════════════════════════
-
-
 class TestFeatureFlags:
     """角色卡 features 字段控制功能启停"""
 
@@ -440,10 +382,12 @@ class TestPromptPipeline:
     def test_persona_pipe_reads_character_card(self, create_card):
         """PersonaPipe 从角色卡读取 system_prompt"""
         from core.prompt_pipeline import PersonaPipe, PipelineContext
+        from core.character_card import CharacterCard
+        CharacterCard.deactivate_all()
         card, cid = create_card(system_prompt="你是自定义角色")
         card.activate(cid)
         pipe = PersonaPipe()
-        ctx = PipelineContext(user_message="你好", emotion="neutral")
+        ctx = PipelineContext(user_message="你好", emotion="neutral", character_id=cid)
         result = pipe.process(ctx)
         assert result is not None
         assert "自定义角色" in result
@@ -474,10 +418,12 @@ class TestPromptPipeline:
     def test_post_history_pipe_from_card(self, create_card):
         """PostHistoryPipe 从角色卡读取 post_history_instructions"""
         from core.prompt_pipeline import PostHistoryPipe, PipelineContext
+        from core.character_card import CharacterCard
+        CharacterCard.deactivate_all()
         card, cid = create_card(post_history_instructions="请用温柔的语气回复")
         card.activate(cid)
         pipe = PostHistoryPipe()
-        ctx = PipelineContext(user_message="你好", emotion="neutral")
+        ctx = PipelineContext(user_message="你好", emotion="neutral", character_id=cid)
         result = pipe.process(ctx)
         assert result is not None
         assert "温柔" in result

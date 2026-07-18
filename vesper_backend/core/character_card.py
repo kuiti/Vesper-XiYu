@@ -193,6 +193,51 @@ class CharacterCard:
     def description(self) -> str:
         return self.data.get("description", "")
 
+    @property
+    def first_mes(self) -> str:
+        return self.data.get("first_mes", "")
+
+    @property
+    def mes_example(self) -> str:
+        return self.data.get("mes_example", "")
+
+    @property
+    def personality(self) -> str:
+        return self.data.get("personality", "")
+
+    @property
+    def scenario(self) -> str:
+        return self.data.get("scenario", "")
+
+    @property
+    def post_history_instructions(self) -> str:
+        return self.data.get("post_history_instructions", "")
+
+    @property
+    def creator_notes(self) -> str:
+        return self.data.get("creator_notes", "")
+
+    @property
+    def tags(self) -> list:
+        return self.data.get("tags", [])
+
+    @property
+    def features(self) -> dict:
+        return self.data.get("features", {})
+
+    @property
+    def voice(self) -> dict:
+        return self.data.get("voice", {})
+
+    @property
+    def time_mode(self) -> str:
+        return self.data.get("time_mode", "real_time")
+
+    @property
+    def card_data(self) -> dict:
+        """兼容旧代码中 card.card_data 的访问，等效于 card.data"""
+        return self.data
+
     # ─── 导入/导出 ───
 
     def to_json(self, indent: int = 2) -> str:
@@ -467,6 +512,12 @@ class CharacterCard:
         if not active:
             return False
         features = active.data.get("features", {})
+        if isinstance(features, str):
+            try:
+                import json
+                features = json.loads(features)
+            except (json.JSONDecodeError, ValueError):
+                return False
         if isinstance(features, dict):
             return features.get(feature, False)
         return False

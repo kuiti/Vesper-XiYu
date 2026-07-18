@@ -345,7 +345,7 @@ async def full_reset(data: FullResetConfirm = FullResetConfirm()):
         clear_chat_history(character_id=cid)
         with get_chat_conn(cid) as conn:
             cursor = conn.cursor()
-            for table in ["goal_tracking", "pending_goals", "relationship",
+            for table in ["relationship",
                            "emotion_daily", "emotion_log", "ai_personality_traits",
                            "tiered_summary", "death_archive", "user_profile",
                            "memory", "entities", "knowledge_graph",
@@ -358,9 +358,9 @@ async def full_reset(data: FullResetConfirm = FullResetConfirm()):
     # 3. 清除主库全局表
     with get_conn() as conn:
         cursor = conn.cursor()
-        for table in ["countdowns", "empathy_feedback", "favorites", "documents",
+        for table in [
                        "user_activity_stats", "proactive_response_log", "proactive_flags",
-                       "ai_diary", "achievements", "demand_patterns"]:
+                       "ai_diary", "demand_patterns"]:
             try:
                 cursor.execute(f"DELETE FROM {table}")
             except Exception as e:

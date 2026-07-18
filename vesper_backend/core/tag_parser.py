@@ -49,14 +49,14 @@ class TagExecutor:
     """执行解析出的标签指令，返回可选的 system 反馈"""
 
     @staticmethod
-    def execute(tag: dict) -> Optional[str]:
+    def execute(tag: dict, character_id: int = 0) -> Optional[str]:
         """执行单个标签，返回 system 反馈消息（None = 无需反馈）"""
         t = tag["type"]
         content = tag["content"]
         if t == "add":
-            return TagExecutor._add(content)
+            return TagExecutor._add(content, character_id=character_id)
         elif t == "search":
-            return TagExecutor._search(content)
+            return TagExecutor._search(content, character_id=character_id)
         elif t == "note":
             return TagExecutor._note(content)
         elif t == "todo":
@@ -64,26 +64,26 @@ class TagExecutor:
         return None
 
     @staticmethod
-    def execute_all(tags: list[dict]) -> list[dict]:
+    def execute_all(tags: list[dict], character_id: int = 0) -> list[dict]:
         """执行所有标签，返回每条的执行结果"""
         results = []
         for tag in tags:
             try:
-                feedback = TagExecutor.execute(tag)
+                feedback = TagExecutor.execute(tag, character_id=character_id)
                 results.append({**tag, "success": True, "feedback": feedback})
             except Exception as e:
                 results.append({**tag, "success": False, "feedback": str(e)})
         return results
 
     @staticmethod
-    def _add(content: str) -> str:
+    def _add(content: str, character_id: int = 0) -> str:
         """保存记忆 —— 对应 declare_memory_intent"""
-        from core.db import get_conn
+        from core.db import get_chat_conn
         import hashlib
 
         summary = content
         fact_hash = hashlib.md5(summary.encode()).hexdigest()
-        with get_conn() as conn:
+        with get_chat_conn(character_id) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id FROM user_profile WHERE key = ?", (f"_fact_{fact_hash}",))
             if cursor.fetchone():
@@ -106,12 +106,12 @@ class TagExecutor:
         return f"已记住：{content}"
 
     @staticmethod
-    def _search(keyword: str) -> str:
+    def _search(keyword: str, character_id: int = 0) -> str:
         """搜索记忆 —— 对应 search_memory"""
-        from core.db import get_conn
+        from core.db import get_chat_conn
         # 转义 LIKE 通配符
         safe_kw = keyword.replace('%', '\\%').replace('_', '\\_')
-        with get_conn() as conn:
+        with get_chat_conn(character_id) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT value FROM user_profile WHERE key LIKE '_fact_%' AND value LIKE ? ESCAPE '\\' ORDER BY extracted_at DESC LIMIT 5",
@@ -183,7 +183,7 @@ def process_reply_tags(ai_reply: str, tool_calls_used: bool = False) -> tuple:
         return TagParser.strip_tags(ai_reply), []
 
     # 执行标签
-    results = TagExecutor.execute_all(tags)
+    results = TagExecutor.execute_all(tags, character_id=0)
     logger.info(f"[TagParser] 执行了 {len(results)} 个标签: {[r['type'] for r in results]}")
 
     # 收集非空反馈

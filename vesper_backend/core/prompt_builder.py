@@ -412,14 +412,12 @@ def _get_few_shot_examples(ai_name, user_name, tone):
     return "\n".join(lines)
 
 
-def _get_continuity_bridge() -> str:
+def _get_continuity_bridge(character_id: int = 0) -> str:
     """生成对话连续感提示——让 AI 感觉是在延续对话，而非每次重新开始"""
     from datetime import datetime as _dt
     try:
         from core.db import get_chat_conn
-        from core.character_card import CharacterCard
-        _card = CharacterCard.get_active()
-        _cid = _card._db_id if _card and hasattr(_card, '_db_id') else 0
+        _cid = character_id
         conn = get_chat_conn(_cid)
         cursor = conn.cursor()
         cursor.execute(
@@ -452,11 +450,9 @@ def _get_continuity_bridge() -> str:
     try:
         from datetime import datetime as _dt2
         from core.db import get_chat_conn
-        from core.character_card import CharacterCard
-        _card = CharacterCard.get_active()
-        _cid = _card._db_id if _card and hasattr(_card, '_db_id') else 0
+        _cid = character_id
         _today = _dt2.now().strftime("%Y-%m-%d")
-        _c2 = get_chat_conn(_cid)
+        _c2 = get_chat_conn(character_id)
         _c2.row_factory = None
         _c2.execute("SELECT COUNT(DISTINCT ROUND(julianday(timestamp) * 1440 / 30)) FROM chat_history WHERE role='user' AND timestamp >= ?", (_today,))
         _today_sessions = _c2.fetchone()[0] or 1

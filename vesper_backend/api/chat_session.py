@@ -29,8 +29,8 @@ from core.vector_store import add_message_vector, add_sentence_vectors, is_model
 from core.demand_analyzer import save_demand_record, get_user_patterns
 from api.chat_tasks import (
     _clean_dsml, _apply_background_update,
-    _trigger_daily_evolution, _calc_consecutive_days,
-    _maybe_surprise, _check_goal_completion, _build_rag_context,
+    _trigger_daily_evolution,
+    _maybe_surprise, _build_rag_context,
     _run_demand_pattern_extraction,
 )
 from api.chat_parser import ThinkingParser
@@ -661,10 +661,10 @@ class ChatSession:
             from core.mention_tracker import record_mention
             _background_thread_pool.submit(record_mention, msg, self._character_id)
 
-        # 反讽惩罚：每 50 条检查反讽率 → agreeableness 微降
-        if self._session_msg_count % 50 == 0 and self._session_msg_count > 0:
-            from core.emotion_evolution import _rule_sarcasm_penalty
-            _background_thread_pool.submit(_rule_sarcasm_penalty, self._character_id)
+            # 反讽惩罚：每 50 条检查反讽率 → agreeableness 微降
+            if self._session_msg_count % 50 == 0 and self._session_msg_count > 0:
+                from core.emotion_evolution import _rule_sarcasm_penalty
+                _background_thread_pool.submit(_rule_sarcasm_penalty, self._character_id)
 
         except Exception:
             pass
@@ -754,7 +754,7 @@ class ChatSession:
             pc += "\n" + fc
         elif fc:
             pc = fc
-        ups = get_user_patterns()
+        ups = get_user_patterns(character_id=self._character_id)
         sm = get_config("sentence_mode", "auto")
 
         provider = get_provider()
@@ -976,6 +976,7 @@ class ChatSession:
         await ws.send_text(json.dumps({"type": "done"}))
         set_config("_dropped_context", "")
         await self._save_response(c, True)
+        self._run_post_response_tasks(c)
 
     async def _process_reply(self, full_reply, parser, fallback):
         """Parse tags, save response, trigger background tasks"""
@@ -1056,81 +1057,12 @@ class ChatSession:
             await ws.send_text(json.dumps({"type": "toast", "content": content.strip()[:120]}))
 
         if not self._is_system:
-            mc = increment_msg_counter(character_id=self._character_id)
-            loop = asyncio.get_running_loop()
-            # 用户活跃统计
-            _background_thread_pool.submit(record_user_activity_hour)
-            _background_thread_pool.submit(_trigger_daily_evolution)
-            _background_thread_pool.submit(_calc_consecutive_days, mc, self.ws, loop)
-            _background_thread_pool.submit(_maybe_surprise, self.ws, loop)
-            _background_thread_pool.submit(_check_goal_completion, content, self._character_id)
-            # 里程碑检查（需开启 milestones feature）
-            try:
-                from core.character_card import CharacterCard
-                if CharacterCard.is_feature_enabled("milestones"):
-                    from core.relationship import check_milestone
-                    char_name = ""
-                    active = CharacterCard.get_active()
-                    if active:
-                        char_name = active.name
-                    milestone = check_milestone(char_name, character_id=self._character_id)
-                    if milestone:
-                        _background_thread_pool.submit(add_chat_message, "system", milestone, character_id=self._character_id)
-            except Exception:
-                pass
+            self._run_post_response_tasks(content)
+    def _run_post_response_tasks(self, content: str):
+        """Shared post-response background tasks (called by normal and tool-call paths)."""
 
-            # 三级摘要后台任务（per-character：衰减/摘要生成/关键词/反思/巩固）
-            try:
-                from core.summary_engine import run_background_tasks
-                _background_thread_pool.submit(run_background_tasks, mc, self.user_message, self._character_id)
-            except Exception as e:
-                silent_exc("后台摘要任务", e)
-            # 记忆整理（每 8 轮自动提取事实，per-character）
-            if mc > 0 and mc % 8 == 0:
-                _background_thread_pool.submit(_run_memory_curation, self.history, self._character_id)
-            # 共同经历检测
-            try:
-                from core.shared_memory import detect_moment, record_shared_moment
-                moment_type = detect_moment(self.user_message, content)
-                if moment_type:
-                    _background_thread_pool.submit(record_shared_moment, content[:100], moment_type)
-            except Exception as e:
-                silent_exc("共同经历检测", e)
-            if parser and hasattr(parser, "extract_demand"):
-                d = parser.extract_demand()
-                if d and d.get("level", "") not in ("LITERAL", "UNKNOWN"):
-                    _background_thread_pool.submit(save_demand_record, d, self.user_message)
-            _background_thread_pool.submit(self._extract_knowledge_graph, content)
-        # 每轮提取实体 + 用语
-        try:
-            from core.memory_provider import MemoryProvider
-            provider = MemoryProvider()
-            provider.extract_entities_from_text(self.user_message, self._character_id)
-            provider.extract_vocabulary_from_text(self.user_message, self._character_id)
-        except Exception as e:
-            silent_exc("实体/用语提取", e)
-        # 结论分析：每 30 条消息执行一次（AI 对用户行为模式的总结）
-        if self._session_msg_count > 0 and self._session_msg_count % 30 == 0:
-            try:
-                from core.conclusion_engine import run_conclusion_analysis
-                _background_thread_pool.submit(run_conclusion_analysis)
-            except Exception as e:
-                silent_exc("结论分析", e)
-            # TempMemory 批量巩固：每 30 条消息后台提取一次（不用等到每日 4:30）
-            try:
-                from core.memory_provider import batch_extract_memories
-                _background_thread_pool.submit(batch_extract_memories, self._character_id, 5)
-            except Exception as e:
-                silent_exc("TempMemory 巩固", e)
-        # 需求模式提炼：每 50 条消息执行一次（LLM 分析用户深层需求）
-        if self._session_msg_count > 0 and self._session_msg_count % 50 == 0:
-            _background_thread_pool.submit(_run_demand_pattern_extraction)
-        # TempMemory：暂存本轮对话供后续批量巩固
-        try:
-            from core.memory_provider import save_temp_conversation
-            _background_thread_pool.submit(save_temp_conversation, self._character_id, self.user_message, content)
-        except Exception as e:
-            silent_exc("TempMemory 暂存", e)
+        if not self._is_system:
+            self._run_post_response_tasks(content)
 
     async def _save_response(self, content, is_tool_response=False):
         """Save AI response to chat_history and vector store"""

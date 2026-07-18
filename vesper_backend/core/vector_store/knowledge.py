@@ -65,7 +65,7 @@ def delete_document_vectors(doc_id):
         logger.warning(f"[知识库删除] 异常: {e}")
 
 
-def add_profile_vectors():
+def add_profile_vectors(character_id: int = 0):
     """将 user_profile 中有意义的画像写入向量库"""
     if not is_model_ready():
         return

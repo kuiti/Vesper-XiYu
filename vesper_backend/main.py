@@ -23,7 +23,6 @@ _startup_stage = "importing"
 
 # ─── 所有路由延迟加载列表 ───
 _ALL_ROUTERS = [
-    ("api.habits", "router"),
     ("api.settings", "router"),
     ("api.test", "router"),
     ("api.history", "router"),
@@ -36,7 +35,6 @@ _ALL_ROUTERS = [
     ("api.export", "router"),
     ("api.user_persona", "router"),
     ("api.avatar", "router"),
-    ("api.countdowns", "router"),
     ("api.lorebook", "router"),
     ("api.migrate", "router"),
     ("api.split_sentences", "router"),
@@ -52,7 +50,6 @@ _ALL_ROUTERS = [
     ("api.emotion", "router"),
     ("api.relationship", "router"),
     ("api.demand", "router"),
-    ("api.goal", "router"),
     ("api.favorites", "router"),
     ("api.stats", "router"),
     ("api.report", "router"),
@@ -65,11 +62,11 @@ _ALL_ROUTERS = [
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
 HAS_FRONTEND = os.path.exists(FRONTEND_DIR)
 
-API_PREFIXES = ("settings", "chat", "countdowns",
+API_PREFIXES = ("settings", "chat",
                 "memory", "summary", "search", "rag", "export", "avatar",
                 "migrate", "test", "tts", "stt", "ws", "avatars", "api",
                 "knowledge", "mcp", "profile", "vision", "cloud", "text",
-                "emotion", "relationship", "demand", "goal", "favorites",
+                "emotion", "relationship", "demand", "favorites",
                 "history", "split_sentences", "report", "stats")
 
 

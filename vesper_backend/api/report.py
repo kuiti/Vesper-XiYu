@@ -35,9 +35,6 @@ async def monthly_report(month: str = Query(default="")):
     peak = cursor.fetchone()
     peak_day = f"{peak['d']} ({peak['cnt']}条)" if peak else "无"
     # 成就
-    cursor.execute("SELECT name FROM achievements WHERE unlocked_at >= ? AND unlocked_at < date(?, '+1 month')", (start, start))
-    achievements = [r["name"] for r in cursor.fetchall()]
-    # 关系变化
     cursor.execute("SELECT affection_after, trust_after FROM emotion_log WHERE timestamp >= ? AND timestamp < date(?, '+1 month') ORDER BY timestamp DESC LIMIT 1", (start, start))
     rel = cursor.fetchone()
 
@@ -57,11 +54,9 @@ async def monthly_report(month: str = Query(default="")):
         f"- 正面：{pos} | 负面：{neg} | 中性：{neu}",
         f"",
     ]
-    if achievements:
-        lines.append(f"## 本月解锁成就\n- " + "\n- ".join(achievements) + "\n")
     if rel:
         lines.append(f"## 关系状态\n- 好感度：{rel['affection_after']} | 信任度：{rel['trust_after']}\n")
 
     lines.append(f"\n> 报告由 {ai_name} 自动生成 · {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-    return {"ok": True, "content": "\n".join(lines), "month": month, "stats": {"total": total, "active_days": active_days, "pos": pos, "neg": neg, "neu": neu, "achievements": achievements}}
+    return {"ok": True, "content": "\n".join(lines), "month": month, "stats": {"total": total, "active_days": active_days, "pos": pos, "neg": neg, "neu": neu}}

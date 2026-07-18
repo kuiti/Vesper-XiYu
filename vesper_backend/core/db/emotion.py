@@ -11,15 +11,22 @@ logger = logging.getLogger(__name__)
 # ========== 情绪日志清理 ==========
 
 def cleanup_emotion_log(days: int = 90):
-    """清理 N 天前的情绪日志，防止无限增长"""
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-        cursor.execute("DELETE FROM emotion_log WHERE timestamp < ?", (cutoff,))
-        deleted = cursor.rowcount
-    if deleted > 0:
-        logger.info(f"[清理] 删除 {deleted} 条 {days} 天前的 emotion_log")
-    return deleted
+    """清理 N 天前的情绪日志，防止无限增长（per-character，遍历各角色库）"""
+    from . import get_chat_conn
+    from core.emotion_evolution import _enumerate_character_ids
+    total_deleted = 0
+    cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+    for cid in _enumerate_character_ids():
+        try:
+            with get_chat_conn(cid) as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM emotion_log WHERE timestamp < ?", (cutoff,))
+                total_deleted += cursor.rowcount
+        except Exception as e:
+            logger.warning(f"[清理] 角色{cid} emotion_log 清理失败: {e}")
+    if total_deleted > 0:
+        logger.info(f"[清理] 删除 {total_deleted} 条 {days} 天前的 emotion_log")
+    return total_deleted
 
 
 # ========== 用户活跃时段统计 ==========

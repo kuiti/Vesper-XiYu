@@ -42,7 +42,7 @@ def add_sentence_vectors(msg_id: int, text: str, role: str = "user", character_i
                             documents=[sentence]
                         )
                         importance = calculate_importance(sentence, role)
-                        set_memory_importance(existing_id, importance, now)
+                        set_memory_importance(existing_id, importance, now, character_id=character_id)
                         logger.info(f"[去重] 更新: {existing_doc[:30]} → {sentence[:30]}")
                     else:
                         logger.info(f"[去重] 跳过: {sentence[:30]} (已有更长版本)")
@@ -51,7 +51,7 @@ def add_sentence_vectors(msg_id: int, text: str, role: str = "user", character_i
                 cursor.execute("INSERT INTO sentence_index (character_id, msg_id, seq, content, created_at) VALUES (?, ?, ?, ?, ?)",
                               (character_id, msg_id, seq, sentence, now))
                 importance = calculate_importance(sentence, role)
-                set_memory_importance(sid, importance, now)
+                set_memory_importance(sid, importance, now, character_id=character_id)
                 collection.upsert(
                     ids=[sid],
                     embeddings=[embedding],
@@ -64,44 +64,46 @@ def add_sentence_vectors(msg_id: int, text: str, role: str = "user", character_i
     reset_bm25_cache()
 
 
-def add_message_vector(msg_id: str, text: str, metadata: dict = None):
+def add_message_vector(msg_id: str, text: str, metadata: dict = None, character_id: int = 0):
     if not is_model_ready():
         return
-    # 过滤短消息噪声：少于5个字符的消息不建立向量索引
     if not text or len(text.strip()) < 5:
         return
     model = get_embedding_model()
     try:
         embedding = model.encode(text).tolist()
         collection = get_collection()
+        meta = dict(metadata or {})
+        meta["character_id"] = character_id
+        meta.setdefault("text", text[:200])
         collection.upsert(
-            ids=[msg_id],
+            ids=[f"c{character_id}_{msg_id}"],
             embeddings=[embedding],
-            metadatas=[metadata or {"text": text[:200]}],
+            metadatas=[meta],
             documents=[text]
         )
     except Exception as e:
         logger.warning(f"向量索引失败（{msg_id}）：{str(e)}")
-    # 新消息写入后刷新 BM25 缓存
     reset_bm25_cache()
 
 
-def add_memory_vector(key: str, value: str, meta: dict = None) -> bool:
-    """将 memory 表的一条记录写入向量库"""
+def add_memory_vector(key: str, value: str, meta: dict = None, character_id: int = 0) -> bool:
+    """将 memory 表的一条记录写入向量库（per-character 隔离）"""
     if not is_model_ready() or not value or len(value.strip()) < 5:
         return False
     try:
         model = get_embedding_model()
         embedding = model.encode(value).tolist()
         collection = get_collection("memory_store")
+        meta = dict(meta or {})
+        meta["character_id"] = character_id
+        meta.setdefault("key", key)
+        meta.setdefault("type", "memory")
+        meta.setdefault("text", value[:200])
         collection.upsert(
-            ids=[f"mem_{key}"],
+            ids=[f"mem_{character_id}_{key}"],
             embeddings=[embedding],
-            metadatas=[{
-                "key": key,
-                "type": meta.get("type", "memory") if meta else "memory",
-                "text": value[:200],
-            }],
+            metadatas=[meta],
             documents=[value]
         )
         return True
@@ -117,7 +119,7 @@ def delete_message_vectors(msg_id, character_id: int = 0):
     try:
         # 主集合：chat_memory 以 msg_id 为 id
         main = get_collection()
-        main.delete(ids=[str(msg_id)])
+        main.delete(ids=[f"c{character_id}_{msg_id}"])
     except Exception as e:
         logger.warning(f"[向量删除] chat_memory: {e}")
     try:

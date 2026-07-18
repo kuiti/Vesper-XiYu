@@ -1,6 +1,6 @@
 """记忆管理 API — 提供手动记忆、记忆保险箱、AI日记、今日学习等功能（per-character）。"""
 from fastapi import APIRouter, Query
-from core.db import get_memory, set_memory, delete_memory, get_chat_conn
+from core.db import get_memory, set_memory, delete_memory, get_chat_conn, get_conn
 from pydantic import BaseModel
 from typing import Dict
 import json as _json

@@ -58,9 +58,8 @@ async def proactive_loop(
                     # 用户没回应上一条 → 检查是否为连续（2条未回复消息）
                     try:
                         from core.db import get_chat_conn
-                        from core.character_card import CharacterCard
-                        _card = CharacterCard.get_active()
-                        _cid = _card._db_id if _card and hasattr(_card, '_db_id') else 0
+                        # character_card import removed (use character_id param)
+                        _cid = character_id
                         _chat_conn = get_chat_conn(_cid)
                         _recent = _chat_conn.execute(
                             "SELECT role FROM chat_history ORDER BY id DESC LIMIT 2"
@@ -122,7 +121,7 @@ async def proactive_loop(
         pass
 
 
-async def diary_scheduler():
+async def diary_scheduler(character_id: int = 0):
     """每天 23:00 自动生成 AI 日记"""
     last_generated = ""
     while True:
@@ -140,9 +139,7 @@ async def diary_scheduler():
 
             ai_name = get_config("ai_name", "夕语")
             from core.db import get_chat_conn
-            from core.character_card import CharacterCard
-            _card = CharacterCard.get_active()
-            _cid = _card._db_id if _card and hasattr(_card, '_db_id') else 0
+            _cid = character_id
             _chat_conn = get_chat_conn(_cid)
             cursor = _chat_conn.cursor()
             cursor.execute("SELECT COUNT(*) as cnt FROM chat_history WHERE timestamp >= ?", (today,))
@@ -160,7 +157,7 @@ async def diary_scheduler():
             result = call_llm(prompt=prompt, temperature=0.8, max_tokens=200, timeout=15)
             if result:
                 mood = "温暖"
-                save_diary_entry(today, result, mood)
+                save_diary_entry(today, result, mood, character_id=character_id)
                 logger.info(f"[AI日记] 已自动生成 {today}")
         except Exception as e:
             logger.error(f"[AI日记] 自动生成失败: {e}")

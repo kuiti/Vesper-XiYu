@@ -318,7 +318,7 @@ def search_similar(query: str, top_k: int = 3, include_metadata: bool = False, c
             _update_access_batch(mmr_result)
             # 递增未被选中的候选的忽略计数（记忆退休机制）
             mmr_ids = {
-                f"s_{m[2]['msg_id']}_{m[2].get('seq', 0)}"
+                f"s_{m[2].get('character_id', 0)}_{m[2]['msg_id']}_{m[2].get('seq', 0)}"
                 for m in mmr_result if m[2] and m[2].get("msg_id")
             }
             ignored_ids = []
@@ -366,7 +366,7 @@ def search_knowledge_similar(query, top_k=5):
     return []
 
 
-def search_memories(query: str, top_k: int = 5) -> list[dict]:
+def search_memories(query: str, top_k: int = 5, character_id: int = 0) -> list[dict]:
     """向量检索记忆库（memory_store collection），返回 [{"key", "value", "score"}, ...]。
     若向量模型未就绪或库为空，降级为关键词检索。
     """
@@ -383,9 +383,11 @@ def search_memories(query: str, top_k: int = 5) -> list[dict]:
         if count == 0:
             return _keyword_search_memories(query, top_k)
 
+        _where = {"character_id": character_id} if character_id else None
         results = collection.query(
             query_embeddings=[query_emb],
             n_results=top_k,
+            where=_where,
             include=["documents", "distances", "metadatas"]
         )
         if not results or not results.get("documents") or not results["documents"][0]:

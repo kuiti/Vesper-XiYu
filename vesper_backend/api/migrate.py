@@ -5,15 +5,15 @@ logger = logging.getLogger(__name__)
 
 # 允许导入/导出的表名白名单
 _TABLE_WHITELIST = frozenset({
-    "user_profile", "ai_personality_traits", "goal_tracking",
+    "user_profile", "ai_personality_traits",
     "emotion_daily", "proactive_flags", "proactive_response_log",
     "chat_history", "config", "memory",
-    "countdowns", "presets", "tiered_summary",
+    "presets", "tiered_summary",
     "death_archive", "entities", "knowledge_graph",
-    "pending_goals", "empathy_feedback", "demand_patterns",
+    "empathy_feedback", "demand_patterns",
     "sentence_index", "memory_importance", "memory_history",
-    "user_activity_stats", "habits", "favorites", "ai_diary",
-    "achievements", "emotion_log", "lorebook", "user_personas",
+    "user_activity_stats", "favorites", "ai_diary",
+    "emotion_log", "lorebook", "user_personas",
     "characters_v2", "user_conclusions", "user_vocabulary",
     "shared_moments", "story_arcs",
 })
@@ -31,8 +31,9 @@ from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks, Request
 from fastapi.responses import JSONResponse
 from core.db import (
+    get_chat_conn,
     get_conn, get_memory, get_all_chat_messages,
-    get_countdowns, get_presets,
+    get_presets,
     get_last_summary, set_config, set_memory, save_preset,
     add_summary, reset_active_memory, reset_msg_counter, get_active_tiered_summaries, get_death_archive, get_msg_counter,
     add_tiered_summary
@@ -64,6 +65,37 @@ def _query_all(table: str) -> list:
         return [dict(r) for r in cursor.fetchall()]
 
 
+def _collect_per_char_data() -> dict:
+    """收集所有角色库的 per-character 数据。"""
+    result = {}
+    try:
+        from core.character_card import CharacterCard
+        all_cids = {0}
+        for card_info in CharacterCard.list_all():
+            cid = card_info.get("id", 0) if isinstance(card_info, dict) else 0
+            if cid:
+                all_cids.add(cid)
+        for cid in sorted(all_cids):
+            try:
+                char_data = {
+                    "chat_history": get_all_chat_messages(character_id=cid),
+                    "tiered_summaries": get_active_tiered_summaries(character_id=cid),
+                    "memory": get_memory(character_id=cid),
+                    "death_archive": get_death_archive(character_id=cid),
+                }
+                try:
+                    from core.db.misc import get_diary_entries
+                    char_data["diary"] = get_diary_entries(limit=100, character_id=cid)
+                except Exception:
+                    char_data["diary"] = []
+                result[str(cid)] = char_data
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return result
+
+
 def _collect_export_data() -> dict:
     """收集导出数据，返回纯 dict（供 cloud.py 内部调用）"""
     with get_conn() as conn:
@@ -85,7 +117,7 @@ def _collect_export_data() -> dict:
         "config": config,
         "memory": get_memory(),
         "chat_history": get_all_chat_messages(),
-        "countdowns": get_countdowns(),
+        "chat_history_per_char": _collect_per_char_data(),
         "presets": get_presets(),
         "last_summary": get_last_summary(),
         "tiered_summaries": get_active_tiered_summaries(),
@@ -95,12 +127,9 @@ def _collect_export_data() -> dict:
         # 新增表
         "user_profile": _query_all("user_profile"),
         "ai_personality_traits": _query_all("ai_personality_traits"),
-        "goal_tracking": _query_all("goal_tracking"),
-        "pending_goals": _query_all("pending_goals"),
         "empathy_feedback": _query_all("empathy_feedback"),
         "emotion_log": _query_all("emotion_log"),
         "emotion_daily": _query_all("emotion_daily"),
-        "achievements": _query_all("achievements"),
         "favorites": _query_all("favorites"),
         "ai_diary": _query_all("ai_diary"),
         "demand_patterns": _query_all("demand_patterns"),
@@ -186,14 +215,6 @@ async def import_all(request: Request, file: UploadFile = File(...), bg: Backgro
             reset_msg_counter()
             reset_active_memory()
 
-        # 恢复 countdowns（单连接）
-        with get_conn() as conn:
-            cursor = conn.cursor()
-
-            cursor.execute("DELETE FROM countdowns")
-            for c in data.get("countdowns", []):
-                cursor.execute("INSERT INTO countdowns (name, target_date) VALUES (?, ?)",
-                               (c["name"], c["target"]))
 
         # 恢复 presets
         for name, preset_data in data.get("presets", {}).items():
@@ -241,8 +262,8 @@ async def import_all(request: Request, file: UploadFile = File(...), bg: Backgro
 
         # 恢复新增表（通用方式：从数据推断列名，逐表处理）
         _extra_tables = [
-            "user_profile", "ai_personality_traits", "goal_tracking", "pending_goals",
-            "emotion_log", "emotion_daily", "achievements", "favorites", "ai_diary",
+            "user_profile", "ai_personality_traits",
+            "emotion_log", "emotion_daily", "favorites", "ai_diary",
             "demand_patterns", "empathy_feedback", "relationship", "proactive_flags",
             "user_activity_stats", "sentence_index",
             # 本轮新增
@@ -290,16 +311,13 @@ async def import_all(request: Request, file: UploadFile = File(...), bg: Backgro
         "message": "数据已恢复，请手动重建向量索引",
         "restored": {
             "chat_messages": len(data.get("chat_history", [])),
-            "countdowns": len(data.get("countdowns", [])),
             "presets": len(data.get("presets", {})),
             "memories": len(data.get("memory", {})),
             "tiered_summaries": len(data.get("tiered_summaries", [])),
             "death_archive": len(data.get("death_archive", [])),
             "user_profile": len(data.get("user_profile", [])),
             "ai_personality_traits": len(data.get("ai_personality_traits", [])),
-            "goal_tracking": len(data.get("goal_tracking", [])),
             "emotion_log": len(data.get("emotion_log", [])),
-            "achievements": len(data.get("achievements", [])),
             "ai_diary": len(data.get("ai_diary", [])),
             "sentence_index": len(data.get("sentence_index", [])),
         }

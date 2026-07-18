@@ -164,3 +164,16 @@ def set_char_config(key: str, value, character_id: int = 0):
                        (key, value, datetime.now().isoformat()))
     cache_key = f"char_{character_id}_{key}"
     _config_cache.pop(cache_key, None)
+
+
+def resolve_config(key: str, default=None, character_id: int = 0):
+    """三级配置查询链：角色私有配置 → 全局配置 → 默认值。
+
+    用于需要在角色级别覆盖全局设置的场景（如 api_key、api_provider）。
+    """
+    if character_id:
+        val = get_char_config(key, character_id)
+        if val is not None:
+            return val
+    val = get_config(key)
+    return val if val is not None else default

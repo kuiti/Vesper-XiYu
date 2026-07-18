@@ -134,7 +134,7 @@ async def _diary_generate_job():
         result = generate_diary_content(prompt)
 
         if result:
-            save_diary_entry(today, result, detected_mood)
+            save_diary_entry(today, result, detected_mood, character_id=cid)
             logger.info(f"[AI日记] 已生成 {today} 心情:{detected_mood} ({len(result)}字)")
         else:
             logger.warning(f"[AI日记] 生成结果为空，跳过")

@@ -8,12 +8,12 @@
 
 import logging
 from datetime import datetime
-from core.db import get_conn
+from core.db import get_chat_conn
 
 logger = logging.getLogger(__name__)
 
 
-def save_demand_record(demand: dict, user_message: str):
+def save_demand_record(demand: dict, user_message: str, character_id: int = 0):
     """保存一次需求分析记录到 demand_patterns 表"""
     if not demand or not user_message:
         return
@@ -23,9 +23,9 @@ def save_demand_record(demand: dict, user_message: str):
     trigger = user_message.strip()[:100]
     now = datetime.now().isoformat()
 
-    with get_conn() as conn:
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
-        # 检查是否已有相同 trigger_context + demand_level 的记录
+        # check for existing record
         cursor.execute(
             "SELECT id, frequency FROM demand_patterns WHERE trigger_context=? AND demand_level=?",
             (trigger, level)
@@ -43,9 +43,9 @@ def save_demand_record(demand: dict, user_message: str):
             )
 
 
-def get_user_patterns(limit: int = 10) -> list:
-    """获取高频需求模式（频率 >= 3），按频率降序"""
-    with get_conn() as conn:
+def get_user_patterns(limit: int = 10, character_id: int = 0) -> list:
+    """获取高频需求模式（频率 >= 3），按频率降序（per-character）"""
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT trigger_context, demand_level, latent_need, frequency FROM demand_patterns WHERE frequency >= 3 ORDER BY frequency DESC LIMIT ?",
@@ -55,11 +55,11 @@ def get_user_patterns(limit: int = 10) -> list:
     return [dict(r) for r in rows]
 
 
-def extract_patterns_via_llm():
+def extract_patterns_via_llm(character_id: int = 0):
     """后台任务：用 LLM 分析 demand_patterns 原始记录，提炼用户行为规律
-    将提炼结果更新到 existing records 的 latent_need 字段
+    将提炼结果更新到 existing records 的 latent_need 字段（per-character）
     """
-    with get_conn() as conn:
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         cursor.execute(
             "SELECT id, trigger_context, demand_level, emotion_analysis, frequency FROM demand_patterns WHERE frequency >= 3"
@@ -96,7 +96,7 @@ def extract_patterns_via_llm():
 
     # 更新 latent_need
     now = datetime.now().isoformat()
-    with get_conn() as conn:
+    with get_chat_conn(character_id) as conn:
         cursor = conn.cursor()
         for p in patterns:
             trigger = p.get("trigger_context", "")

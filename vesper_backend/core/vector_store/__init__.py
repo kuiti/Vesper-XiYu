@@ -54,7 +54,7 @@ from core.retry import silent_exc
 logger = logging.getLogger(__name__)
 
 
-def rebuild_all_vectors(progress_callback=None):
+def rebuild_all_vectors(progress_callback=None, character_id: int = 0):
     """重建所有向量索引（安全模式：先写临时集合，成功后替换旧集合）"""
     if not _rebuild_lock.acquire(blocking=False):
         logger.warning("[向量重建] 已有重建任务在进行中，跳过")
@@ -63,7 +63,7 @@ def rebuild_all_vectors(progress_callback=None):
         from core.db import get_all_chat_messages
         import chromadb
 
-        messages = get_all_chat_messages()
+        messages = get_all_chat_messages(character_id=character_id)
         if not messages:
             return
         client = chromadb.PersistentClient(path=CHROMA_PATH)

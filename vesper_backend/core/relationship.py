@@ -9,7 +9,7 @@ AI 情绪：由好感度和信任度共同决定，有更多变化
 import time
 import threading
 from datetime import datetime, timedelta
-from core.db import get_conn, get_chat_conn, get_config, set_config
+from core.db import get_conn, get_chat_conn, get_config, set_config, set_char_config
 import logging
 from core.retry import silent_exc
 logger = logging.getLogger(__name__)
@@ -532,7 +532,7 @@ def switch_relationship_mode(new_mode: str, character_id: int = 0) -> dict:
 
     # 写入新模式 + 冷却锁
     set_config("relationship_mode", new_mode)
-    set_config("_rel_mode_locked_until", (now + timedelta(days=1)).isoformat())
+    set_char_config("_rel_mode_locked_until", (now + timedelta(days=1)).isoformat())
 
     return {"ok": True, "mode": new_mode, "clamped": clamped, "clamp_reason": clamp_reason}
 
@@ -769,7 +769,7 @@ def reset_relationship(character_id: int = 0):
     conn.commit()
     invalidate_relationship_cache(character_id)
     # 模式/冷却/预钳值在主库 config（全局，不区分角色——已知限制）
-    set_config("_rel_mode_locked_until", "")
+    set_char_config("_rel_mode_locked_until", "")
     set_config("_rel_pre_clamp_affection", None)
     set_config("_rel_pre_clamp_trust", None)
     set_config("ai_background", "")

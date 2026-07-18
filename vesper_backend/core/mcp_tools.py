@@ -115,70 +115,6 @@ def _handle_declare_memory_intent(args: dict) -> str:
     return f"置信度过低({confidence})，未保存"
 
 
-def _handle_add_countdown(args: dict) -> str:
-    """添加倒计时"""
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO countdowns (name, target_date) VALUES (?, ?)",
-            (args["name"], args["target_date"]),
-        )
-        conn.commit()
-    return f"倒计时已添加: {args['name']}"
-
-
-def _handle_get_countdowns(args: dict) -> str:
-    """获取所有倒计时列表"""
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, target_date FROM countdowns ORDER BY target_date")
-        rows = cursor.fetchall()
-    if not rows:
-        return "暂无倒计时"
-    return "\n".join([f"- {r['name']} ({r['target_date']})" for r in rows])
-
-
-def _handle_delete_countdown(args: dict) -> str:
-    """删除指定倒计时"""
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM countdowns WHERE id = ?", (args["id"],))
-        conn.commit()
-    return "倒计时已删除"
-
-
-def _handle_add_goal(args: dict) -> str:
-    """添加目标"""
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO goal_tracking (goal_text, category, status, first_mentioned, last_mentioned) VALUES (?, ?, 'active', datetime('now'), datetime('now'))",
-            (args["goal_text"], args.get("category", "生活")),
-        )
-        conn.commit()
-    return f"目标已添加: {args['goal_text']}"
-
-
-def _handle_get_goals(args: dict) -> str:
-    """获取所有活跃目标"""
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, goal_text, category, status FROM goal_tracking WHERE status = 'active' ORDER BY created_at DESC LIMIT 20")
-        rows = cursor.fetchall()
-    if not rows:
-        return "暂无进行中的目标"
-    return "\n".join([f"- [{r['category']}] {r['goal_text']}" for r in rows])
-
-
-def _handle_delete_goal(args: dict) -> str:
-    """标记目标为已完成"""
-    with get_conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("UPDATE goal_tracking SET status = 'completed' WHERE id = ?", (args["id"],))
-        conn.commit()
-    return "目标已完成"
-
-
 def _handle_search_chat(args: dict) -> str:
     """搜索聊天记录"""
     query = args.get("query", "")
@@ -263,68 +199,6 @@ BUILTIN_TOOLS = [
             },
         },
         "required": ["kind", "summary", "confidence"],
-    },
-    {
-        "name": "add_countdown",
-        "description": "添加倒计时（距离某天还有多少天）",
-        "handler": _handle_add_countdown,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "name": {"type": "string", "description": "倒计时名称"},
-                "target_date": {"type": "string", "description": "目标日期（YYYY-MM-DD）"},
-            },
-        },
-        "required": ["name", "target_date"],
-        "commands": ["/countdown"],
-    },
-    {
-        "name": "get_countdowns",
-        "description": "获取所有倒计时列表",
-        "handler": _handle_get_countdowns,
-        "parameters": {"type": "object", "properties": {}},
-        "commands": ["/countdowns"],
-    },
-    {
-        "name": "delete_countdown",
-        "description": "删除倒计时",
-        "handler": _handle_delete_countdown,
-        "parameters": {
-            "type": "object",
-            "properties": {"id": {"type": "integer", "description": "倒计时ID"}},
-        },
-        "required": ["id"],
-    },
-    {
-        "name": "add_goal",
-        "description": "添加目标（学习目标、健身目标等）",
-        "handler": _handle_add_goal,
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "goal_text": {"type": "string", "description": "目标内容"},
-                "category": {"type": "string", "description": "类别（学习/健身/工作/生活等）"},
-            },
-        },
-        "required": ["goal_text"],
-        "commands": ["/goal"],
-    },
-    {
-        "name": "get_goals",
-        "description": "获取所有目标列表",
-        "handler": _handle_get_goals,
-        "parameters": {"type": "object", "properties": {}},
-        "commands": ["/goals"],
-    },
-    {
-        "name": "delete_goal",
-        "description": "删除目标",
-        "handler": _handle_delete_goal,
-        "parameters": {
-            "type": "object",
-            "properties": {"id": {"type": "integer", "description": "目标ID"}},
-        },
-        "required": ["id"],
     },
     {
         "name": "update_background",

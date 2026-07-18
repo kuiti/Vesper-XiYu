@@ -106,9 +106,9 @@ def check_topic_relevance(user_message):
 
 
 # ========== 提及检测 ==========
-def check_summary_mentions(user_message):
+def check_summary_mentions(user_message, character_id: int = 0):
     """检测用户消息中是否提及了已有摘要的关键信息，返回被提及的摘要列表。"""
-    active = db.get_active_tiered_summaries()
+    active = db.get_active_tiered_summaries(character_id=character_id)
     if not active:
         return []
 
@@ -167,7 +167,7 @@ def process_mentions(user_message, character_id: int = 0):
     """检测用户消息中的摘要提及，并为被提及的摘要增加寿命（per-character）。"""
     if not user_message or not user_message.strip():
         return
-    mentioned = check_summary_mentions(user_message)
+    mentioned = check_summary_mentions(user_message, character_id=character_id)
     for s in mentioned:
         cap = calculate_daily_cap(s["level"])
         if s["daily_boost"] >= cap:
@@ -316,13 +316,6 @@ def run_summary_pipeline(msg_count, user_message="", topic_relevant=True, charac
         )
         db.set_last_trigger_at(level, msg_count)
         logger.info(f"[摘要] Level {level} 生成成功，寿命 {lifespan:.1f} 天，重要性 {result['importance']}")
-
-        # 扫描新 key_points 中的目标/计划
-        try:
-            from core.goal_tracker import ingest_keypoints
-            ingest_keypoints(result.get("key_points", []), character_id=character_id)
-        except Exception as e:
-            logger.warning(f"[GoalTracker] 扫描异常: {e}")
 
 
 def run_decay_check(character_id: int = 0):

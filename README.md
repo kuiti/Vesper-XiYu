@@ -9,19 +9,18 @@
 ## 项目结构
 
 ```
-├── vesper_backend/          # 后端核心（FastAPI + 引擎）
-│   ├── api/                 # 46 个 API 端点
-│   ├── core/                # 75 个核心引擎模块
-│   ├── launcher/            # 桌面启动器
-│   ├── frontend/            # Vue 3 前端构建产物
-│   └── tests/               # 450 个测试用例
-├── vesper_frontend/         # Vue 3 前端源码
-├── vesper_new_frontend/     # 新版前端（开发中）
-├── vesper_mobile/           # 移动端
-└── .gitignore
+├── api/                     # 46 个 API 端点
+├── core/                    # 75 个核心引擎模块
+├── launcher/                # 桌面启动器
+├── frontend/                # Vue 3 前端构建产物
+├── tests/                   # 450 个测试用例
+├── launcher.py              # 桌面启动入口
+├── main.py                  # FastAPI 应用
+├── cloud_server.py          # 云端部署入口
+└── Vesper.spec              # PyInstaller 打包配置
 ```
 
-**主项目入口：** [`vesper_backend/`](vesper_backend/)
+**入口文件：** `launcher.py`（桌面）/ `main.py`（后端）
 
 ---
 
@@ -31,7 +30,7 @@
 
 ```bash
 git clone https://github.com/kuiti/Vesper-XiYu.git
-cd Vesper-XiYu/vesper_backend
+cd Vesper-XiYu
 ```
 
 ### 2. 虚拟环境
